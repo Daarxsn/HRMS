@@ -27,8 +27,8 @@ All health responses use `Cache-Control: no-store`. API responses include an `X-
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/attendance?from=YYYY-MM-DD&to=YYYY-MM-DD` | Own attendance and fixed-lunch work calculations |
-| POST | `/attendance/check-in` | GPS, approved WFH or current QR check-in |
-| POST | `/attendance/check-out` | GPS, WFH or current QR check-out |
+| POST | `/attendance/check-in` | Office GPS + office-network verification, or approved WFH check-in |
+| POST | `/attendance/check-out` | Office GPS + office-network verification, or WFH check-out |
 | POST | `/attendance/corrections` | Request a missing or incorrect attendance time |
 | POST | `/attendance/flex-requests` | Request a 9:00–10:30 flex start |
 | GET | `/attendance/exits/current` | Current temporary-exit record |
@@ -46,7 +46,7 @@ All health responses use `Cache-Control: no-store`. API responses include an `X-
 | POST | `/account/notifications/:id/read` | Mark an own notification read |
 | POST | `/account/notifications/read-all` | Mark all own notifications read |
 
-GPS check-in/check-out JSON uses `{ "method":"GPS", "latitude":18.5, "longitude":73.8, "accuracy":20 }`. The server measures distance from the currently stored office coordinates and radius. QR uses `{ "method":"QR", "qrToken":"..." }`; WFH uses `{ "method":"WFH" }` and requires an approved WFH record for the date.
+Office GPS check-in/check-out JSON uses `{ "method":"GPS", "latitude":18.5, "longitude":73.8, "accuracy":20 }`. The server verifies the request's network identity against the configured `OFFICE_NETWORK_IPS` allow-list and then measures distance from the currently stored office coordinates and radius. WFH uses `{ "method":"WFH" }` and requires an approved WFH record for the date.
 
 Leave JSON uses `{ "type":"SICK", "startDate":"YYYY-MM-DD", "endDate":"YYYY-MM-DD", "reason":"...", "attachmentId":"uuid" }`. A note is required for 3+ consecutive sick leave calendar days. Casual and sick leave draw from the same balance.
 
@@ -60,9 +60,7 @@ Leave JSON uses `{ "type":"SICK", "startDate":"YYYY-MM-DD", "endDate":"YYYY-MM-D
 | GET | `/admin/attendance?from=...&to=...` | Attendance and GPS verification records |
 | GET | `/admin/approvals` | Pending leave, WFH, attendance correction and flex requests |
 | POST | `/admin/approvals/:type/:id` | Approve/reject a request with an optional note |
-| GET/PUT | `/admin/settings` | Office coordinates/radius, GPS accuracy, QR expiry and WFH limit |
-| POST | `/admin/qr` | Create an expiring dynamic office QR |
-| DELETE | `/admin/qr/current` | Revoke active QR codes created by the signed-in administrator |
+| GET/PUT | `/admin/settings` | Office coordinates/radius, GPS accuracy and WFH limit |
 | GET | `/admin/reports.csv?from=...&to=...` | Download spreadsheet-compatible CSV |
 | GET | `/admin/audit` | Recent sign-in, attendance, approval and settings events |
 | GET | `/admin/temporary-exits?date=...` | Temporary exit/return record list |
@@ -70,6 +68,6 @@ Leave JSON uses `{ "type":"SICK", "startDate":"YYYY-MM-DD", "endDate":"YYYY-MM-D
 
 ## Database entities
 
-`employees`, `system_settings`, `attendance_records`, `qr_challenges`, `qr_challenge_uses`, `attendance_correction_requests`, `employee_schedule_exceptions`, `flex_start_requests`, `attachments`, `leave_requests`, `wfh_requests`, `temporary_exits`, `company_holidays`, `notifications`, `audit_logs`, and `schema_migrations`.
+`employees`, `system_settings`, `attendance_records`, `qr_challenges`, `qr_challenge_uses`, `attendance_correction_requests`, `employee_schedule_exceptions`, `flex_start_requests`, `attachments`, `leave_requests`, `wfh_requests`, `temporary_exits`, `company_holidays`, `notifications`, `audit_logs`, and `schema_migrations`. The QR tables are retained only as legacy schema from the pre-production implementation; the current application exposes no QR attendance flow.
 
 The API returns generic errors for unexpected server failures. Input is validated server-side; employee routes are scoped to the signed-in account, and admin routes check the administrator role before database operations.
