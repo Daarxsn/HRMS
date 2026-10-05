@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { query } from '../db.js';
+import { query, transaction } from '../db.js';
 import { authCookieOptions, signToken, audit } from '../security.js';
 import { requireAuth } from '../security.js';
 import { asyncRoute } from '../validate.js';
 
 const router = Router();
 const googleClient = new OAuth2Client();
-const userSelect = `id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date`;
+const userSelect = `id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date, session_version`;
 
 router.get('/demo-users', asyncRoute(async (req, res) => {
   if (process.env.NODE_ENV === 'production' || process.env.DEMO_AUTH_ENABLED !== 'true') return res.json({ enabled: false, users: [] });
@@ -50,7 +50,11 @@ router.post('/google', asyncRoute(async (req, res) => {
 }));
 
 router.get('/me', requireAuth, asyncRoute(async (req, res) => res.json({ user: req.user })));
-router.post('/logout', asyncRoute(async (req, res) => {
+router.post('/logout', requireAuth, asyncRoute(async (req, res) => {
+  await transaction(async (connection) => {
+    await connection.execute('UPDATE employees SET session_version = session_version + 1 WHERE id=:id', { id: req.user.id });
+  });
+  await audit({ actorId: req.user.id, action: 'AUTH_LOGOUT', entityType: 'employee', entityId: req.user.id, ipAddress: req.ip });
   res.clearCookie('fx_session', authCookieOptions()).json({ ok: true });
 }));
 
