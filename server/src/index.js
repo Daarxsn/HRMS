@@ -15,6 +15,9 @@ import adminRoutes from './routes/admin.js';
 import accountRoutes from './routes/account.js';
 
 const app = express();
+const APP_VERSION = process.env.APP_VERSION || '1.0.0';
+const BUILD_SHA = process.env.BUILD_SHA || 'development';
+const startedAt = Date.now();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');if(!process.env.GCS_BUCKET)throw new Error('Set GCS_BUCKET for private production attachments.');}
@@ -50,14 +53,14 @@ app.use(express.json({ limit:'100kb', strict:true }));
 app.use(cookieParser());
 app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:40,standardHeaders:true,legacyHeaders:false}));
 const healthPayload=(res,payload,status=200)=>{res.setHeader('Cache-Control','no-store');res.status(status).json(payload);};
-app.get('/api/health/live',(req,res)=>healthPayload(res,{status:'ok',service:'falchion-xeniaa-api'}));
+app.get('/api/health/live',(req,res)=>healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}));
 app.get('/api/health/ready',async(req,res)=>{
-  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',database:'ok'}); }
-  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api',database:'unavailable'},503); }
+  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
+  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'unavailable'},503); }
 });
 app.get('/api/health',async(req,res)=>{
-  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api'}); }
-  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api'},503); }
+  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
+  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'unavailable'},503); }
 });
 app.use('/api/auth',authRoutes);
 app.use('/api/attendance',attendanceRoutes);
