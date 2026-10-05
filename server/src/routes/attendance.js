@@ -74,6 +74,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   if(!isScheduledWorkday(date,new Set(dateHolidays.map((x)=>x.date)))) throw Object.assign(new Error('Attendance check-in is available Monday–Saturday, excluding company holidays.'),{status:403});
   const settings = await getSettings();
   let method = input.method;
+  if (method === 'GPS') verifyOfficeNetwork(req);
   let distance = null;
   if (method === 'GPS') {
     if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again, or use the office QR fallback.'), { status: 400 });
@@ -105,7 +106,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
 }));
 
 router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ method: z.enum(['GPS','QR','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional(), qrToken: z.string().optional() }), req.body || {});
+  const input = validate(z.object({ method: z.enum(['GPS','QR','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
   const date = indiaDate();
   const settings = await getSettings();
   let distance = null;
