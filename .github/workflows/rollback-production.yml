@@ -1,0 +1,105 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing Artifact Registry image tag to roll back to (for example a previous commit SHA)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Roll back API and verify
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      AR_REPOSITORY: ${{ vars.GCP_AR_REPOSITORY }}
+      API_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      CLOUD_SQL_CONNECTION: ${{ vars.CLOUD_SQL_CONNECTION }}
+      DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DB_NAME: ${{ vars.DB_NAME }}
+      DB_USER: ${{ vars.DB_USER }}
+      GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+      APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      DB_PASSWORD_SECRET: ${{ vars.DB_PASSWORD_SECRET }}
+      JWT_SECRET_NAME: ${{ vars.JWT_SECRET_NAME }}
+      DB_PASSWORD_SECRET_VERSION: ${{ vars.DB_PASSWORD_SECRET_VERSION }}
+      JWT_SECRET_VERSION: ${{ vars.JWT_SECRET_VERSION }}
+
+    steps:
+      - name: Validate rollback configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            PROJECT_ID REGION AR_REPOSITORY API_SERVICE CLOUD_SQL_CONNECTION
+            DEPLOYER_SERVICE_ACCOUNT RUNTIME_SERVICE_ACCOUNT WIF_PROVIDER
+            DB_NAME DB_USER GCS_BUCKET APP_ORIGIN GOOGLE_CLIENT_ID
+            DB_PASSWORD_SECRET JWT_SECRET_NAME
+            DB_PASSWORD_SECRET_VERSION JWT_SECRET_VERSION
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing production repository/environment variable: ${name}"
+              exit 1
+            fi
+          done
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          version: ">= 363.0.0"
+
+      - name: Verify target image exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/falchion-xeniaa-api:${{ inputs.image_tag }}"
+          gcloud artifacts docker images describe "${IMAGE_URI}" --project="${PROJECT_ID}"
+          echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
+
+      - name: Deploy existing image
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --port=8080             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --allow-unauthenticated             --set-env-vars="NODE_ENV=production,APP_VERSION=1.0.0,BUILD_SHA=${{ inputs.image_tag }},PORT=8080,APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"
+
+      - name: Verify rollback health
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_URL="$(gcloud run services describe "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --format="value(status.url)")"
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/live"
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/ready"
+
+          {
+            echo "## Production rollback"
+            echo ""
+            echo "- Image: ${IMAGE_URI}"
+            echo "- Cloud Run service: ${API_SERVICE}"
+            echo "- Liveness: passed"
+            echo "- Readiness: passed"
+            echo "- Database migrations: not run during rollback"
+          } >> "$GITHUB_STEP_SUMMARY"
