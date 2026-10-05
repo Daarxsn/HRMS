@@ -44,3 +44,28 @@
 .settings-health-grid b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:900px){.settings-health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:600px){.settings-health-grid{grid-template-columns:1fr}}
+
+/* Phase 9 — employee action center */
+.employee-action-center{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:15px;margin-top:16px;align-items:stretch}
+.action-center-card{padding:18px 19px}
+.employee-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}
+.employee-action-item{min-width:0;display:flex;align-items:center;gap:11px;padding:12px 12px;border:1px solid #edf1ed;border-radius:12px;background:#fcfdfb;color:#4d625a;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.employee-action-item:hover{transform:translateY(-1px);border-color:#dce8de;background:#f8fbf7}
+.employee-action-item>span:nth-child(2){min-width:0;flex:1}
+.employee-action-item b,.employee-action-item small{display:block}
+.employee-action-item b{font-size:10px;color:#40544d;font-weight:800}
+.employee-action-item small{font-size:8.5px;line-height:1.45;color:#9aa59f;margin-top:3px;white-space:normal}
+.employee-action-item>svg{color:#9bac9f;flex:0 0 auto}
+.employee-action-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px;background:#f0f5ef;color:#71927a;flex:0 0 auto}
+.action-item-primary{border-color:#d8e7da;background:#f5faf5}
+.action-item-primary .employee-action-icon{background:#dfefdf;color:#4f7d5b}
+.employee-action-button{font:inherit;text-align:left;cursor:pointer;width:100%}
+.next-holiday-card{padding:17px 16px;display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,#fbfaf5,#f7f4e9);border-color:#ece8d9}
+.next-holiday-card>div{min-width:0;flex:1}
+.next-holiday-card small,.next-holiday-card b,.next-holiday-card span{display:block}
+.next-holiday-card small{font-size:7.5px;letter-spacing:.12em;color:#a29d87;font-weight:800}
+.next-holiday-card b{font-size:12px;color:#5c604e;margin-top:5px}
+.next-holiday-card div span{font-size:9px;color:#999b8d;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-holiday-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#eeead8;color:#9d905e;flex:0 0 auto}
+@media(max-width:900px){.employee-action-center{grid-template-columns:1fr}.employee-action-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.employee-action-grid{grid-template-columns:1fr}.next-holiday-card{min-height:76px}}
