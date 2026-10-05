@@ -244,7 +244,7 @@ function AttendancePage(){
   const [correctionOpen,setCorrectionOpen]=useState(false);
   const [flexOpen,setFlexOpen]=useState(false);
   const [exit,setExit]=useState(null);
-  const [workplaceMode,setWorkplaceMode]=useState('OFFICE');
+  const [workplaceMode,setWorkplaceMode]=useState('OFFICE');const [verificationStage,setVerificationStage]=useState('idle');
 
   const load=async()=>{
     setLoading(true);
@@ -304,10 +304,16 @@ function AttendancePage(){
   const punch=async(type,method='GPS')=>{
     setBusy(true);
     setError('');
+    setVerificationStage(method==='GPS'?'location':'network');
     try{
       let geo={};
-      if(method==='GPS')geo=await captureLocation();
+      if(method==='GPS'){
+        setVerificationStage('location');
+        geo=await captureLocation();
+        setVerificationStage('network');
+      }
       const result=await post(`/attendance/${type}`,{method,...geo});
+      setVerificationStage('success');
       setWorkplaceMode('OFFICE');
       notify(type==='check-in'
         ? `You're checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`
@@ -315,6 +321,7 @@ function AttendancePage(){
       await load();
       refresh();
     }catch(e){
+      setVerificationStage('idle');
       setError(e.message);
     }finally{
       setBusy(false);
@@ -331,12 +338,22 @@ function AttendancePage(){
             <span className="action-kicker"><span className={`pulse-dot${working?'':' pulse-muted'}`}/>{todayHoliday&&!working?todayHoliday.name.toUpperCase():working?'DAY IN PROGRESS':'TODAY · '+formatDate(today,{weekday:'long',day:'numeric',month:'long'})}</span>
             <h2>{todayHoliday&&!working?'A scheduled day to pause.':working?"You're checked in.":'Start your workday.'}</h2>
             <p>{todayHoliday&&!working?`${todayHoliday.name} is a company holiday. There’s no check-in expected today.`:working?`You started at ${formatTime(current.check_in_at)}. Check out when you’re ready to wrap up.`:workplaceMode==='WFH'?'Your approved remote day does not require office location verification.':'Click check in and we’ll request your location once, verify the office geofence and confirm the office network.'}</p>
+            {busy&&workplaceMode==='OFFICE' && <div className="verification-panel" role="status" aria-live="polite">
+              <div className="verification-line">
+                <span className={`verification-step ${verificationStage==='location'?'verification-active':'verification-done'}`}>{verificationStage==='location'?<Spinner/>:<Check size={13}/>}</span>
+                <span><b>{verificationStage==='location'?'Verifying your location':'Location verified'}</b><small>{verificationStage==='location'?'Waiting for the browser’s one-time location result.':'GPS accuracy and the 80 m office radius passed.'}</small></span>
+              </div>
+              <div className="verification-line">
+                <span className={`verification-step ${verificationStage==='network'?'verification-active':verificationStage==='success'?'verification-done':''}`}>{verificationStage==='network'?<Spinner/>:verificationStage==='success'?<Check size={13}/>:<span>2</span>}</span>
+                <span><b>{verificationStage==='network'?'Verifying office network':verificationStage==='success'?'Office network verified':'Office network check'}</b><small>{verificationStage==='network'?'Confirming that this request came through the approved office network.':'Checked by the HRMS server; no Wi-Fi name is collected.'}</small></span>
+              </div>
+            </div>}
             <div className="checkin-action-row">
               {working
                 ? <Button onClick={()=>punch('check-out',current.check_in_method==='WFH'?'WFH':'GPS')} loading={busy} icon={LogOut}>Check out</Button>
                 : todayHoliday
                   ? <Link className="button button-soft" to="/calendar"><CalendarDays size={16}/> View holiday calendar</Link>
-                  : <><Button onClick={()=>workplaceMode==='WFH'?punch('check-in','WFH'):punch('check-in','GPS')} loading={busy} icon={LogIn}>{workplaceMode==='WFH'?'Start remote day':'Check in at office'}</Button><button className={`mode-switch${workplaceMode==='WFH'?' mode-switch-active':''}`} onClick={()=>setWorkplaceMode(workplaceMode==='WFH'?'OFFICE':'WFH')}><House size={15}/>{workplaceMode==='WFH'?'Remote work selected':'Working from home'}</button></>
+                  : <><Button onClick={()=>workplaceMode==='WFH'?punch('check-in','WFH'):punch('check-in','GPS')} loading={busy} icon={LogIn}>{busy?(verificationStage==='location'?'Verifying location…':verificationStage==='network'?'Verifying office network…':'Checking in…'):workplaceMode==='WFH'?'Start remote day':'Check in at office'}</Button><button className={`mode-switch${workplaceMode==='WFH'?' mode-switch-active':''}`} onClick={()=>setWorkplaceMode(workplaceMode==='WFH'?'OFFICE':'WFH')}><House size={15}/>{workplaceMode==='WFH'?'Remote work selected':'Working from home'}</button></>
               }
             </div>
             <div className="checkin-meta">
