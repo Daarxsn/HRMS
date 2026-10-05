@@ -14,7 +14,6 @@ export const POLICY = Object.freeze({
   leaveEntitlements: { CASUAL: 8, SICK: 8, EARNED: 15, FLOATING: 4 },
   earnedLeaveMonthlyAccrual: 1,
   wfhTypicalMonthlyCap: 4,
-  qrTtlSeconds: 120,
   gpsMaxAccuracyMeters: 100
 });
 
