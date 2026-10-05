@@ -29,6 +29,8 @@ for (const route of requiredRoutes) {
 }
 
 assert.ok(app.includes('AppErrorBoundary'), 'React error boundary contract missing');
+assert.ok(app.includes('System health'), 'Administrator system-health view contract missing');
+assert.ok(app.includes("get('/admin/system-health')"), 'Administrator system-health API integration contract missing');
 assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
