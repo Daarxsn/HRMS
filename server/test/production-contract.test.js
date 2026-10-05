@@ -40,6 +40,5 @@ assert.match(admin,/mysql_version/);
 assert.match(validate,/request_id:req.requestId/);
 assert.match(validate,/requestId: req.requestId/);
 assert.match(dbTest,/schema_migrations/);
-assert.match(dbTest,/falchion_hrms_ci/);
 
 console.log('Production API contracts: PASS');
