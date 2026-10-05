@@ -97,6 +97,12 @@ The workflow is intentionally configuration-driven. It does not contain company 
 
 Phase 4 is not considered production-complete until the company-owned Cloud SQL, Cloud Run, GCS, Google OAuth and Vercel environments pass the documented UAT and rollback checks.
 
+## Phase 5 operational excellence
+
+Phase 5 adds runtime release traceability, administrator-only system health diagnostics, and request-correlated API error responses. The production deployment path stamps the deployed commit SHA into the API runtime, while the Office Settings screen provides safe database/runtime diagnostics for administrators.
+
+See [Phase 5 operational excellence](docs/PHASE5_OPERATIONAL_EXCELLENCE.md) for the acceptance and lock criteria.
+
 ## Google Cloud deployment
 
 Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a private Cloud Storage bucket for leave documentation. Keep the bucket’s public access prevention enabled.
