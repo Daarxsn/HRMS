@@ -30,6 +30,9 @@ for (const route of requiredRoutes) {
 
 assert.ok(app.includes('AppErrorBoundary'), 'React error boundary contract missing');
 assert.ok(app.includes('System health'), 'Administrator system-health view contract missing');
+assert.ok(app.includes('Verifying your location'), 'Attendance location verification UX contract missing');
+assert.ok(app.includes('Verifying office network'), 'Attendance office-network verification UX contract missing');
+assert.ok(app.includes('navigator.geolocation'), 'Browser geolocation attendance contract missing');
 assert.ok(app.includes("get('/admin/system-health')"), 'Administrator system-health API integration contract missing');
 assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
