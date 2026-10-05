@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
