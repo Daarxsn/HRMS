@@ -14,12 +14,16 @@ try {
 
   const [migrationRows] = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
   assert.ok(migrationRows.some((row) => row.version === '001_initial_schema.sql'), 'Initial schema migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '002_session_revocation.sql'), 'Session revocation migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '003_retire_qr_setting.sql'), 'QR retirement migration is not recorded');
 
   const [employeeRows] = await pool.query("SELECT COUNT(*) AS total FROM employees WHERE status='ACTIVE'");
   assert.ok(Number(employeeRows[0].total) >= 11, 'Expected seeded local workforce plus administrator');
 
   const [settings] = await pool.query("SELECT setting_value FROM system_settings WHERE setting_key='geofence_meters'");
   assert.equal(Number(settings[0]?.setting_value), 80, 'Locked 80m geofence setting is missing');
+  const [qrSetting] = await pool.query("SELECT COUNT(*) AS total FROM system_settings WHERE setting_key='qr_ttl_seconds'");
+  assert.equal(Number(qrSetting[0].total), 0, 'Retired QR setting is still present');
 
   console.log('Database smoke verification: PASS');
 } finally {
