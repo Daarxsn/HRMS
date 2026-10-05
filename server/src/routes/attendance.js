@@ -73,7 +73,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   let distance = null;
   if (method === 'GPS') {
     if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again.'), { status: 400 });
-    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area or use .'), { status: 422 });
+    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area and try again.'), { status: 422 });
     distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
     if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error(`You are about ${Math.round(distance)} m from the office, outside the ${settings.geofence_meters || POLICY.geofenceMeters} m check-in radius.`), { status: 422 });
     verifyOfficeNetwork(req);
