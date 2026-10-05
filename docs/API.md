@@ -2,6 +2,16 @@
 
 All routes are prefixed with `/api`. Successful JSON responses use UTF-8. The session is an eight-hour, signed HTTP-only cookie; clients send `credentials: include`. All protected routes enforce authorization on the server.
 
+## Runtime health
+
+| Method | Route | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/health/live` | Public | Process/liveness check; does not depend on MySQL |
+| GET | `/health/ready` | Public | Readiness check; verifies MySQL connectivity |
+| GET | `/health` | Public | Backward-compatible health check with database verification |
+
+All health responses use `Cache-Control: no-store`. API responses include an `X-Request-ID` correlation header.
+
 ## Authentication
 
 | Method | Route | Access | Purpose |
