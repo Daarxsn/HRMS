@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:smoke": "node test/smoke.mjs",
+    "test:smoke": "node --experimental-strip-types test/smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
