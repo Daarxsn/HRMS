@@ -35,6 +35,7 @@ jobs:
       DB_USER: ${{ vars.DB_USER }}
       GCS_BUCKET: ${{ vars.GCS_BUCKET }}
       APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      OFFICE_NETWORK_IPS: ${{ vars.OFFICE_NETWORK_IPS }}
       GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       DB_PASSWORD_SECRET: ${{ vars.DB_PASSWORD_SECRET }}
       JWT_SECRET_NAME: ${{ vars.JWT_SECRET_NAME }}
@@ -49,7 +50,7 @@ jobs:
           required=(
             PROJECT_ID REGION AR_REPOSITORY API_SERVICE CLOUD_SQL_CONNECTION
             DEPLOYER_SERVICE_ACCOUNT RUNTIME_SERVICE_ACCOUNT WIF_PROVIDER
-            DB_NAME DB_USER GCS_BUCKET APP_ORIGIN GOOGLE_CLIENT_ID
+            DB_NAME DB_USER GCS_BUCKET APP_ORIGIN OFFICE_NETWORK_IPS GOOGLE_CLIENT_ID
             DB_PASSWORD_SECRET JWT_SECRET_NAME
             DB_PASSWORD_SECRET_VERSION JWT_SECRET_VERSION
           )
@@ -84,7 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gcloud run deploy "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --port=8080             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --allow-unauthenticated             --set-env-vars="NODE_ENV=production,APP_VERSION=1.0.0,BUILD_SHA=${{ inputs.image_tag }},PORT=8080,APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"
+          gcloud run deploy "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --port=8080             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --allow-unauthenticated             --set-env-vars="NODE_ENV=production,APP_VERSION=1.0.0,BUILD_SHA=${{ inputs.image_tag }},PORT=8080,APP_ORIGIN=${APP_ORIGIN},OFFICE_NETWORK_IPS=${OFFICE_NETWORK_IPS},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"
 
       - name: Verify rollback health
         shell: bash
