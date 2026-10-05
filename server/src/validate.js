@@ -21,7 +21,7 @@ export function errorHandler(error, req, res, next) {
   if (error instanceof ZodError) return res.status(400).json({ error: 'Please check the information and try again.' });
   if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'That record already exists.' });
   const status = error.status || 500;
-  if (status >= 500) console.error(error);
-  res.status(status).json({ error: status >= 500 ? 'Something went wrong. Please try again.' : error.message });
+  if (status >= 500) console.error(JSON.stringify({type:'http_error',request_id:req.requestId,error:String(error?.message||error),method:req.method,path:req.path,status}));
+  res.status(status).json({ error: status >= 500 ? 'Something went wrong. Please try again.' : error.message, requestId: req.requestId });
 }
 export const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
