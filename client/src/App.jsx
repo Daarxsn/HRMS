@@ -1,12 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { QRCodeSVG } from 'qrcode.react';
 import {
   Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, Calendar,
   CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck,
   CircleHelp, CircleUserRound, ClipboardCheck, Clock3, Download, FileClock, FileText, Filter,
-  Fingerprint, Gauge, House, LogIn, LogOut, MapPin, Menu, MoreHorizontal, Plus, QrCode,
+  Fingerprint, Gauge, House, LogIn, LogOut, MapPin, Menu, MoreHorizontal, Plus,
   RefreshCw, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Timer, Trash2, Users, X,
   PanelLeftClose, UserRound, XCircle
 } from 'lucide-react';
@@ -62,7 +61,7 @@ function Button({ children, variant='primary', size='', icon:Icon, disabled, loa
 function StatusPill({ value, children }) {
   const raw=value || children || '—';
   const key=String(raw).toLowerCase().replaceAll('_','-').replaceAll(' ','-');
-  const labels={on_time:'On time',late_entry:'Late entry',pending:'Pending',approved:'Approved',rejected:'Declined',cancelled:'Withdrawn',active:'Active',inactive:'Inactive',wfh:'Working remotely',on_leave:'On leave',gps:'GPS verified',qr:'Office QR',absent:'Absent'};
+  const labels={on_time:'On time',late_entry:'Late entry',pending:'Pending',approved:'Approved',rejected:'Declined',cancelled:'Withdrawn',active:'Active',inactive:'Inactive',wfh:'Working remotely',on_leave:'On leave',gps:'GPS verified',absent:'Absent'};
   return <span className={`status status-${key}`}>{labels[String(raw).toLowerCase()]||raw}</span>;
 }
 function EmptyState({ icon:Icon=FileText, title, body, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={21}/></span><h3>{title}</h3><p>{body}</p>{action}</div>; }
@@ -236,58 +235,132 @@ function AdminHome(){
 }
 
 function AttendancePage(){
-  const {user,notify,refresh}=useApp();const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [showQr,setShowQr]=useState(false);const [qrToken,setQrToken]=useState('');const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [exit,setExit]=useState(null);const [workplaceMode,setWorkplaceMode]=useState('OFFICE');
-  const load=async()=>{setLoading(true);try{const [a,x,c]=await Promise.all([get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),get('/attendance/exits/current'),get(`/calendar?year=${today.slice(0,4)}`)]);setRows(a.records||[]);setExit(x.exit);setTodayHoliday(c.holidays.find((h)=>h.date===today)||null);}catch(e){setError(e.message);}finally{setLoading(false);}};
+  const {notify,refresh}=useApp();
+  const [rows,setRows]=useState([]);
+  const [todayHoliday,setTodayHoliday]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [correctionOpen,setCorrectionOpen]=useState(false);
+  const [flexOpen,setFlexOpen]=useState(false);
+  const [exit,setExit]=useState(null);
+  const [workplaceMode,setWorkplaceMode]=useState('OFFICE');
+
+  const load=async()=>{
+    setLoading(true);
+    try{
+      const [a,x,c]=await Promise.all([
+        get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),
+        get('/attendance/exits/current'),
+        get(`/calendar?year=${today.slice(0,4)}`)
+      ]);
+      setRows(a.records||[]);
+      setExit(x.exit);
+      setTodayHoliday(c.holidays.find((h)=>h.date===today)||null);
+    }catch(e){setError(e.message);}
+    finally{setLoading(false);}
+  };
+
   useEffect(()=>{load();},[]);
-  useEffect(()=>{const token=new URLSearchParams(window.location.search).get('qr');if(token){setQrToken(token);setShowQr(true);history.replaceState({},'',window.location.pathname);}},[]);
-  const current=rows.find((r)=>r.attendance_date===today);const working=current?.check_in_at&&!current.check_out_at;
+
+  const current=rows.find((r)=>r.attendance_date===today);
+  const working=current?.check_in_at&&!current.check_out_at;
+
   const captureLocation=()=>new Promise((resolve,reject)=>{
-    if(!navigator.geolocation)return reject(new Error('This browser does not support location. Use the office QR fallback.'));
-    navigator.geolocation.getCurrentPosition(
+    if(!navigator.geolocation){
+      reject(new Error('This browser does not support location. Use a supported browser or device.'));
+      return;
+    }
+    const requestLocation=()=>navigator.geolocation.getCurrentPosition(
       ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
       (geoError)=>{
         const message = geoError?.code===1
-          ? 'Location permission was denied. Allow location access or use the office QR fallback.'
+          ? 'Location permission is required for office attendance. Allow location access for this site and try again.'
           : geoError?.code===2
-            ? 'Your location could not be determined. Move to an area with a clearer signal or use the office QR fallback.'
+            ? 'Your location could not be determined. Move to a clearer area and try again.'
             : geoError?.code===3
-              ? 'Location lookup took too long. Try again or use the office QR fallback.'
-              : 'Location permission is unavailable. Use the office QR fallback.';
+              ? 'Location lookup took too long. Try again.'
+              : 'Location access is unavailable. Check the browser location permission and try again.';
         reject(new Error(message));
       },
       {enableHighAccuracy:true,timeout:12000,maximumAge:0}
     );
+
+    if(navigator.permissions?.query){
+      navigator.permissions.query({name:'geolocation'})
+        .then((permission)=>{
+          if(permission.state==='denied'){
+            reject(new Error('Location permission is blocked for this site. Allow Location access for localhost in Safari settings, then try again.'));
+            return;
+          }
+          requestLocation();
+        })
+        .catch(requestLocation);
+    }else{
+      requestLocation();
+    }
   });
-  const punch=async(type,method='GPS',token)=>{
-    setBusy(true);setError('');
-    try{let geo={};if(method==='GPS')geo=await captureLocation();const result=await post(`/attendance/${type}`,{method,...geo,qrToken:token});setShowQr(false);setQrToken('');setWorkplaceMode('OFFICE');notify(type==='check-in'?`You’re checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`:'You’re checked out. Have a good evening.');await load();refresh();}
-    catch(e){setError(e.message);if(method==='GPS' && !e.code && (e.status==null || e.status===400 || e.status===422))setShowQr(true);}
-    finally{setBusy(false);}
+
+  const punch=async(type,method='GPS')=>{
+    setBusy(true);
+    setError('');
+    try{
+      let geo={};
+      if(method==='GPS')geo=await captureLocation();
+      const result=await post(`/attendance/${type}`,{method,...geo});
+      setWorkplaceMode('OFFICE');
+      notify(type==='check-in'
+        ? `You're checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`
+        : 'You're checked out. Have a good evening.');
+      await load();
+      refresh();
+    }catch(e){
+      setError(e.message);
+    }finally{
+      setBusy(false);
+    }
   };
-  const submitQr=()=>{let token=qrToken.trim();try{const parsed=new URL(token,window.location.origin);token=parsed.searchParams.get('qr')||token;}catch{}punch(working?'check-out':'check-in','QR',token);};
+
   return <>
-    <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="Check in for today or look back at your attendance history." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
+    <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="Arrive, verify once, and start your workday." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
     {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss"><X size={15}/></button></div>}
-    {showQr&&<QRFallback token={qrToken} setToken={setQrToken} busy={busy} action={submitQr} close={()=>{setShowQr(false);setError('');}} checkOut={working}/>}
-    <div className="attendance-layout"><div className="attendance-main-col"><Card className="attendance-action-card"><div className="attendance-action-copy"><span className="action-kicker"><span className={`pulse-dot${working?'':' pulse-muted'}`}/>{todayHoliday&&!working?todayHoliday.name.toUpperCase():working?'DAY IN PROGRESS':'TODAY · '+formatDate(today,{weekday:'long',day:'numeric',month:'long'})}</span><h2>{todayHoliday&&!working?'A scheduled day to pause.':working?'You’re checked in.':'Start your workday.'}</h2><p>{todayHoliday&&!working?`${todayHoliday.name} is a company holiday. There’s no check-in expected today.`:working?`You started at ${formatTime(current.check_in_at)}. Check out when you’re ready to wrap up.`:'Your location is used once to verify this check-in. Nothing runs in the background.'}</p><div className="checkin-action-row">{working?<><Button onClick={()=>punch('check-out',current.check_in_method==='WFH'?'WFH':'GPS')} loading={busy} icon={LogOut}>Check out</Button>{current.check_in_method!=='WFH'&&<button className="button button-soft" onClick={()=>punch('check-out','QR')} disabled={busy}><QrCode size={17}/> Use office QR</button>}</>:todayHoliday?<Link className="button button-soft" to="/calendar"><CalendarDays size={16}/> View holiday calendar</Link>:<><Button onClick={()=>workplaceMode==='WFH'?punch('check-in','WFH'):punch('check-in','GPS')} loading={busy} icon={LogIn}>{workplaceMode==='WFH'?'Start remote day':'Check in at office'}</Button><button className={`mode-switch${workplaceMode==='WFH'?' mode-switch-active':''}`} onClick={()=>setWorkplaceMode(workplaceMode==='WFH'?'OFFICE':'WFH')}><House size={15}/>{workplaceMode==='WFH'?'Remote work selected':'Working from home'}</button></>}</div><div className="checkin-meta"><span><MapPin size={14}/>{todayHoliday&&!working?todayHoliday.name:workplaceMode==='WFH'?'Approved remote work':'Pune HQ · 80 m radius'}</span><span><ShieldCheck size={14}/> Check-in location only</span></div></div><div className="attendance-status-art"><div className="status-orbit status-orbit1"/><div className="status-orbit status-orbit2"/><div className="status-clock"><Clock3 size={37}/><span>{working?'IN':todayHoliday?'HOL':'—'}</span></div><small>9:00 AM <i/> 6:00 PM</small></div></Card>
-      <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Day-by-day, without the noise.</p></div><span className="date-range-label"><CalendarDays size={15}/> {today.slice(0,4)}</span></div>
-      <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>CHECK IN</th><th>CHECK OUT</th><th>WORKED</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:rows.length?rows.map((r)=><tr key={r.id}><td><b>{formatDate(r.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td>{formatMinutes(r.worked_minutes)}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="5"><div className="table-message">Your attendance records will appear here.</div></td></tr>}</tbody></table></div></Card>
-      </div><div className="attendance-side-col"><Card className="schedule-card"><span className="side-card-icon"><Sun size={18}/></span><h3>Today’s rhythm</h3><p>A steady schedule that leaves space for life.</p><div className="schedule-row"><span>Office hours</span><b>9:00 AM — 6:00 PM</b></div><div className="schedule-row"><span>Lunch</span><b>30 minutes · fixed</b></div><div className="schedule-row"><span>Working days</span><b>Monday to Saturday</b></div><div className="schedule-policy"><Clock3 size={14}/><span>Check-in at <b>9:30 AM or later</b> is recorded as late. Manager-approved flex starts are respected.</span></div></Card>
+    <div className="attendance-layout">
+      <div className="attendance-main-col">
+        <Card className="attendance-action-card">
+          <div className="attendance-action-copy">
+            <span className="action-kicker"><span className={`pulse-dot${working?'':' pulse-muted'}`}/>{todayHoliday&&!working?todayHoliday.name.toUpperCase():working?'DAY IN PROGRESS':'TODAY · '+formatDate(today,{weekday:'long',day:'numeric',month:'long'})}</span>
+            <h2>{todayHoliday&&!working?'A scheduled day to pause.':working?'You're checked in.':'Start your workday.'}</h2>
+            <p>{todayHoliday&&!working?`${todayHoliday.name} is a company holiday. There’s no check-in expected today.`:working?`You started at ${formatTime(current.check_in_at)}. Check out when you’re ready to wrap up.`:workplaceMode==='WFH'?'Your approved remote day does not require office location verification.':'Click check in and we’ll request your location once, verify the office geofence and confirm the office network.'}</p>
+            <div className="checkin-action-row">
+              {working
+                ? <Button onClick={()=>punch('check-out',current.check_in_method==='WFH'?'WFH':'GPS')} loading={busy} icon={LogOut}>Check out</Button>
+                : todayHoliday
+                  ? <Link className="button button-soft" to="/calendar"><CalendarDays size={16}/> View holiday calendar</Link>
+                  : <><Button onClick={()=>workplaceMode==='WFH'?punch('check-in','WFH'):punch('check-in','GPS')} loading={busy} icon={LogIn}>{workplaceMode==='WFH'?'Start remote day':'Check in at office'}</Button><button className={`mode-switch${workplaceMode==='WFH'?' mode-switch-active':''}`} onClick={()=>setWorkplaceMode(workplaceMode==='WFH'?'OFFICE':'WFH')}><House size={15}/>{workplaceMode==='WFH'?'Remote work selected':'Working from home'}</button></>
+              }
+            </div>
+            <div className="checkin-meta">
+              <span><MapPin size={14}/>{todayHoliday&&!working?todayHoliday.name:workplaceMode==='WFH'?'Approved remote work':'Pune HQ · 80 m radius'}</span>
+              <span><ShieldCheck size={14}/>{workplaceMode==='WFH'?'WFH approved':'Location + office Wi-Fi verification'}</span>
+            </div>
+          </div>
+          <div className="attendance-status-art"><div className="status-orbit status-orbit1"/><div className="status-orbit status-orbit2"/><div className="status-clock"><Clock3 size={37}/><span>{working?'IN':todayHoliday?'HOL':'—'}</span></div><small>9:00 AM <i/> 6:00 PM</small></div>
+        </Card>
+        <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Day-by-day, without the noise.</p></div><span className="date-range-label"><CalendarDays size={15}/> {today.slice(0,4)}</span></div>
+        <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>CHECK IN</th><th>CHECK OUT</th><th>WORKED</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:rows.length?rows.map((r)=><tr key={r.id}><td><b>{formatDate(r.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td>{formatMinutes(r.worked_minutes)}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="5"><div className="table-message">Your attendance records will appear here.</div></td></tr>}</tbody></table></div></Card>
+      </div>
+      <div className="attendance-side-col">
+        <Card className="schedule-card"><span className="side-card-icon"><Sun size={18}/></span><h3>Today’s rhythm</h3><p>A steady schedule that leaves space for life.</p><div className="schedule-row"><span>Office hours</span><b>9:00 AM — 6:00 PM</b></div><div className="schedule-row"><span>Lunch</span><b>30 minutes · fixed</b></div><div className="schedule-row"><span>Working days</span><b>Monday to Saturday</b></div><div className="schedule-policy"><ShieldCheck size={14}/><span>Office check-in verifies <b>your location + office Wi-Fi</b>. There is no background tracking.</span></div></Card>
         <Card className="help-card"><div className="help-top"><span><CircleHelp size={17}/></span><h3>Need to correct a day?</h3></div><p>Forgot to check out, or had a location issue? Ask an administrator to review a correction.</p><button className="text-link" onClick={()=>setCorrectionOpen(true)}>Request correction <ArrowRight size={14}/></button></Card>
         <Card className="help-card flex-help"><div className="help-top"><span><Timer size={17}/></span><h3>Need a flex start?</h3></div><p>Request an adjusted start between 9:00 and 10:30 AM for manager approval.</p><button className="text-link" onClick={()=>setFlexOpen(true)}>Request flex start <ArrowRight size={14}/></button></Card>
-        <Card className="wfh-shortcut"><span className="wfh-short-icon"><House size={17}/></span><b>Remote day?</b><small>WFH must be enabled and approved first.</small><Link to="/wfh">See WFH requests <ArrowRight size={13}/></Link></Card>
-      </div></div>
+        <Card className="wfh-shortcut"><span className="wfh-short-icon"><House size={17}/></span><b>Remote day?</b><small>WFH is separate from office attendance verification.</small><Link to="/wfh">See WFH requests <ArrowRight size={13}/></Link></Card>
+      </div>
+    </div>
     {correctionOpen&&<CorrectionModal close={()=>setCorrectionOpen(false)} onDone={()=>{setCorrectionOpen(false);notify('Your correction request was sent for review.');load();}}/>}
     {flexOpen&&<FlexModal close={()=>setFlexOpen(false)} onDone={()=>{setFlexOpen(false);notify('Your flex-start request was sent to the administrator.');refresh();}}/>}
   </>;
 }
 
-function QRFallback({token,setToken,busy,action,close,checkOut}){
-  const [camera,setCamera]=useState(false);const [cameraError,setCameraError]=useState('');const videoRef=useRef(null);const streamRef=useRef(null);
-  useEffect(()=>{if(!camera)return;let running=true;let detector;
-    const start=async()=>{try{if(!('BarcodeDetector'in window))throw new Error('QR scanning is not supported in this browser. Use your camera app or enter the code below.');detector=new window.BarcodeDetector({formats:['qr_code']});if(!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access is not available in this browser. Enter the office QR link manually.');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});streamRef.current=stream;if(videoRef.current)videoRef.current.srcObject=stream;await videoRef.current?.play();const scan=async()=>{if(!running||!videoRef.current)return;try{const codes=await detector.detect(videoRef.current);if(codes[0]?.rawValue){const value=new URL(codes[0].rawValue,location.origin).searchParams.get('qr')||codes[0].rawValue;setToken(value);setCamera(false);return;}}catch{}requestAnimationFrame(scan);};scan();}catch(e){setCameraError(e.message);setCamera(false);}};start();return()=>{running=false;streamRef.current?.getTracks().forEach(t=>t.stop());};},[camera,setToken]);
-  return <div className="qr-overlay"><Card className="qr-modal"><div className="qr-modal-head"><div><span className="eyebrow">LOCATION ALTERNATIVE</span><h2>Use the office QR</h2><p>Ask an administrator for the current, expiring office code.</p></div><button className="icon-button" onClick={close} aria-label="Close"><X size={20}/></button></div>{camera&&<div className="camera-box"><video ref={videoRef} playsInline muted/><button className="button button-soft" onClick={()=>setCamera(false)}>Stop camera</button></div>}{cameraError&&<div className="inline-alert alert-neutral">{cameraError}</div>}<div className="qr-divider"><span>SCAN OR ENTER THE CODE</span></div><div className="qr-input-row"><input className="text-input" value={token} onChange={(e)=>setToken(e.target.value)} placeholder="Paste or scan the secure office link" aria-label="Office QR link or token"/><Button onClick={action} disabled={!token.trim()} loading={busy} icon={checkOut?LogOut:LogIn}>{checkOut?'Check out':'Check in'}</Button></div><div className="qr-modal-foot"><button className="text-link" onClick={()=>{setCameraError('');setCamera(true);}}><QrCode size={15}/> Scan with camera</button><span><ShieldCheck size={14}/> Expires automatically · no location access needed</span></div></Card></div>;
-}
 function CorrectionModal({close,onDone}){
   const [date,setDate]=useState(today);const [checkIn,setCheckIn]=useState('');const [checkOut,setCheckOut]=useState('');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/corrections',{date,requestedCheckIn:checkIn?new Date(checkIn).toISOString():undefined,requestedCheckOut:checkOut?new Date(checkOut).toISOString():undefined,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
@@ -450,20 +523,121 @@ function ReportsPage(){
 }
 
 function SettingsPage(){
-  const {notify}=useApp();const [settings,setSettings]=useState(null);const [form,setForm]=useState({});const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [qr,setQr]=useState(null);const [seconds,setSeconds]=useState(0);const [qrBusy,setQrBusy]=useState(false);const [revokeBusy,setRevokeBusy]=useState(false);const [health,setHealth]=useState(null);const [healthLoading,setHealthLoading]=useState(true);const [healthError,setHealthError]=useState('');
-  const load=async()=>{setLoading(true);setHealthLoading(true);setHealthError('');try{const [r,h]=await Promise.all([get('/admin/settings'),get('/admin/system-health')]);setSettings(r.settings);setForm({office_name:r.settings.office_name,office_latitude:r.settings.office_latitude,office_longitude:r.settings.office_longitude,geofence_meters:r.settings.geofence_meters,gps_max_accuracy_meters:r.settings.gps_max_accuracy_meters,qr_ttl_seconds:r.settings.qr_ttl_seconds,wfh_monthly_cap:r.settings.wfh_monthly_cap});setHealth(h);}catch(e){setHealthError(e.message);try{const r=await get('/admin/settings');setSettings(r.settings);setForm({office_name:r.settings.office_name,office_latitude:r.settings.office_latitude,office_longitude:r.settings.office_longitude,geofence_meters:r.settings.geofence_meters,gps_max_accuracy_meters:r.settings.gps_max_accuracy_meters,qr_ttl_seconds:r.settings.qr_ttl_seconds,wfh_monthly_cap:r.settings.wfh_monthly_cap});}catch(inner){setError(inner.message);}}finally{setLoading(false);setHealthLoading(false);}};
+  const {notify}=useApp();
+  const [form,setForm]=useState({});
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [health,setHealth]=useState(null);
+  const [healthLoading,setHealthLoading]=useState(true);
+  const [healthError,setHealthError]=useState('');
+
+  const load=async()=>{
+    setLoading(true);
+    setHealthLoading(true);
+    setHealthError('');
+    try{
+      const [r,h]=await Promise.all([get('/admin/settings'),get('/admin/system-health')]);
+      setForm({
+        office_name:r.settings.office_name,
+        office_latitude:r.settings.office_latitude,
+        office_longitude:r.settings.office_longitude,
+        geofence_meters:r.settings.geofence_meters,
+        gps_max_accuracy_meters:r.settings.gps_max_accuracy_meters,
+        wfh_monthly_cap:r.settings.wfh_monthly_cap
+      });
+      setHealth(h);
+    }catch(e){
+      setHealthError(e.message);
+      try{
+        const r=await get('/admin/settings');
+        setForm({
+          office_name:r.settings.office_name,
+          office_latitude:r.settings.office_latitude,
+          office_longitude:r.settings.office_longitude,
+          geofence_meters:r.settings.geofence_meters,
+          gps_max_accuracy_meters:r.settings.gps_max_accuracy_meters,
+          wfh_monthly_cap:r.settings.wfh_monthly_cap
+        });
+      }catch(inner){setError(inner.message);}
+    }finally{
+      setLoading(false);
+      setHealthLoading(false);
+    }
+  };
+
   useEffect(()=>{load();},[]);
-  useEffect(()=>{if(!qr)return;const timer=setInterval(()=>setSeconds(Math.max(0,Math.ceil((new Date(qr.expiresAt)-Date.now())/1000))),1000);return()=>clearInterval(timer);},[qr]);
-  const save=async(e)=>{e.preventDefault();setBusy(true);setError('');try{const body={...form,office_latitude:Number(form.office_latitude),office_longitude:Number(form.office_longitude),geofence_meters:Number(form.geofence_meters),gps_max_accuracy_meters:Number(form.gps_max_accuracy_meters),qr_ttl_seconds:Number(form.qr_ttl_seconds),wfh_monthly_cap:Number(form.wfh_monthly_cap)};await put('/admin/settings',body);notify('Office settings saved.');load();}catch(e){setError(e.message);}finally{setBusy(false);}};
-  const generateQr=async()=>{setQrBusy(true);setError('');try{const value=await post('/admin/qr');setQr(value);setSeconds(value.expiresIn);notify('A fresh office QR code is live.');}catch(e){setError(e.message);}finally{setQrBusy(false);}};
-  const revoke=async()=>{if(!window.confirm('Revoke every currently active office QR code? Employees using an old code will need a fresh QR.'))return;setRevokeBusy(true);setError('');try{await del('/admin/qr/current');setQr(null);setSeconds(0);notify('The current office QR codes have been revoked.');}catch(e){setError(e.message);}finally{setRevokeBusy(false);}};
+
+  const save=async(e)=>{
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try{
+      const body={
+        ...form,
+        office_latitude:Number(form.office_latitude),
+        office_longitude:Number(form.office_longitude),
+        geofence_meters:Number(form.geofence_meters),
+        gps_max_accuracy_meters:Number(form.gps_max_accuracy_meters),
+        wfh_monthly_cap:Number(form.wfh_monthly_cap)
+      };
+      await put('/admin/settings',body);
+      notify('Office settings saved.');
+      load();
+    }catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  };
+
   const set=(key,value)=>setForm((f)=>({...f,[key]:value}));
-  const mins=Math.floor(seconds/60);const secs=seconds%60;
-  return <><PageTitle eyebrow="ONE OFFICE · CLEAR RULES" title="Office settings" description="Manage Pune HQ verification, QR fallback and the current WFH limit." action={<button className="button button-soft" onClick={load}><RefreshCw size={15}/> Refresh</button>}/>{error&&<InlineError>{error}</InlineError>}
-    {loading?<Card className="settings-loading"><Spinner/></Card>:<div className="settings-layout"><div className="settings-main"><Card className="settings-card"><CardHeading title="Pune HQ attendance" subtitle="Location is checked at the employee’s request, at check-in or check-out."/><form className="form-stack" onSubmit={save}><label className="form-field"><span>Office name</span><input value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label><div className="form-two"><label className="form-field"><span>Latitude</span><input type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div><div className="form-two"><label className="form-field"><span>Geofence radius <small>(metres)</small></span><input type="number" min="20" max="1000" value={form.geofence_meters??''} onChange={(e)=>set('geofence_meters',e.target.value)} required/></label><label className="form-field"><span>Maximum GPS accuracy <small>(metres)</small></span><input type="number" min="20" max="250" value={form.gps_max_accuracy_meters??''} onChange={(e)=>set('gps_max_accuracy_meters',e.target.value)} required/></label></div><div className="locked-policy"><span><Clock3 size={16}/></span><div><b>Attendance rules</b><small>9:00 AM–6:00 PM · Monday–Saturday · late at 9:30 AM · fixed 30-minute lunch</small></div><span className="locked-badge"><ShieldCheck size={12}/> CURRENT POLICY</span></div><Button type="submit" loading={busy}>Save office settings</Button></form></Card>
-      <Card className="settings-card qr-settings-card"><CardHeading title="Dynamic office QR" subtitle="The QR code expires automatically and can be refreshed at any time." action={<span className="live-tag"><i/> SECURE FALLBACK</span>}/><div className="qr-setting-row"><label className="form-field"><span>QR expiry <small>(seconds)</small></span><input type="number" min="30" max="600" value={form.qr_ttl_seconds??120} onChange={(e)=>set('qr_ttl_seconds',e.target.value)}/></label><div className="qr-ttl-explainer"><Clock3 size={16}/><span>Short-lived, signed office credential. Employees can each use it once per action.</span></div></div>{qr?<div className="generated-qr"><div className={`qr-display${seconds===0?' qr-expired':''}`}>{seconds>0?<QRCodeSVG value={qr.payload} size={174} level="M" includeMargin/>:<div className="expired-qr"><Clock3 size={27}/><b>QR expired</b></div>}</div><div className="qr-generated-info"><span className={`qr-expiry-label${seconds<20?' qr-expiry-soon':''}`}><i/> {seconds>0?`EXPIRES IN ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`:'EXPIRED'}</span><b>{seconds>0?'Post this code at the office entrance.':'Generate a fresh code when employees need it.'}</b><small>Each employee may use this QR once to check in and once to check out during its validity window.</small><div className="qr-action-row"><Button size="small" onClick={generateQr} loading={qrBusy} icon={RefreshCw}>Generate new QR</Button><Button size="small" variant="soft" onClick={revoke} loading={revokeBusy} icon={X}>Revoke active codes</Button></div></div></div>:<div className="qr-empty"><div className="qr-preview-icon"><QrCode size={28}/></div><div><b>No QR code is active</b><small>Generate a code when an employee needs the GPS fallback.</small></div><Button size="small" onClick={generateQr} loading={qrBusy} icon={QrCode}>Generate QR</Button></div>}</Card>
-      <Card className="settings-card"><CardHeading title="System health" subtitle="Runtime and database diagnostics for administrators." action={<span className="live-tag"><i/> OPERATIONAL VIEW</span>}/>{healthLoading?<div className="settings-loading"><Spinner/></div>:health?<div className="settings-health-grid"><div><small>API status</small><b>{health.status === 'ok' ? 'Operational' : 'Unavailable'}</b></div><div><small>Database</small><b>{health.mysqlVersion || 'Connected'}</b></div><div><small>DB latency</small><b>{health.databaseLatencyMs} ms</b></div><div><small>Runtime</small><b>{health.nodeVersion}</b></div><div><small>Release</small><b>{health.version}</b></div><div><small>Build</small><b>{String(health.build).slice(0,12)}</b></div></div>:<InlineError>{healthError || 'System health is unavailable.'}</InlineError>}</Card><Card className="settings-card"><CardHeading title="Remote work" subtitle="The usual guideline is up to 4 days per month, with manager approval."/><div className="wfh-cap-row"><div className="wfh-cap-icon"><House size={18}/></div><div><b>Typical monthly limit</b><small>Only employees with WFH enabled can request a day.</small></div><div className="cap-input"><input type="number" min="1" max="15" value={form.wfh_monthly_cap??4} onChange={(e)=>set('wfh_monthly_cap',e.target.value)}/><span>days / month</span></div></div><div className="privacy-promise"><ShieldCheck size={16}/><span>No spyware, screen recording, webcam watching or keyboard tracking. WFH is trust-based; performance is measured through delivery.</span></div></Card></div>
-      <div className="settings-side"><Card className="office-map-card"><div className="map-drawing"><div className="map-grid-lines"/><div className="map-ring map-ring-one"/><div className="map-ring map-ring-two"/><span className="map-pin"><MapPin size={20} fill="currentColor"/></span><span className="map-label">PUNE HQ</span></div><div className="map-caption"><span className="office-live"><i/> OFFICE GEOGRAPHY</span><b>{form.office_name}</b><small>{Number(form.office_latitude).toFixed(6)}° N · {Number(form.office_longitude).toFixed(6)}° E</small><span className="radius-label"><i/> {form.geofence_meters} m geofence</span></div></Card><Card className="settings-note"><span className="note-shield"><ShieldCheck size={18}/></span><h3>Respect is built in.</h3><p>Location is sampled only for an attendance action and stored as a verification record. The app has no background location or continuous tracking.</p><Link className="text-link" to="/admin-attendance">Review the attendance data <ArrowRight size={14}/></Link></Card></div></div>}
+  const network=health?.officeNetwork;
+
+  return <>
+    <PageTitle eyebrow="ONE OFFICE · CLEAR RULES" title="Office settings" description="Manage Pune HQ verification and the current WFH limit." action={<button className="button button-soft" onClick={load}><RefreshCw size={15}/> Refresh</button>}/>
+    {error&&<InlineError>{error}</InlineError>}
+    {loading?<Card className="settings-loading"><Spinner/></Card>:<div className="settings-layout">
+      <div className="settings-main">
+        <Card className="settings-card">
+          <CardHeading title="Pune HQ attendance" subtitle="Office attendance requires a one-time location check and the configured office network."/>
+          <form className="form-stack" onSubmit={save}>
+            <label className="form-field"><span>Office name</span><input value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label>
+            <div className="form-two"><label className="form-field"><span>Latitude</span><input type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div>
+            <div className="form-two"><label className="form-field"><span>Geofence radius <small>(metres)</small></span><input type="number" min="20" max="1000" value={form.geofence_meters??''} onChange={(e)=>set('geofence_meters',e.target.value)} required/></label><label className="form-field"><span>Maximum GPS accuracy <small>(metres)</small></span><input type="number" min="20" max="250" value={form.gps_max_accuracy_meters??''} onChange={(e)=>set('gps_max_accuracy_meters',e.target.value)} required/></label></div>
+            <div className="locked-policy"><span><Clock3 size={16}/></span><div><b>Attendance rules</b><small>9:00 AM–6:00 PM · Monday–Saturday · late at 9:30 AM · fixed 30-minute lunch</small></div><span className="locked-badge"><ShieldCheck size={12}/> CURRENT POLICY</span></div>
+            <Button type="submit" loading={busy}>Save office settings</Button>
+          </form>
+        </Card>
+
+        <Card className="settings-card">
+          <CardHeading title="Office network verification" subtitle="The API verifies the network used for every GPS check-in and check-out."/>
+          {healthLoading?<div className="settings-loading"><Spinner/></div>:network?<div className="settings-health-grid">
+            <div><small>Configuration</small><b>{network.configured?'Ready':'Not configured'}</b></div>
+            <div><small>This request</small><b>{network.matchedCurrentRequest?'Office network':'Outside office network'}</b></div>
+            <div><small>Observed IP</small><b>{network.currentClientIp||'—'}</b></div>
+            <div><small>Allowed IPs</small><b>{network.configuredIpCount}</b></div>
+            <div><small>Attendance gate</small><b>{network.configured?'Location + Wi-Fi':'Configuration required'}</b></div>
+            <div><small>Tracking</small><b>One-time check only</b></div>
+          </div>:<InlineError>{healthError || 'Network verification status is unavailable.'}</InlineError>}
+          <div className="privacy-promise"><ShieldCheck size={16}/><span>The browser does not need to know the Wi-Fi name. The server verifies the office network identity when the attendance request arrives.</span></div>
+        </Card>
+
+        <Card className="settings-card">
+          <CardHeading title="System health" subtitle="Runtime and database diagnostics for administrators." action={<span className="live-tag"><i/> OPERATIONAL VIEW</span>}/>
+          {healthLoading?<div className="settings-loading"><Spinner/></div>:health?<div className="settings-health-grid">
+            <div><small>API status</small><b>{health.status === 'ok' ? 'Operational' : 'Unavailable'}</b></div><div><small>Database</small><b>{health.mysqlVersion || 'Connected'}</b></div><div><small>DB latency</small><b>{health.databaseLatencyMs} ms</b></div><div><small>Runtime</small><b>{health.nodeVersion}</b></div><div><small>Release</small><b>{health.version}</b></div><div><small>Build</small><b>{String(health.build).slice(0,12)}</b></div>
+          </div>:<InlineError>{healthError || 'System health is unavailable.'}</InlineError>}
+        </Card>
+
+        <Card className="settings-card">
+          <CardHeading title="Remote work" subtitle="The usual guideline is up to 4 days per month, with manager approval."/>
+          <div className="wfh-cap-row"><div className="wfh-cap-icon"><House size={18}/></div><div><b>Typical monthly limit</b><small>Only employees with WFH enabled can request a day.</small></div><div className="cap-input"><input type="number" min="1" max="15" value={form.wfh_monthly_cap??4} onChange={(e)=>set('wfh_monthly_cap',e.target.value)}/><span>days / month</span></div></div>
+          <div className="privacy-promise"><ShieldCheck size={16}/><span>No spyware, screen recording, webcam watching or keyboard tracking. WFH is trust-based; performance is measured through delivery.</span></div>
+        </Card>
+      </div>
+      <div className="settings-side">
+        <Card className="office-map-card"><div className="map-drawing"><div className="map-grid-lines"/><div className="map-ring map-ring-one"/><div className="map-ring map-ring-two"/><span className="map-pin"><MapPin size={20} fill="currentColor"/></span><span className="map-label">PUNE HQ</span></div><div className="map-caption"><span className="office-live"><i/> OFFICE GEOGRAPHY</span><b>{form.office_name}</b><small>{Number(form.office_latitude).toFixed(6)}° N · {Number(form.office_longitude).toFixed(6)}° E</small><span className="radius-label"><i/> {form.geofence_meters} m geofence</span></div></Card>
+        <Card className="settings-note"><span className="note-shield"><ShieldCheck size={18}/></span><h3>Respect is built in.</h3><p>Location is sampled only for an attendance action and stored as a verification record. The app has no background location or continuous tracking.</p><Link className="text-link" to="/admin-attendance">Review the attendance data <ArrowRight size={14}/></Link></Card>
+      </div>
+    </div>}
   </>;
 }
 
