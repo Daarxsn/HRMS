@@ -83,6 +83,20 @@ npm run dev
 
 Open `http://localhost:5173`. Select an account from the Local Preview list, or configure Google OAuth. The API health checks are `http://localhost:8080/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
 
+## Phase 4 production launch
+
+Phase 4 adds a controlled production release path through GitHub Actions. The manually triggered `Deploy Production` workflow:
+
+- authenticates to Google Cloud with GitHub OIDC / Workload Identity Federation;
+- builds the API image with Cloud Build into Artifact Registry;
+- runs the database migration runner as a one-task Cloud Run Job;
+- deploys the same immutable image to Cloud Run;
+- verifies both liveness and database-backed readiness after deployment.
+
+The workflow is intentionally configuration-driven. It does not contain company credentials, database passwords, JWT secrets, service-account keys, or real employee data. Configure the protected GitHub `production` environment from `docs/PHASE4_PRODUCTION_LAUNCH.md` before using it.
+
+Phase 4 is not considered production-complete until the company-owned Cloud SQL, Cloud Run, GCS, Google OAuth and Vercel environments pass the documented UAT and rollback checks.
+
 ## Google Cloud deployment
 
 Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a private Cloud Storage bucket for leave documentation. Keep the bucket’s public access prevention enabled.
