@@ -13,6 +13,7 @@ const leave=fs.readFileSync(path.join(root,'src/routes/leave.js'),'utf8');
 const admin=fs.readFileSync(path.join(root,'src/routes/admin.js'),'utf8');
 const validate=fs.readFileSync(path.join(root,'src/validate.js'),'utf8');
 const dbTest=fs.readFileSync(path.join(root,'test/database-smoke.mjs'),'utf8');
+const rollback=fs.readFileSync(path.join(root,'../.github/workflows/rollback-production.yml'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -40,5 +41,9 @@ assert.match(admin,/mysql_version/);
 assert.match(validate,/request_id:req.requestId/);
 assert.match(validate,/requestId: req.requestId/);
 assert.match(dbTest,/schema_migrations/);
+assert.match(rollback,/workflow_dispatch/);
+assert.match(rollback,/gcloud artifacts docker images describe/);
+assert.match(rollback,/gcloud run deploy/);
+assert.match(rollback,/Database migrations: not run during rollback/);
 
 console.log('Production API contracts: PASS');
