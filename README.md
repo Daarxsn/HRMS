@@ -109,6 +109,12 @@ Phase 6 adds bounded transient MySQL transaction retries, real MySQL 8.4 migrati
 
 See [Phase 6 reliability and recovery](docs/PHASE6_RELIABILITY_RECOVERY.md) for the recovery model and lock criteria.
 
+## Phase 7 identity security and integration certification
+
+Phase 7 hardens session lifecycle security with server-side session revocation and adds a real API integration smoke gate against the migrated and seeded MySQL database. Logout invalidates the current session version server-side, and GitHub Actions verifies employee/admin authentication, authorization, protected-route validation, system health, dashboard access, and logout revocation.
+
+See [Phase 7 identity security and integration certification](docs/PHASE7_IDENTITY_INTEGRATION.md) for the acceptance and lock criteria.
+
 ## Google Cloud deployment
 
 Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a private Cloud Storage bucket for leave documentation. Keep the bucket’s public access prevention enabled.
