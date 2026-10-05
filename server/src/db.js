@@ -34,19 +34,38 @@ export const query = async (sql, values = {}) => {
   const [rows] = await pool.execute(sql, values);
   return rows;
 };
+const transactionRetries = Number(process.env.DB_TRANSACTION_RETRIES || 2);
+if(!Number.isInteger(transactionRetries)||transactionRetries<0||transactionRetries>5)throw new Error('DB_TRANSACTION_RETRIES must be an integer between 0 and 5.');
+
+const transientTransactionErrors = new Set(['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT']);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const transaction = async (fn) => {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await fn(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    try { await connection.rollback(); } catch (rollbackError) {
-      console.error(JSON.stringify({type:'transaction_rollback_error',error:String(rollbackError?.message||rollbackError)}));
+  for (let attempt = 0; attempt <= transactionRetries; attempt += 1) {
+    const connection = await pool.getConnection();
+    let inTransaction = false;
+    try {
+      await connection.beginTransaction();
+      inTransaction = true;
+      const result = await fn(connection);
+      await connection.commit();
+      inTransaction = false;
+      return result;
+    } catch (error) {
+      if (inTransaction) {
+        try { await connection.rollback(); } catch (rollbackError) {
+          console.error(JSON.stringify({type:'transaction_rollback_error',error:String(rollbackError?.message||rollbackError)}));
+        }
+      }
+      const retryable = transientTransactionErrors.has(error?.code) && attempt < transactionRetries;
+      if (!retryable) throw error;
+      const delay = 50 * 2 ** attempt;
+      console.warn(JSON.stringify({type:'transaction_retry',attempt:attempt+1,code:error.code,delay_ms:delay}));
+      await sleep(delay);
+    } finally {
+      connection.release();
     }
-    throw error;
-  } finally {
-    connection.release();
   }
+  throw new Error('Transaction could not be completed.');
 };
