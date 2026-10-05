@@ -30,7 +30,12 @@ router.post('/google', asyncRoute(async (req, res) => {
   const credential = req.body?.credential;
   if (typeof credential !== 'string' || credential.length > 5000) return res.status(400).json({ error: 'Google sign-in token is missing.' });
   if (!process.env.GOOGLE_CLIENT_ID) return res.status(503).json({ error: 'Google Sign-In is not configured yet.' });
-  const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
+  } catch {
+    throw Object.assign(new Error('Google could not verify this sign-in. Please try again.'), { status: 401 });
+  }
   const claims = ticket.getPayload();
   if (!claims?.email || claims.email_verified !== true || !claims.sub) return res.status(401).json({ error: 'Google could not verify this account.' });
   const email = claims.email.trim().toLowerCase();
