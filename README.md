@@ -103,6 +103,12 @@ Phase 5 adds runtime release traceability, administrator-only system health diag
 
 See [Phase 5 operational excellence](docs/PHASE5_OPERATIONAL_EXCELLENCE.md) for the acceptance and lock criteria.
 
+## Phase 6 reliability and recovery
+
+Phase 6 adds bounded transient MySQL transaction retries, real MySQL 8.4 migration/seed verification in CI, and a controlled production rollback workflow for redeploying a known-good immutable API image.
+
+See [Phase 6 reliability and recovery](docs/PHASE6_RELIABILITY_RECOVERY.md) for the recovery model and lock criteria.
+
 ## Google Cloud deployment
 
 Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a private Cloud Storage bucket for leave documentation. Keep the bucket’s public access prevention enabled.
