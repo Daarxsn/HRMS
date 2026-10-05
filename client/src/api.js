@@ -25,8 +25,11 @@ export async function request(path, options = {}) {
       if (response.status === 401 && !authEndpoint) {
         globalThis.dispatchEvent?.(new CustomEvent('hrms:session-expired'));
       }
-      const error = new Error(data.error || `Request failed (${response.status}).`);
+      const requestId = data.requestId || response.headers.get('X-Request-ID') || null;
+      const message = data.error || `Request failed (${response.status}).`;
+      const error = new Error(requestId && response.status >= 500 ? `${message} Reference: ${requestId}` : message);
       error.status = response.status;
+      error.requestId = requestId;
       throw error;
     }
 
