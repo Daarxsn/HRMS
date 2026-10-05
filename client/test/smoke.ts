@@ -40,6 +40,9 @@ assert.ok(app.includes('approved this month'), 'Employee WFH usage visibility co
 assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract missing');
 assert.ok(app.includes('path="/notifications"'), 'Employee notifications route contract missing');
 assert.ok(app.includes('get(\'/account/notifications\')'), 'Employee notifications API integration contract missing');
+assert.ok(app.includes('Workplace pulse'), 'Administrator workplace pulse contract missing');
+assert.ok(app.includes('Next to review'), 'Administrator review preview contract missing');
+assert.ok(app.includes("get('/admin/approvals')"), 'Administrator approval queue integration contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
 assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the production UI');
