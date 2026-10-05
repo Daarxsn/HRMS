@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = path.resolve(process.cwd(), 'client');
+const root = process.cwd();
 const app = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
 const api = fs.readFileSync(path.join(root, 'src/api.js'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
