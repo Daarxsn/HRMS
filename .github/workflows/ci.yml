@@ -45,10 +45,10 @@ jobs:
 
       - name: Check server syntax
         run: |
-          find server/src server/test -type f -name '*.js' -print0 |
+          find server/src server/test -type f \( -name '*.js' -o -name '*.mjs' \) -print0 |
             xargs -0 -n1 node --check
 
-      - name: Run backend tests
+      - name: Run backend unit and contract tests
         run: npm test
 
       - name: Apply MySQL migrations in CI
@@ -72,12 +72,25 @@ jobs:
           npm run db:seed
           npm run db:verify --workspace server
 
+      - name: Run API integration smoke test
+        env:
+          NODE_ENV: development
+          PORT: 8090
+          APP_ORIGIN: http://127.0.0.1:8090
+          DEMO_AUTH_ENABLED: true
+          JWT_SECRET: ci-integration-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run test:integration --workspace server
+
       - name: Build frontend
         run: npm run build
 
       - name: Run frontend smoke contracts
         run: npm run test:smoke --workspace client
-
 
       - name: Build production API image
         run: docker build -f server/Dockerfile -t falchion-xeniaa-api:ci server
