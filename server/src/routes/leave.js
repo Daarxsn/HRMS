@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.js';
@@ -8,6 +9,7 @@ import { indiaDate, workingDaysInclusive } from '../policy.js';
 
 const router = Router();
 router.use(requireAuth);
+const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 async function getLeaveBalances(employee, connection = null) {
   const execute = async (sql, values = {}) => connection ? (await connection.execute(sql, values))[0] : query(sql, values);
@@ -52,7 +54,7 @@ router.get('/', asyncRoute(async (req, res) => {
   res.json({ requests });
 }));
 
-router.post('/', asyncRoute(async (req, res) => {
+router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({
     type: z.enum(['CASUAL','SICK','EARNED','FLOATING']), startDate: dateSchema,
     endDate: dateSchema, reason: z.string().trim().min(8).max(1000), attachmentId: z.string().uuid().optional()
@@ -93,7 +95,7 @@ router.post('/', asyncRoute(async (req, res) => {
   res.status(201).json({ ok: true, id, days });
 }));
 
-router.delete('/:id', asyncRoute(async (req, res) => {
+router.delete('/:id', leaveMutationLimiter, asyncRoute(async (req, res) => {
   const result = await query(`UPDATE leave_requests SET status='CANCELLED' WHERE id=:id AND employee_id=:employee AND status='PENDING'`, { id: req.params.id, employee: req.user.id });
   if (!result.affectedRows) throw Object.assign(new Error('Only pending requests can be withdrawn.'), { status: 409 });
   await audit({ actorId: req.user.id, action: 'LEAVE_REQUEST_CANCELLED', entityType: 'leave_request', entityId: req.params.id, ipAddress: req.ip });
