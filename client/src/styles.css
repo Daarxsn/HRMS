@@ -35,3 +35,11 @@
   .modal-overlay{padding-bottom:calc(9px + env(safe-area-inset-bottom))}
   button,.button,.icon-button,.nav-link{touch-action:manipulation}
 }
+
+
+.settings-health-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:4px}
+.settings-health-grid>div{border:1px solid var(--line,#e6e2dc);border-radius:14px;padding:14px;background:var(--surface-muted,#faf9f7);display:flex;flex-direction:column;gap:5px;min-width:0}
+.settings-health-grid small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#7a7772)}
+.settings-health-grid b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:900px){.settings-health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.settings-health-grid{grid-template-columns:1fr}}
