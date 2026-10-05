@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { query, transaction } from '../db.js';
+import { pool, query, transaction } from '../db.js';
 import { audit, notify, requireAdmin, requireAuth, hashToken } from '../security.js';
 import { asyncRoute, dateSchema, validate } from '../validate.js';
 import { attendanceStatus, indiaDate, indiaTime, isScheduledWorkday, netWorkedMinutes, POLICY } from '../policy.js';
@@ -79,7 +79,7 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
 
 router.get('/system-health', asyncRoute(async (req, res) => {
   const started = process.hrtime.bigint();
-  const [rows] = await connectionQuery('SELECT VERSION() AS mysql_version, UTC_TIMESTAMP() AS database_time');
+  const [rows] = await pool.query('SELECT VERSION() AS mysql_version, UTC_TIMESTAMP() AS database_time');
   const latencyMs = Number((process.hrtime.bigint() - started) / 1000000n);
   res.json({
     status: 'ok',
@@ -92,10 +92,6 @@ router.get('/system-health', asyncRoute(async (req, res) => {
     databaseLatencyMs: latencyMs
   });
 }));
-
-async function connectionQuery(sql, values = {}) {
-  return await (await import('../db.js')).pool.execute(sql, values);
-}
 
 router.get('/users', asyncRoute(async (req, res) => {
   const users = await query(`SELECT e.id, e.employee_code, e.full_name, e.email, e.role, e.user_type, e.status, e.title, e.phone, e.wfh_enabled, e.joined_on,
