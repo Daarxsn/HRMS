@@ -43,10 +43,13 @@ jobs:
       - name: Security audit dependencies
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Check server syntax
+      - name: Check TypeScript server syntax
         run: |
-          find server/src server/test -type f \( -name '*.js' -o -name '*.mjs' \) -print0 |
-            xargs -0 -n1 node --check
+          find server/src server/test -type f -name '*.ts' -print0 |
+            xargs -0 -n1 node --experimental-strip-types --check
+
+      - name: Typecheck frontend and backend
+        run: npm run typecheck
 
       - name: Run backend unit and contract tests
         run: npm test
@@ -86,7 +89,7 @@ jobs:
           DB_PASSWORD: root
         run: npm run test:integration --workspace server
 
-      - name: Build frontend
+      - name: Build frontend and backend
         run: npm run build
 
       - name: Run frontend smoke contracts
