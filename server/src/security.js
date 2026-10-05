@@ -9,7 +9,11 @@ const secret = () => {
 };
 
 export function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, secret(), { expiresIn: '8h', issuer: 'falchion-xeniaa' });
+  return jwt.sign(
+    { sub: user.id, role: user.role, session_version: Number(user.session_version || 0) },
+    secret(),
+    { expiresIn: '8h', issuer: 'falchion-xeniaa' }
+  );
 }
 export function authCookieOptions() {
   return { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 8 * 60 * 60 * 1000 };
@@ -19,9 +23,10 @@ export async function requireAuth(req, res, next) {
     const token = req.cookies?.fx_session;
     if (!token) return res.status(401).json({ error: 'Sign in to continue.' });
     const payload = jwt.verify(token, secret(), { issuer: 'falchion-xeniaa' });
-    const rows = await query(`SELECT id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date
+    const rows = await query(`SELECT id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date, session_version
       FROM employees WHERE id = :id LIMIT 1`, { id: payload.sub });
     if (!rows[0] || rows[0].status !== 'ACTIVE') return res.status(401).json({ error: 'This account is not active.' });
+    if (Number(payload.session_version) !== Number(rows[0].session_version)) return res.status(401).json({ error: 'Your session has been revoked. Sign in again.' });
     req.user = rows[0];
     next();
   } catch {
