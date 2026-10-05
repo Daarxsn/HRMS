@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, isScheduledWorkday, netWorkedMinutes, workingDaysInclusive } from '../src/policy.js';
+import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, workingDaysInclusive } from '../src/policy.js';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
@@ -35,4 +35,11 @@ test('work duration always deducts the fixed 30-minute lunch and never goes belo
   assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 12:30:00'), 510);
   assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 11:30:00'), 450);
   assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 03:50:00'), 0);
+});
+
+
+test('office network verification accepts configured IPs and rejects external networks', () => {
+  assert.equal(isOfficeNetworkIpAllowed('127.0.0.1', '127.0.0.1;::1'), true);
+  assert.equal(isOfficeNetworkIpAllowed('::1', '127.0.0.1;::1'), true);
+  assert.equal(isOfficeNetworkIpAllowed('203.0.113.42', '127.0.0.1;::1'), false);
 });
