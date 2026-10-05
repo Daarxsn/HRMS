@@ -258,7 +258,7 @@ function AttendancePage(){
   const punch=async(type,method='GPS',token)=>{
     setBusy(true);setError('');
     try{let geo={};if(method==='GPS')geo=await captureLocation();const result=await post(`/attendance/${type}`,{method,...geo,qrToken:token});setShowQr(false);setQrToken('');setWorkplaceMode('OFFICE');notify(type==='check-in'?`You’re checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`:'You’re checked out. Have a good evening.');await load();refresh();}
-    catch(e){setError(e.message);if(method==='GPS')setShowQr(true);}
+    catch(e){setError(e.message);if(method==='GPS' && !e.code && (e.status==null || e.status===400 || e.status===422))setShowQr(true);}
     finally{setBusy(false);}
   };
   const submitQr=()=>{let token=qrToken.trim();try{const parsed=new URL(token,window.location.origin);token=parsed.searchParams.get('qr')||token;}catch{}punch(working?'check-out':'check-in','QR',token);};
