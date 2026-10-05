@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
+import { rateLimit } from 'express-rate-limit';
 import { Storage } from '@google-cloud/storage';
 import { z } from 'zod';
 import { query, transaction } from '../db.js';
@@ -13,12 +14,13 @@ import { indiaDate, isScheduledWorkday } from '../policy.js';
 const router = Router();
 router.use(requireAuth);
 const storage = process.env.GCS_BUCKET ? new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT }) : null;
+const uploadLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => {
   const allowed = ['application/pdf','image/jpeg','image/png'];
   cb(allowed.includes(file.mimetype) ? null : Object.assign(new Error('Only PDF, JPG, or PNG files are accepted.'), { status: 400 }), allowed.includes(file.mimetype));
 } });
 
-router.post('/files', upload.single('file'), asyncRoute(async (req, res) => {
+router.post('/files', uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) throw Object.assign(new Error('Choose a PDF, JPG, or PNG file up to 10 MB.'), { status: 400 });
   const signatures={
     'application/pdf':Buffer.from('%PDF-'),
@@ -29,15 +31,30 @@ router.post('/files', upload.single('file'), asyncRoute(async (req, res) => {
   const id = crypto.randomUUID();
   const suffix = req.file.mimetype === 'application/pdf' ? '.pdf' : req.file.mimetype === 'image/jpeg' ? '.jpg' : '.png';
   const key = `${req.user.id}/${id}${suffix}`;
-  if (storage) {
-    await storage.bucket(process.env.GCS_BUCKET).file(key).save(req.file.buffer, { resumable: false, metadata: { contentType: req.file.mimetype, cacheControl: 'private, no-store' }, validation: 'crc32c' });
-  } else {
-    const folder = path.resolve(process.cwd(), 'private-uploads', req.user.id);
-    await fs.mkdir(folder, { recursive: true, mode: 0o700 });
-    await fs.writeFile(path.join(folder, `${id}${suffix}`), req.file.buffer, { mode: 0o600, flag: 'wx' });
+  const localPath = path.resolve(process.cwd(), 'private-uploads', key);
+  try {
+    if (storage) {
+      await storage.bucket(process.env.GCS_BUCKET).file(key).save(req.file.buffer, {
+        resumable: false,
+        metadata: { contentType: req.file.mimetype, cacheControl: 'private, no-store' },
+        validation: 'crc32c',
+        preconditionOpts: { ifGenerationMatch: 0 }
+      });
+    } else {
+      await fs.mkdir(path.dirname(localPath), { recursive: true, mode: 0o700 });
+      await fs.writeFile(localPath, req.file.buffer, { mode: 0o600, flag: 'wx' });
+    }
+    await query(`INSERT INTO attachments (id, uploaded_by, original_filename, object_key, content_type, size_bytes)
+      VALUES (:id, :owner, :name, :key, :type, :size)`, { id, owner: req.user.id, name: path.basename(req.file.originalname).slice(0,255), key, type: req.file.mimetype, size: req.file.size });
+  } catch (error) {
+    try {
+      if (storage) await storage.bucket(process.env.GCS_BUCKET).file(key).delete({ ignoreNotFound: true });
+      else await fs.unlink(localPath);
+    } catch (cleanupError) {
+      console.error(JSON.stringify({type:'attachment_cleanup_error',request_id:req.requestId,attachment_id:id,error:String(cleanupError?.message||cleanupError)}));
+    }
+    throw error;
   }
-  await query(`INSERT INTO attachments (id, uploaded_by, original_filename, object_key, content_type, size_bytes)
-    VALUES (:id, :owner, :name, :key, :type, :size)`, { id, owner: req.user.id, name: path.basename(req.file.originalname).slice(0,255), key, type: req.file.mimetype, size: req.file.size });
   await audit({ actorId: req.user.id, action: 'PRIVATE_ATTACHMENT_UPLOADED', entityType: 'attachment', entityId: id, details: { content_type: req.file.mimetype, size_bytes: req.file.size }, ipAddress: req.ip });
   res.status(201).json({ id, filename: path.basename(req.file.originalname) });
 }));
