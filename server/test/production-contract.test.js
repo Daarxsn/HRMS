@@ -12,6 +12,7 @@ const attendance=fs.readFileSync(path.join(root,'src/routes/attendance.js'),'utf
 const leave=fs.readFileSync(path.join(root,'src/routes/leave.js'),'utf8');
 const admin=fs.readFileSync(path.join(root,'src/routes/admin.js'),'utf8');
 const validate=fs.readFileSync(path.join(root,'src/validate.js'),'utf8');
+const dbTest=fs.readFileSync(path.join(root,'test/database-smoke.mjs'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -24,6 +25,9 @@ assert.match(docker,/USER node/);
 assert.match(docker,/STOPSIGNAL SIGTERM/);
 assert.match(db,/connectTimeout: 10000/);
 assert.match(db,/queueLimit: 20/);
+assert.match(db,/DB_TRANSACTION_RETRIES/);
+assert.match(db,/ER_LOCK_DEADLOCK/);
+assert.match(db,/ER_LOCK_WAIT_TIMEOUT/);
 assert.match(migrate,/GET_LOCK/);
 assert.match(index,/requestTimeout=30000/);
 assert.match(index,/headersTimeout=35000/);
@@ -35,5 +39,7 @@ assert.match(admin,/system-health/);
 assert.match(admin,/mysql_version/);
 assert.match(validate,/request_id:req.requestId/);
 assert.match(validate,/requestId: req.requestId/);
+assert.match(dbTest,/schema_migrations/);
+assert.match(dbTest,/falchion_hrms_ci/);
 
 console.log('Production API contracts: PASS');
