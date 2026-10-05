@@ -23,7 +23,7 @@ This gives the server an explicit revocation mechanism rather than relying only 
 
 ### 7.2 API integration smoke gate
 
-Added server/test/integration.mjs and the test:integration workspace command.
+Added server/test/integration.ts and the test:integration workspace command.
 
 The test starts the API against the CI MySQL database and verifies:
 
