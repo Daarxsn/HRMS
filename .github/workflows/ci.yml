@@ -36,3 +36,6 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Run frontend smoke contracts
+        run: npm run test:smoke --workspace client
