@@ -89,6 +89,15 @@ function App() {
     return()=>{live=false;};
   },[]);
   useEffect(()=>{ if(user)refreshNotifications(); },[user,refresh]);
+  useEffect(()=>{
+    const onSessionExpired=()=>{
+      setUser(null);
+      setNotifications({unread:0,notifications:[]});
+      setToast({message:'Your session has expired. Please sign in again.',type:'error'});
+    };
+    window.addEventListener('hrms:session-expired',onSessionExpired);
+    return ()=>window.removeEventListener('hrms:session-expired',onSessionExpired);
+  },[]);
   useEffect(()=>{ if(import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
   const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications}),[user,notifications]);
   return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><IconLogo/><Spinner large/></div>:user?<Shell/>:<LoginScreen demo={demo}/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
@@ -170,10 +179,10 @@ function Shell(){
   </div>;
 }
 function NotificationPopover({close,refresh}){
-  const {notifications}=useApp();const [items,setItems]=useState(notifications.notifications);const [busy,setBusy]=useState(false);
+  const {notifications,notify}=useApp();const [items,setItems]=useState(notifications.notifications);const [busy,setBusy]=useState(false);const [busyId,setBusyId]=useState(null);
   useEffect(()=>setItems(notifications.notifications),[notifications]);
-  const mark=async(id)=>{try{await post(`/account/notifications/${id}/read`);setItems((all)=>all.map((x)=>x.id===id?{...x,read_at:new Date().toISOString()}:x));refresh();}catch{}}
-  const markAll=async()=>{setBusy(true);try{await post('/account/notifications/read-all');setItems((all)=>all.map((x)=>({...x,read_at:new Date().toISOString()})));refresh();}catch{}setBusy(false);}
+  const mark=async(id)=>{setBusyId(id);try{await post(`/account/notifications/${id}/read`);setItems((all)=>all.map((x)=>x.id===id?{...x,read_at:new Date().toISOString()}:x));refresh();}catch(e){notify(e.message,'error');}finally{setBusyId(null);}}
+  const markAll=async()=>{setBusy(true);try{await post('/account/notifications/read-all');setItems((all)=>all.map((x)=>({...x,read_at:new Date().toISOString()})));refresh();}catch(e){notify(e.message,'error');}finally{setBusy(false);}}
   return <div className="notification-popover"><div className="popover-heading"><div><b>Notifications</b><small>{notifications.unread?`${notifications.unread} unread`:'You’re all caught up'}</small></div><button className="text-button" disabled={!notifications.unread||busy} onClick={markAll}>Mark all read</button></div><div className="notification-list">{items.length?items.slice(0,8).map((item)=><button className={`notification-item${item.read_at?'':' notification-unread'}`} key={item.id} onClick={()=>mark(item.id)}><span className="notification-icon"><CheckCheck size={15}/></span><span><b>{item.title}</b><small>{item.body}</small><em>{formatTime(item.created_at)} · {formatDate(String(item.created_at).slice(0,10),{month:'short',day:'numeric'})}</em></span></button>):<div className="notification-empty"><Bell size={20}/><span>No notifications yet</span></div>}</div></div>;
 }
 function NoAccess(){return <div className="no-access"><ShieldCheck size={30}/><h2>You don’t have access to this view.</h2><p>Ask an administrator if you think this is a mistake.</p><Link className="text-link" to="/">Back to overview <ArrowRight size={15}/></Link></div>;}
@@ -226,7 +235,23 @@ function AttendancePage(){
   useEffect(()=>{load();},[]);
   useEffect(()=>{const token=new URLSearchParams(window.location.search).get('qr');if(token){setQrToken(token);setShowQr(true);history.replaceState({},'',window.location.pathname);}},[]);
   const current=rows.find((r)=>r.attendance_date===today);const working=current?.check_in_at&&!current.check_out_at;
-  const captureLocation=()=>new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(new Error('This browser does not support location. Use the office QR fallback.'));navigator.geolocation.getCurrentPosition(({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),()=>reject(new Error('Location permission is unavailable. Use the office QR fallback.')),{enableHighAccuracy:true,timeout:12000,maximumAge:0});});
+  const captureLocation=()=>new Promise((resolve,reject)=>{
+    if(!navigator.geolocation)return reject(new Error('This browser does not support location. Use the office QR fallback.'));
+    navigator.geolocation.getCurrentPosition(
+      ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
+      (geoError)=>{
+        const message = geoError?.code===1
+          ? 'Location permission was denied. Allow location access or use the office QR fallback.'
+          : geoError?.code===2
+            ? 'Your location could not be determined. Move to an area with a clearer signal or use the office QR fallback.'
+            : geoError?.code===3
+              ? 'Location lookup took too long. Try again or use the office QR fallback.'
+              : 'Location permission is unavailable. Use the office QR fallback.';
+        reject(new Error(message));
+      },
+      {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+    );
+  });
   const punch=async(type,method='GPS',token)=>{
     setBusy(true);setError('');
     try{let geo={};if(method==='GPS')geo=await captureLocation();const result=await post(`/attendance/${type}`,{method,...geo,qrToken:token});setShowQr(false);setQrToken('');setWorkplaceMode('OFFICE');notify(type==='check-in'?`You’re checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`:'You’re checked out. Have a good evening.');await load();refresh();}
@@ -254,7 +279,7 @@ function AttendancePage(){
 function QRFallback({token,setToken,busy,action,close,checkOut}){
   const [camera,setCamera]=useState(false);const [cameraError,setCameraError]=useState('');const videoRef=useRef(null);const streamRef=useRef(null);
   useEffect(()=>{if(!camera)return;let running=true;let detector;
-    const start=async()=>{try{if(!('BarcodeDetector'in window))throw new Error('QR scanning is not supported in this browser. Use your camera app or enter the code below.');detector=new window.BarcodeDetector({formats:['qr_code']});const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});streamRef.current=stream;if(videoRef.current)videoRef.current.srcObject=stream;await videoRef.current?.play();const scan=async()=>{if(!running||!videoRef.current)return;try{const codes=await detector.detect(videoRef.current);if(codes[0]?.rawValue){const value=new URL(codes[0].rawValue,location.origin).searchParams.get('qr')||codes[0].rawValue;setToken(value);setCamera(false);return;}}catch{}requestAnimationFrame(scan);};scan();}catch(e){setCameraError(e.message);setCamera(false);}};start();return()=>{running=false;streamRef.current?.getTracks().forEach(t=>t.stop());};},[camera,setToken]);
+    const start=async()=>{try{if(!('BarcodeDetector'in window))throw new Error('QR scanning is not supported in this browser. Use your camera app or enter the code below.');detector=new window.BarcodeDetector({formats:['qr_code']});if(!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access is not available in this browser. Enter the office QR link manually.');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});streamRef.current=stream;if(videoRef.current)videoRef.current.srcObject=stream;await videoRef.current?.play();const scan=async()=>{if(!running||!videoRef.current)return;try{const codes=await detector.detect(videoRef.current);if(codes[0]?.rawValue){const value=new URL(codes[0].rawValue,location.origin).searchParams.get('qr')||codes[0].rawValue;setToken(value);setCamera(false);return;}}catch{}requestAnimationFrame(scan);};scan();}catch(e){setCameraError(e.message);setCamera(false);}};start();return()=>{running=false;streamRef.current?.getTracks().forEach(t=>t.stop());};},[camera,setToken]);
   return <div className="qr-overlay"><Card className="qr-modal"><div className="qr-modal-head"><div><span className="eyebrow">LOCATION ALTERNATIVE</span><h2>Use the office QR</h2><p>Ask an administrator for the current, expiring office code.</p></div><button className="icon-button" onClick={close} aria-label="Close"><X size={20}/></button></div>{camera&&<div className="camera-box"><video ref={videoRef} playsInline muted/><button className="button button-soft" onClick={()=>setCamera(false)}>Stop camera</button></div>}{cameraError&&<div className="inline-alert alert-neutral">{cameraError}</div>}<div className="qr-divider"><span>SCAN OR ENTER THE CODE</span></div><div className="qr-input-row"><input className="text-input" value={token} onChange={(e)=>setToken(e.target.value)} placeholder="Paste or scan the secure office link" aria-label="Office QR link or token"/><Button onClick={action} disabled={!token.trim()} loading={busy} icon={checkOut?LogOut:LogIn}>{checkOut?'Check out':'Check in'}</Button></div><div className="qr-modal-foot"><button className="text-link" onClick={()=>{setCameraError('');setCamera(true);}}><QrCode size={15}/> Scan with camera</button><span><ShieldCheck size={14}/> Expires automatically · no location access needed</span></div></Card></div>;
 }
 function CorrectionModal({close,onDone}){
