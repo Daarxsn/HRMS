@@ -69,7 +69,11 @@ app.use((req,res)=>res.status(404).json({error:'That API route was not found.',r
 app.use(errorHandler);
 
 const port=Number(process.env.PORT || 8080);
-const server=app.listen(port,()=>console.log(`Falchion Xeniaa API listening on ${port}`));
+const server=app.listen(port,()=>console.log(JSON.stringify({type:'server_started',service:'falchion-xeniaa-api',port,node_env:process.env.NODE_ENV||'development'})));
+server.requestTimeout=30000;
+server.headersTimeout=35000;
+server.keepAliveTimeout=5000;
+server.maxRequestsPerSocket=1000;
 let shuttingDown=false;
 const stop=async(signal)=>{
   if(shuttingDown)return;
