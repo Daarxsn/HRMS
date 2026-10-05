@@ -3,9 +3,9 @@ import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { pool, query, transaction } from '../db.js';
-import { audit, notify, requireAdmin, requireAuth, hashToken } from '../security.js';
+import { audit, notify, requireAdmin, requireAuth } from '../security.js';
 import { asyncRoute, dateSchema, validate } from '../validate.js';
-import { attendanceStatus, indiaDate, indiaTime, isScheduledWorkday, netWorkedMinutes, POLICY } from '../policy.js';
+import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.js';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -81,6 +81,9 @@ router.get('/system-health', asyncRoute(async (req, res) => {
   const started = process.hrtime.bigint();
   const [rows] = await pool.query('SELECT VERSION() AS mysql_version, UTC_TIMESTAMP() AS database_time');
   const latencyMs = Number((process.hrtime.bigint() - started) / 1000000n);
+  const configuredNetwork = String(process.env.OFFICE_NETWORK_IPS || (process.env.NODE_ENV === 'development' ? '127.0.0.1,::1' : '')).trim();
+  const configuredNetworkIps = parseOfficeNetworkIps(configuredNetwork);
+  const currentNetworkIp = normalizeClientIp(req.ip);
   res.json({
     status: 'ok',
     service: 'falchion-xeniaa-api',
@@ -89,7 +92,13 @@ router.get('/system-health', asyncRoute(async (req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     nodeVersion: process.version,
     mysqlVersion: rows[0]?.mysql_version || null,
-    databaseLatencyMs: latencyMs
+    databaseLatencyMs: latencyMs,
+    officeNetwork: {
+      configured: configuredNetworkIps.length > 0,
+      matchedCurrentRequest: configuredNetworkIps.length > 0 && isOfficeNetworkIpAllowed(currentNetworkIp, configuredNetwork),
+      currentClientIp: currentNetworkIp,
+      configuredIpCount: configuredNetworkIps.length
+    }
   });
 }));
 
@@ -209,24 +218,6 @@ router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
   const input = validate(schema,req.body);
   for (const [key,value] of Object.entries(input)) await query(`INSERT INTO system_settings (setting_key,setting_value,updated_by) VALUES (:key,:value,:actor) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)`, { key,value:String(value),actor:req.user.id });
   await audit({ actorId:req.user.id, action:'SYSTEM_SETTINGS_UPDATED', entityType:'system_settings', details:{ fields:Object.keys(input) }, ipAddress:req.ip });
-  res.json({ok:true});
-}));
-
-router.post('/qr', adminMutationLimiter, asyncRoute(async (req,res) => {
-  const settings = await query(`SELECT setting_key,setting_value FROM system_settings WHERE setting_key IN ('qr_ttl_seconds','office_name')`);
-  const values = Object.fromEntries(settings.map((r)=>[r.setting_key,r.setting_value]));
-  const ttl = Number(values.qr_ttl_seconds || POLICY.qrTtlSeconds);
-  const token = crypto.randomBytes(32).toString('base64url');
-  const id = crypto.randomUUID();
-  await query(`INSERT INTO qr_challenges (id,token_hash,expires_at,created_by) VALUES (:id,:hash,DATE_ADD(UTC_TIMESTAMP(),INTERVAL :ttl SECOND),:actor)`, { id,hash:hashToken(token),ttl,actor:req.user.id });
-  await audit({ actorId:req.user.id, action:'OFFICE_QR_GENERATED', entityType:'qr_challenge', entityId:id, details:{ttl_seconds:ttl}, ipAddress:req.ip });
-  const configuredOrigin = process.env.DEMO_APP_URL || String(process.env.APP_ORIGIN || '').split(',')[0].trim() || 'http://localhost:5173';
-  const base = configuredOrigin.replace(/\/$/,'');
-  res.status(201).json({ id, token, expiresIn:ttl, expiresAt:new Date(Date.now()+ttl*1000).toISOString(), payload:`${base}/?qr=${encodeURIComponent(token)}` });
-}));
-router.delete('/qr/current', adminMutationLimiter, asyncRoute(async (req,res) => {
-  const result = await query(`UPDATE qr_challenges SET revoked_at=UTC_TIMESTAMP() WHERE expires_at>UTC_TIMESTAMP() AND revoked_at IS NULL`);
-  await audit({ actorId:req.user.id, action:'OFFICE_QR_REVOKED', entityType:'qr_challenge', details:{ count:result.affectedRows }, ipAddress:req.ip });
   res.json({ok:true});
 }));
 
