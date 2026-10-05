@@ -35,6 +35,9 @@ assert.ok(app.includes('Verifying office network'), 'Attendance office-network v
 assert.ok(app.includes('navigator.geolocation'), 'Browser geolocation attendance contract missing');
 assert.ok(app.includes("get('/admin/system-health')"), 'Administrator system-health API integration contract missing');
 assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contract missing');
+assert.ok(app.includes('What needs your attention'), 'Employee action-center contract missing');
+assert.ok(app.includes('approved this month'), 'Employee WFH usage visibility contract missing');
+assert.ok(app.includes('Next company holiday'), 'Employee next-holiday contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
 assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the production UI');
