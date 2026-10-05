@@ -1,13 +1,143 @@
-# Falchion Xeniaa HRMS
+# Falchion Xeniaa Employee Management System
 
-Complete Employee + Admin HRMS implementation.
+A responsive employee and administrator workplace portal built with the locked stack: **React, Node.js, MySQL, Google Cloud and Vercel**. The React app uses Vite; the API uses Express on Node.js; production data is stored in MySQL on Cloud SQL; the API is designed for Cloud Run; and the frontend is a static Vite build for Vercel.
 
-The full implementation artifact is committed as `falchion-xeniaa-complete.zip`.
+## What is implemented
 
-## Validation
-- Backend syntax checks passed
-- Backend policy tests: 6/6 passed
-- Frontend production build could not be executed in the packaging environment because Vite was unavailable
+- Google Sign-In with an authorized-user allowlist. An administrator provisions an employee’s Google email first; no company email domain is enforced.
+- Administrator and employee roles, employee/intern account types, and account activation controls. No departments are modeled in V1.
+- Employee home, attendance history, profile, notification center, holiday calendar, leave and WFH request experiences.
+- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, office configuration, and expiring QR generation.
+- Server-side GPS distance and accuracy checks at the time an employee chooses check-in or check-out. A GPS event stores one location verification record. There is no continuous location collection or background tracking.
+- Expiring office QR fallback. Each employee can use a shared current QR once per check-in and once per check-out while it is active. Refreshing/revoking codes is controlled by an administrator.
+- 9:00 AM–6:00 PM schedule, Monday–Saturday work week, late at **9:30 AM or later**, fixed 30-minute lunch deduction, and approved flex starts between 9:00 AM and 10:30 AM.
+- Casual and sick leave share the locked 8-day annual pool; earned leave is 15 days/year with the policy’s 1-day-per-month accrual after probation; floating leave is 4 days/year. Sundays and company/national holidays are excluded from day-counting. A doctor’s note is required for sick leave of 3 or more consecutive calendar days.
+- Planned WFH requires at least 24 hours’ notice, emergency WFH can be requested on the same day, and approval is required. The typical monthly guideline defaults to 4 days and eligibility is individually enabled. Only one seeded demo employee has WFH enabled.
+- Temporary exit/return timestamps, attendance correction requests, flex-start approvals, in-app notifications, private leave attachments, holiday management, and append-only-style audit entries.
+- PWA manifest and a small static shell cache. API responses and personal data are never placed in the offline cache.
+- Security basics: secure HTTP-only session cookie, short-lived signed session, Google token verification, server-side role checks, exact-origin CORS, Helmet, request validation, sign-in rate limiting, least-data location records, CSV formula-injection protection, and private GCS attachment storage. The npm locks pin `uuid` 11.1.1 through an override to address a transitive Google SDK advisory; the affected SDK call sites use the compatible `v4` API.
 
-## Stack
-React + Vite, Node.js + Express, MySQL, Google Sign-In, PWA
+## Project structure
+
+```text
+client/                 React UI, Vite config, PWA shell, Vercel config
+server/src/             Express API, auth, policy, routes and database pool
+server/migrations/      MySQL schema migrations
+server/private-uploads/ Local-only private upload directory (ignored by Git)
+docs/API.md             API roles and endpoint contract
+server/Dockerfile       Cloud Run container build
+```
+
+This archive is the working Falchion Xeniaa application project. It is structured as a Vite React client and Express Node.js API and is ready for local development and deployment configuration.
+
+## Run locally
+
+### Requirements
+
+- Node.js 22 or newer and npm
+- MySQL 8.0 or newer
+- A Google OAuth Web client to exercise Google sign-in (optional for local preview)
+
+### 1. Install packages
+
+From this project directory:
+
+```sh
+npm install
+```
+
+### 2. Create a local MySQL database and user
+
+```sql
+CREATE DATABASE falchion_xeniaa CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'falchion_app'@'localhost' IDENTIFIED BY 'use-a-local-secret-here';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON falchion_xeniaa.* TO 'falchion_app'@'localhost';
+```
+
+Use a separate, least-privilege application identity in each deployed environment. Schema changes are applied through the migration command, which needs the additional DDL rights above; the running application itself only needs routine data access.
+
+### 3. Configure the API
+
+Copy `.env.example` to `server/.env`, then set the local database values. `JWT_SECRET` must be a private random value with at least 32 bytes. Never commit `.env`.
+
+For local preview without Google OAuth, leave `DEMO_AUTH_ENABLED=true`. This is development-only: the server forcibly disables demo sign-in in production. The seed data uses fictional `example.test` emails and is not a set of real company accounts.
+
+For Google sign-in, create a **Web application** OAuth client in Google Cloud Console and add the local frontend origin (`http://localhost:5173`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used.
+
+### 4. Apply schema and demo data
+
+```sh
+npm run db:migrate
+npm run db:seed
+```
+
+The seed inserts **10 fictional employee/intern accounts plus one administrator**, default office and policy settings, the national holidays for 2026, and WFH access for one demo employee. It is for local preview only; do not run it in the production database.
+
+### 5. Start the app
+
+```sh
+npm run dev
+```
+
+Open `http://localhost:5173`. Select an account from the Local Preview list, or configure Google OAuth. The API health check is at `http://localhost:8080/api/health`.
+
+## Google Cloud deployment
+
+Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a private Cloud Storage bucket for leave documentation. Keep the bucket’s public access prevention enabled.
+
+1. Create the Cloud SQL MySQL instance and database. Apply `server/migrations/` from an approved deployment job or a trusted workstation connected through the Cloud SQL Auth Proxy.
+2. Create a dedicated Cloud Run service account. Grant it only Cloud SQL Client and object read/write access to the private attachment bucket. Attach the Cloud SQL instance to the Cloud Run service.
+3. Build/deploy from the `server/` directory so its `Dockerfile` is used. Set the Cloud Run port to 8080.
+4. Configure these Cloud Run variables/secrets:
+
+   - `NODE_ENV=production`
+   - `PORT=8080`
+   - `APP_ORIGIN=https://portal.<your-company-domain>` (comma-separated exact origins if more than one)
+   - `JWT_SECRET` from Secret Manager (never a checked-in value)
+   - `GOOGLE_CLIENT_ID`
+   - `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+   - `DB_SOCKET_PATH=/cloudsql/<project-id>:<region>:<instance-name>`
+   - `GOOGLE_CLOUD_PROJECT`
+   - `GCS_BUCKET=<private-bucket-name>`
+   - `DEMO_AUTH_ENABLED=false`
+   - `DEMO_APP_URL=https://portal.<your-company-domain>`
+
+Use a portal and API custom domain under the same company domain (for example `portal.<company-domain>` and `api.<company-domain>`). This keeps the HTTP-only session cookie same-site while CORS still allows only the portal origin. Set `APP_ORIGIN` to the exact portal origin. Do not use broad wildcards for CORS.
+
+The API is ready for deployment; no Google Cloud account, project, client secrets, or real employee emails were available in this workspace, so no cloud resources were created and no credentials have been fabricated.
+
+## Vercel deployment
+
+1. Import the project into Vercel and set the **Root Directory** to `client`.
+2. Add `VITE_API_URL=https://api.<your-company-domain>/api` and `VITE_GOOGLE_CLIENT_ID=<same Web client ID>` in Vercel’s production environment.
+3. Add the portal origin to the OAuth client’s Authorized JavaScript origins. Add the deployed API to the Cloud Run `APP_ORIGIN` allowlist.
+4. Deploy the Vite static frontend. The included `vercel.json` rewrites client-side routes to `index.html`.
+
+Vite environment variables are embedded at build time. Redeploy the frontend after changing either `VITE_*` setting.
+
+## Locked policy defaults
+
+| Setting | Default |
+| --- | --- |
+| Office | Falchion Xeniaa Pune HQ |
+| Coordinates | 18.506633, 73.857692 |
+| Geofence | 80 m |
+| Work days | Monday–Saturday |
+| Standard hours | 9:00 AM–6:00 PM, Asia/Kolkata |
+| Late threshold | 9:30 AM (exactly 9:30 is late) |
+| Approved flex start | 9:00–10:30 AM by administrator approval |
+| Lunch | Fixed 30 minutes, deducted at checkout; no manual break tracking |
+| Leave | Shared casual/sick 8; earned 15; floating 4 |
+| WFH | Individually enabled; typical cap 4/month |
+| QR expiry | 120 seconds |
+
+The policy PDFs in the referenced conversation are reflected in the code’s leave, flex-start, WFH, and trust/no-spyware behaviors. The locked leave allocation supplied later in that conversation takes precedence over any differing wording in the source documents.
+
+## Important limits before real office use
+
+- The local preview and production source are implemented, but live Google OAuth, Cloud SQL, Cloud Run, Cloud Storage and Vercel deployment still need company-owned credentials and setup.
+- Attendance correction, leave, WFH and flex approvals are handled by an administrator; there is no separate manager hierarchy in this V1. The employee-facing and administrator-facing workflows are both implemented in the React application.
+- No automatic push/email notifications or scheduled background absence job is configured. In-app approval notifications are supported; the administrator dashboard computes attendance exceptions from the current date/time.
+- Uploads are private. Local uploads are stored under `server/private-uploads/` for development; production uses private Google Cloud Storage when `GCS_BUCKET` is configured.
+
+See [API contract](docs/API.md) for routes and role access.

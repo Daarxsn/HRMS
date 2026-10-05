@@ -1,0 +1,15 @@
+{
+  "name": "falchion-xeniaa-employee-management",
+  "private": true,
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "test": "npm run test --workspace server",
+    "db:migrate": "npm run migrate --workspace server",
+    "db:seed": "npm run seed --workspace server"
+  },
+  "overrides": { "uuid": "11.1.1" },
+  "devDependencies": { "concurrently": "^9.2.1" }
+}
