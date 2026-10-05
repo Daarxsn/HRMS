@@ -18,6 +18,7 @@ Required runtime settings:
 - APP_ORIGIN=https://portal.<company-domain>
 - GOOGLE_CLIENT_ID=<web-client-id>
 - GCS_BUCKET=<private-bucket>
+- OFFICE_NETWORK_IPS=<office-public-egress-ip-1;office-public-egress-ip-2>
 - DB_NAME=<production-db>
 - DB_USER=<least-privilege-db-user>
 - DB_PASSWORD=<secret>
@@ -55,8 +56,13 @@ The Vercel deployment should use the client directory as its root.
 2. GET /api/health/ready returns 200 with a reachable database.
 3. Google Sign-In accepts an authorized employee identity.
 4. Unauthorized Google identities are rejected.
-5. Employee attendance works with approved GPS/QR/WFH paths.
+5. Employee attendance works through office GPS + office-network verification or approved WFH.
 6. Admin approval workflows update state and create notifications.
 7. Private attachment upload/download works only for authorized users.
 8. CSV export remains private and formula-safe.
 9. Cloud Run logs contain request IDs for troubleshooting.
+
+
+## Office network verification
+
+Office attendance is not based on the Wi-Fi SSID. The browser requests one-time geolocation permission, while the API verifies the request's observed network identity against the production `OFFICE_NETWORK_IPS` allow-list. Configure one or more stable public egress IPs for the office Wi-Fi, separated with semicolons. Do not use a consumer-device local IP such as 192.168.x.x in Cloud Run; the production API sees the office network's public egress address.
