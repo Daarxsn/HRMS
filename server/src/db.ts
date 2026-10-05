@@ -7,6 +7,20 @@ const maxIdle = Number(process.env.DB_MAX_IDLE || connectionLimit);
 if(!Number.isInteger(connectionLimit)||connectionLimit<1||connectionLimit>50)throw new Error('DB_CONNECTION_LIMIT must be an integer between 1 and 50.');
 if(!Number.isInteger(maxIdle)||maxIdle<1||maxIdle>connectionLimit)throw new Error('DB_MAX_IDLE must be an integer between 1 and DB_CONNECTION_LIMIT.');
 
+const sslMode = String(process.env.DB_SSL_MODE || (production ? 'REQUIRED' : '')).trim().toUpperCase();
+const sslCa = process.env.DB_SSL_CA?.replace(/\\n/g, '\n').trim() || '';
+if (production && !['', 'REQUIRED', 'VERIFY_CA'].includes(sslMode)) {
+  throw new Error('DB_SSL_MODE must be REQUIRED or VERIFY_CA in production.');
+}
+if (production && sslMode === 'VERIFY_CA' && !sslCa) {
+  throw new Error('DB_SSL_CA is required when DB_SSL_MODE=VERIFY_CA.');
+}
+const sslConfig = sslMode === 'REQUIRED'
+  ? { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
+  : sslMode === 'VERIFY_CA'
+    ? { ca: sslCa, rejectUnauthorized: true, minVersion: 'TLSv1.2' }
+    : undefined;
+
 const config = {
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
@@ -24,6 +38,7 @@ const config = {
   timezone: 'Z',
   dateStrings: true,
   namedPlaceholders: true,
+  ...(sslConfig ? { ssl: sslConfig } : {}),
   ...(process.env.DB_SOCKET_PATH ? { socketPath: process.env.DB_SOCKET_PATH } : {})
 };
 
