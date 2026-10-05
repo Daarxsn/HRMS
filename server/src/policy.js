@@ -42,7 +42,19 @@ export function isScheduledWorkday(date, companyHolidayDates = new Set()) {
   const day = new Date(`${date}T12:00:00Z`).getUTCDay();
   return day !== 0 && !companyHolidayDates.has(date) && !nationalHolidayDates(Number(date.slice(0,4))).includes(date);
 }
-export function normalizeClientIp(value) {\n  let ip = String(value || '').trim();\n  if (ip.startsWith('::ffff:')) ip = ip.slice(7);\n  return ip;\n}\nexport function parseOfficeNetworkIps(value) {\n  return [...new Set(String(value || '').split(',').map(normalizeClientIp).filter((ip) => net.isIP(ip)))];\n}\nexport function isOfficeNetworkIpAllowed(clientIp, configuredIps) {\n  const candidate = normalizeClientIp(clientIp);\n  return parseOfficeNetworkIps(configuredIps).includes(candidate);\n}\nexport function minutesOfTime(value) {
+export function normalizeClientIp(value) {
+  let ip = String(value || '').trim();
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  return ip;
+}
+export function parseOfficeNetworkIps(value) {
+  return [...new Set(String(value || '').split(/[;,]/).map(normalizeClientIp).filter((ip) => net.isIP(ip)))];
+}
+export function isOfficeNetworkIpAllowed(clientIp, configuredIps) {
+  const candidate = normalizeClientIp(clientIp);
+  return parseOfficeNetworkIps(configuredIps).includes(candidate);
+}
+export function minutesOfTime(value) {
   const [hour, minute] = String(value).split(':').map(Number);
   return hour * 60 + minute;
 }
