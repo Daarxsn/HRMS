@@ -50,14 +50,14 @@ function IconLogo({ small=false }) {
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
   if (!toast) return null;
-  return <div className={`toast toast-${toast.type||'success'}`} role="status"><span className="toast-icon">{toast.type==='error'?<CircleAlert size={17}/>:<CircleCheck size={17}/>}</span><span>{toast.message}</span><button onClick={onClose} aria-label="Dismiss"><X size={15}/></button></div>;
+  return <div className={`toast toast-${toast.type||'success'}`} role="status" aria-live={toast.type==='error'?'assertive':'polite'}><span className="toast-icon">{toast.type==='error'?<CircleAlert size={17}/>:<CircleCheck size={17}/>}</span><span>{toast.message}</span><button type="button" onClick={onClose} aria-label="Dismiss"><X size={15}/></button></div>;
 }
 function Spinner({ large=false }) { return <span className={`spinner${large?' spinner-large':''}`} aria-label="Loading" role="status"/>; }
 function PageTitle({ eyebrow, title, description, action, children }) {
   return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{description&&<p>{description}</p>}{children}</div>{action&&<div className="page-title-action">{action}</div>}</div>;
 }
-function Button({ children, variant='primary', size='', icon:Icon, disabled, loading, ...props }) {
-  return <button className={`button button-${variant}${size?` button-${size}`:''}`} disabled={disabled||loading} aria-busy={loading||undefined} {...props}>{loading?<Spinner/>:Icon?<Icon size={17} strokeWidth={1.9}/>:null}{children}</button>;
+function Button({ children, variant='primary', size='', icon:Icon, disabled, loading, type='button', ...props }) {
+  return <button type={type} className={`button button-${variant}${size?` button-${size}`:''}`} disabled={disabled||loading} aria-busy={loading||undefined} {...props}>{loading?<Spinner/>:Icon?<Icon size={17} strokeWidth={1.9}/>:null}{children}</button>;
 }
 function StatusPill({ value, children }) {
   const raw=value || children || '—';
