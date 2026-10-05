@@ -1,6 +1,6 @@
 # Falchion Xeniaa Employee Management System
 
-A responsive employee and administrator workplace portal built with the locked stack: **React, Node.js, MySQL, Google Cloud and Vercel**. The React app uses Vite; the API uses Express on Node.js; production data is stored in MySQL on Cloud SQL; the API is designed for Cloud Run; and the frontend is a static Vite build for Vercel.
+A responsive employee and administrator workplace portal built with the locked stack: **React + TypeScript, Node.js + TypeScript, MySQL, Google Cloud and Vercel**. The React app uses Vite; the API uses Express on Node.js; production data is stored in MySQL on Cloud SQL; the API is designed for Cloud Run; and the frontend is a static Vite build for Vercel.
 
 ## What is implemented
 
@@ -175,3 +175,8 @@ The policy PDFs in the referenced conversation are reflected in the code’s lea
 - Uploads are private. Local uploads are stored under `server/private-uploads/` for development; production uses private Google Cloud Storage when `GCS_BUCKET` is configured.
 
 See [API contract](docs/API.md) for routes and role access.
+
+
+### TypeScript architecture
+
+The application source is TypeScript throughout: React components use `.tsx`, shared/browser/server utilities use `.ts`, and the backend is compiled to JavaScript for production Node.js execution. The production service worker is also authored as TypeScript and emitted as the required `sw.js` runtime asset during the Vite build.
