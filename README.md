@@ -15,6 +15,8 @@ A responsive employee and administrator workplace portal built with the locked s
 - Planned WFH requires at least 24 hours’ notice, emergency WFH can be requested on the same day, and approval is required. The typical monthly guideline defaults to 4 days and eligibility is individually enabled. Only one seeded demo employee has WFH enabled.
 - Temporary exit/return timestamps, attendance correction requests, flex-start approvals, in-app notifications, private leave attachments, holiday management, and append-only-style audit entries.
 - PWA manifest and a small static shell cache. API responses and personal data are never placed in the offline cache.
+- Production API containers run as the non-root `node` user and shut down gracefully on SIGTERM. Liveness and database-backed readiness health endpoints are available.
+- Sensitive attendance, leave, administrator mutation and file-upload endpoints use per-user rate limits in addition to the API-wide limit.
 - Security basics: secure HTTP-only session cookie, short-lived signed session, Google token verification, server-side role checks, exact-origin CORS, Helmet, request validation, sign-in rate limiting, least-data location records, CSV formula-injection protection, and private GCS attachment storage. The npm locks pin `uuid` 11.1.1 through an override to address a transitive Google SDK advisory; the affected SDK call sites use the compatible `v4` API.
 
 ## Project structure
@@ -79,7 +81,7 @@ The seed inserts **10 fictional employee/intern accounts plus one administrator*
 npm run dev
 ```
 
-Open `http://localhost:5173`. Select an account from the Local Preview list, or configure Google OAuth. The API health check is at `http://localhost:8080/api/health`.
+Open `http://localhost:5173`. Select an account from the Local Preview list, or configure Google OAuth. The API health checks are `http://localhost:8080/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
 
 ## Google Cloud deployment
 
@@ -104,7 +106,7 @@ Use **Cloud Run for the Node API** and **Cloud SQL for MySQL 8**. Create a priva
 
 Use a portal and API custom domain under the same company domain (for example `portal.<company-domain>` and `api.<company-domain>`). This keeps the HTTP-only session cookie same-site while CORS still allows only the portal origin. Set `APP_ORIGIN` to the exact portal origin. Do not use broad wildcards for CORS.
 
-The API is ready for deployment; no Google Cloud account, project, client secrets, or real employee emails were available in this workspace, so no cloud resources were created and no credentials have been fabricated.
+The API is ready for deployment; no Google Cloud account, project, client secrets, or real employee emails were available in this workspace, so no cloud resources were created and no credentials have been fabricated. Production startup requires a private JWT secret, exact `APP_ORIGIN`, `GOOGLE_CLIENT_ID`, `GCS_BUCKET` and database credentials; the local filesystem attachment fallback is development-only.
 
 ## Vercel deployment
 
