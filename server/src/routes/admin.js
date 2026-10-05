@@ -77,6 +77,26 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
   res.json({ date: today, officeHoliday, holidayName, stats: { employees: Number(people[0].active || 0), present: Number(attendance[0].total || 0), onTime: Number(attendance[0].on_time || 0), late: Number(attendance[0].late || 0), stillIn: Number(attendance[0].still_in || 0), pending: Number(pending[0].total || 0), outNow: out.length, absent:absenceCount, onLeave:leaveCount, approvedWfh:approvedWfhCount }, temporaryExits:out, recent });
 }));
 
+router.get('/system-health', asyncRoute(async (req, res) => {
+  const started = process.hrtime.bigint();
+  const [rows] = await connectionQuery('SELECT VERSION() AS mysql_version, UTC_TIMESTAMP() AS database_time');
+  const latencyMs = Number((process.hrtime.bigint() - started) / 1000000n);
+  res.json({
+    status: 'ok',
+    service: 'falchion-xeniaa-api',
+    version: process.env.APP_VERSION || '1.0.0',
+    build: process.env.BUILD_SHA || 'development',
+    uptimeSeconds: Math.floor(process.uptime()),
+    nodeVersion: process.version,
+    mysqlVersion: rows[0]?.mysql_version || null,
+    databaseLatencyMs: latencyMs
+  });
+}));
+
+async function connectionQuery(sql, values = {}) {
+  return await (await import('../db.js')).pool.execute(sql, values);
+}
+
 router.get('/users', asyncRoute(async (req, res) => {
   const users = await query(`SELECT e.id, e.employee_code, e.full_name, e.email, e.role, e.user_type, e.status, e.title, e.phone, e.wfh_enabled, e.joined_on,
     e.probation_end_date, (SELECT COUNT(*) FROM attendance_records a WHERE a.employee_id=e.id AND a.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND a.status='LATE_ENTRY') AS late_count
