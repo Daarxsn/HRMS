@@ -11,7 +11,7 @@
     "seed": "node dist/src/seed.js",
     "db:verify": "node --experimental-strip-types test/database-smoke.ts",
     "test:integration": "node --experimental-strip-types test/integration.ts",
-    "test": "npm run build && node --test dist/test/policy.test.js dist/test/production-contract.test.js",
+    "test": "node --experimental-strip-types --test test/policy.test.ts test/production-contract.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "overrides": {
