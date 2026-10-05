@@ -84,26 +84,31 @@ jobs:
           IMAGE_TAG="${IMAGE_TAG:-${GITHUB_SHA}}"
           IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/falchion-xeniaa-api:${IMAGE_TAG}"
           echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
-          gcloud builds submit server             --project="${PROJECT_ID}"             --tag="${IMAGE_URI}"
+          gcloud builds submit server \
+            --project="${PROJECT_ID}"             --tag="${IMAGE_URI}"
 
       - name: Apply database migrations with Cloud Run Job
         shell: bash
         run: |
           set -euo pipefail
-          gcloud run jobs deploy "${MIGRATION_JOB}"             --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --set-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --set-env-vars="NODE_ENV=production,DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},DB_NAME=${DB_NAME},DB_USER=${DB_USER},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"             --command="node"             --args="src/migrate.js"             --tasks=1             --max-retries=1             --task-timeout=10m             --cpu=1             --memory=512Mi
-          gcloud run jobs execute "${MIGRATION_JOB}"             --project="${PROJECT_ID}"             --region="${REGION}"             --wait
+          gcloud run jobs deploy "${MIGRATION_JOB}" \
+            --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --set-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --set-env-vars="NODE_ENV=production,DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},DB_NAME=${DB_NAME},DB_USER=${DB_USER},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"             --command="node"             --args="src/migrate.js"             --tasks=1             --max-retries=1             --task-timeout=10m             --cpu=1             --memory=512Mi
+          gcloud run jobs execute "${MIGRATION_JOB}" \
+            --project="${PROJECT_ID}"             --region="${REGION}"             --wait
 
       - name: Deploy API to Cloud Run
         shell: bash
         run: |
           set -euo pipefail
-          gcloud run deploy "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --port=8080             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --allow-unauthenticated             --set-env-vars="NODE_ENV=production,PORT=8080,APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"
+          gcloud run deploy "${API_SERVICE}" \
+            --project="${PROJECT_ID}"             --region="${REGION}"             --image="${IMAGE_URI}"             --port=8080             --service-account="${RUNTIME_SERVICE_ACCOUNT}"             --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"             --allow-unauthenticated             --set-env-vars="NODE_ENV=production,PORT=8080,APP_ORIGIN=${APP_ORIGIN},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_SOCKET_PATH=/cloudsql/${CLOUD_SQL_CONNECTION},GCS_BUCKET=${GCS_BUCKET},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DEMO_AUTH_ENABLED=false"             --set-secrets="DB_PASSWORD=${DB_PASSWORD_SECRET}:${DB_PASSWORD_SECRET_VERSION},JWT_SECRET=${JWT_SECRET_NAME}:${JWT_SECRET_VERSION}"
 
       - name: Verify production health
         shell: bash
         run: |
           set -euo pipefail
-          API_URL="$(gcloud run services describe "${API_SERVICE}"             --project="${PROJECT_ID}"             --region="${REGION}"             --format="value(status.url)")"
+          API_URL="$(gcloud run services describe "${API_SERVICE}" \
+                         --project="${PROJECT_ID}"             --region="${REGION}"             --format="value(status.url)")"
           echo "API_URL=${API_URL}" >> "$GITHUB_ENV"
           curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20             "${API_URL}/api/health/live"
           curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20             "${API_URL}/api/health/ready"
