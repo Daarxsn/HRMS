@@ -3,14 +3,29 @@ const base = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 export async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${base}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers, credentials: 'include' });
-  const type = response.headers.get('content-type') || '';
-  if (!response.ok) {
-    const data = type.includes('application/json') ? await response.json().catch(() => ({})) : {};
-    throw new Error(data.error || `Request failed (${response.status}).`);
+
+  const controller = options.signal ? null : new AbortController();
+  const timeout = controller ? window.setTimeout(() => controller.abort(), 15000) : null;
+  try {
+    const response = await fetch(`${base}${path.startsWith('/') ? path : `/${path}`}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: options.signal || controller.signal
+    });
+    const type = response.headers.get('content-type') || '';
+    if (!response.ok) {
+      const data = type.includes('application/json') ? await response.json().catch(() => ({})) : {};
+      throw new Error(data.error || `Request failed (${response.status}).`);
+    }
+    if (type.includes('text/csv')) return response.blob();
+    return type.includes('application/json') ? response.json() : response;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('The request timed out. Please check your connection and try again.');
+    throw error;
+  } finally {
+    if (timeout) window.clearTimeout(timeout);
   }
-  if (type.includes('text/csv')) return response.blob();
-  return type.includes('application/json') ? response.json() : response;
 }
 export const get = (path) => request(path);
 export const post = (path, body = {}) => request(path, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body) });
