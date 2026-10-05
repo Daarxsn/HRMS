@@ -1,3 +1,5 @@
+import net from 'node:net';
+
 export const TIME_ZONE = 'Asia/Kolkata';
 export const POLICY = Object.freeze({
   officeName: 'Falchion Xeniaa Pune HQ',
@@ -41,7 +43,7 @@ export function isScheduledWorkday(date, companyHolidayDates = new Set()) {
   const day = new Date(`${date}T12:00:00Z`).getUTCDay();
   return day !== 0 && !companyHolidayDates.has(date) && !nationalHolidayDates(Number(date.slice(0,4))).includes(date);
 }
-export function minutesOfTime(value) {
+export function normalizeClientIp(value) {\n  let ip = String(value || '').trim();\n  if (ip.startsWith('::ffff:')) ip = ip.slice(7);\n  return ip;\n}\nexport function parseOfficeNetworkIps(value) {\n  return [...new Set(String(value || '').split(',').map(normalizeClientIp).filter((ip) => net.isIP(ip)))];\n}\nexport function isOfficeNetworkIpAllowed(clientIp, configuredIps) {\n  const candidate = normalizeClientIp(clientIp);\n  return parseOfficeNetworkIps(configuredIps).includes(candidate);\n}\nexport function minutesOfTime(value) {
   const [hour, minute] = String(value).split(':').map(Number);
   return hour * 60 + minute;
 }
