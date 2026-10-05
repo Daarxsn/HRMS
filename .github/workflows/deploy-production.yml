@@ -29,6 +29,7 @@ jobs:
       API_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
       MIGRATION_JOB: ${{ vars.CLOUD_RUN_MIGRATION_JOB }}
       CLOUD_SQL_CONNECTION: ${{ vars.CLOUD_SQL_CONNECTION }}
+      DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
       WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
       DB_NAME: ${{ vars.DB_NAME }}
@@ -50,7 +51,7 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.RUNTIME_SERVICE_ACCOUNT }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v3
