@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.js';
@@ -8,6 +9,7 @@ import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isScheduledWork
 
 const router = Router();
 router.use(requireAuth);
+const attendanceMutationLimiter = rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 async function getSettings() {
   const rows = await query('SELECT setting_key, setting_value FROM system_settings');
@@ -58,7 +60,7 @@ router.get('/', asyncRoute(async (req, res) => {
   }) });
 }));
 
-router.post('/check-in', asyncRoute(async (req, res) => {
+router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const schema = z.object({
     method: z.enum(['GPS','QR','WFH']),
     latitude: z.number().min(-90).max(90).optional(),
@@ -102,7 +104,7 @@ router.post('/check-in', asyncRoute(async (req, res) => {
   res.status(201).json({ ok: true, status, method, attendanceId: id });
 }));
 
-router.post('/check-out', asyncRoute(async (req, res) => {
+router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ method: z.enum(['GPS','QR','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional(), qrToken: z.string().optional() }), req.body || {});
   const date = indiaDate();
   const settings = await getSettings();
@@ -130,7 +132,7 @@ router.post('/check-out', asyncRoute(async (req, res) => {
   res.json({ ok: true, method: result.method });
 }));
 
-router.post('/corrections', asyncRoute(async (req, res) => {
+router.post('/corrections', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, requestedCheckIn: z.string().datetime().optional(), requestedCheckOut: z.string().datetime().optional(), reason: z.string().trim().min(8).max(1000) }).refine((v) => v.requestedCheckIn || v.requestedCheckOut, 'Add the missing check-in or check-out time.'), req.body);
   if (input.date > indiaDate()) throw Object.assign(new Error('Choose today or an earlier date for an attendance correction.'), { status: 400 });
   const matching = await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', { employee: req.user.id, date: input.date });
@@ -147,7 +149,7 @@ router.post('/corrections', asyncRoute(async (req, res) => {
   res.status(201).json({ ok: true, id });
 }));
 
-router.post('/flex-requests', asyncRoute(async (req, res) => {
+router.post('/flex-requests', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), reason: z.string().trim().min(8).max(1000) }), req.body);
   if (input.startTime < '09:00' || input.startTime > '10:30') throw Object.assign(new Error('A flex start must be between 9:00 AM and 10:30 AM.'), { status: 400 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
