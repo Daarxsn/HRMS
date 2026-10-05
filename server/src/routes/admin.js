@@ -213,7 +213,7 @@ router.get('/settings', asyncRoute(async (req,res) => {
 }));
 router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
   const schema = z.object({ office_name:z.string().trim().min(2).max(120).optional(), office_latitude:z.number().min(-90).max(90).optional(), office_longitude:z.number().min(-180).max(180).optional(),
-    geofence_meters:z.number().int().min(20).max(1000).optional(), qr_ttl_seconds:z.number().int().min(30).max(600).optional(), wfh_monthly_cap:z.number().int().min(1).max(15).optional(),
+    geofence_meters:z.number().int().min(20).max(1000).optional(), wfh_monthly_cap:z.number().int().min(1).max(15).optional(),
     gps_max_accuracy_meters:z.number().int().min(20).max(250).optional() }).refine((x)=>Object.keys(x).length>0,'Change at least one setting.');
   const input = validate(schema,req.body);
   for (const [key,value] of Object.entries(input)) await query(`INSERT INTO system_settings (setting_key,setting_value,updated_by) VALUES (:key,:value,:actor) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)`, { key,value:String(value),actor:req.user.id });
