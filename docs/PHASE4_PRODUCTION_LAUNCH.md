@@ -79,7 +79,7 @@ Create a protected GitHub Environment named `production` and define:
 | `CLOUD_RUN_SERVICE` | Production API Cloud Run service name |
 | `CLOUD_RUN_MIGRATION_JOB` | Cloud Run Job used for schema migrations |
 | `CLOUD_SQL_CONNECTION` | Cloud SQL connection name |
-| `CLOUD_RUN_SERVICE_ACCOUNT` | Runtime service account used by the API and migration job |
+| `GCP_DEPLOYER_SERVICE_ACCOUNT` | GitHub OIDC deployment identity used to build/deploy |\n| `CLOUD_RUN_SERVICE_ACCOUNT` | Runtime service account used by the API and migration job |
 | `GCP_WIF_PROVIDER` | Full GitHub OIDC Workload Identity Provider resource name |
 | `DB_NAME` | Production database name |
 | `DB_USER` | Least-privilege application database user |
@@ -97,7 +97,7 @@ Do not put secret values themselves into GitHub variables. Only resource identif
 
 The GitHub deployment identity needs only the permissions required to build and deploy. Google documents the Cloud Run / Cloud Build roles and the Workload Identity Federation flow for GitHub Actions. citeturn149071search0turn149071search6
 
-The Cloud Run runtime service account separately needs:
+The GitHub deployment identity should be separate from the Cloud Run runtime service account. The deployment identity needs only the build/deploy permissions required by the workflow.\n\nThe Cloud Run runtime service account separately needs:
 
 - Cloud SQL Client access to the target Cloud SQL instance.
 - Secret Manager Secret Accessor access to the two runtime secrets.
