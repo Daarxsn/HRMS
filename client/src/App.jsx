@@ -311,7 +311,7 @@ function AttendancePage(){
       setWorkplaceMode('OFFICE');
       notify(type==='check-in'
         ? `You're checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`
-        : 'You're checked out. Have a good evening.');
+        : "You're checked out. Have a good evening.");
       await load();
       refresh();
     }catch(e){
