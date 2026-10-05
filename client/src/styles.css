@@ -73,3 +73,34 @@
 /* Phase 9 — employee notifications */
 .notification-page-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.notification-page-summary .card{display:flex;align-items:center;gap:11px;padding:15px 16px}.notification-page-summary .card>span{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#f0f5ef;color:#6c9076}.notification-page-summary b,.notification-page-summary small{display:block}.notification-page-summary b{font-size:17px;letter-spacing:-.04em;color:#40554d}.notification-page-summary small{font-size:8px;color:#9aa69f;margin-top:3px}.notification-page-toolbar{display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px}.notification-page-card{overflow:hidden}.notification-page-list{display:flex;flex-direction:column}.notification-page-item{width:100%;display:flex;align-items:center;gap:12px;padding:15px 17px;border:0;border-bottom:1px solid #eef1ee;background:#fff;text-align:left;cursor:pointer}.notification-page-item:last-child{border-bottom:0}.notification-page-item:hover{background:#fafcf9}.notification-page-item-unread{background:#f8fbf7}.notification-page-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#f0f5ef;color:#6d8f76;flex:0 0 auto}.notification-page-copy{min-width:0;flex:1}.notification-page-copy b,.notification-page-copy small,.notification-page-copy em{display:block}.notification-page-copy b{font-size:10px;color:#41544e}.notification-page-copy small{font-size:9px;line-height:1.5;color:#89968f;margin-top:3px;white-space:normal}.notification-page-copy em{font-style:normal;font-size:8px;color:#acb5b0;margin-top:5px}.notification-page-state{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#a1aaa5}.notification-page-item-unread .notification-page-state{color:#5a8064}
 @media(max-width:700px){.notification-page-summary{grid-template-columns:1fr}.notification-page-toolbar{align-items:flex-start;gap:10px}.notification-page-item{align-items:flex-start}.notification-page-state{padding-top:4px}}
+
+/* Phase 10 — administrator workplace pulse */
+.admin-pulse-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:15px;margin-top:16px}
+.admin-pulse-card,.admin-review-preview{padding:18px 19px}
+.admin-pulse-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:15px}
+.admin-pulse-metrics>div{min-width:0;padding:11px;border:1px solid #edf1ed;border-radius:12px;background:#fcfdfb}
+.pulse-metric-icon{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;margin-bottom:8px}
+.pulse-green{background:#eaf4ec;color:#5d8967}.pulse-blue{background:#edf2f7;color:#68819a}.pulse-gold{background:#f5f0e2;color:#9c8a58}.pulse-rose{background:#f7eded;color:#a47575}
+.admin-pulse-metrics small,.admin-pulse-metrics b,.admin-pulse-metrics em{display:block}
+.admin-pulse-metrics small{font-size:7px;letter-spacing:.1em;color:#a0aaa5;font-weight:800}
+.admin-pulse-metrics b{font-size:18px;line-height:1.1;color:#40554d;margin-top:4px}
+.admin-pulse-metrics em{font-style:normal;font-size:8px;color:#9ca7a1;margin-top:3px}
+.admin-pulse-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding-top:12px;border-top:1px solid #eef1ee}
+.admin-pulse-foot>span{display:flex;align-items:center;gap:7px;color:#929d97;font-size:8.5px}
+.review-preview-list{display:flex;flex-direction:column;margin-top:11px}
+.review-preview-item{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid #eef1ee;text-decoration:none}
+.review-preview-item:last-child{border-bottom:0}
+.review-preview-item:hover .review-preview-icon{transform:translateY(-1px)}
+.review-preview-item>span:nth-child(2){min-width:0;flex:1}
+.review-preview-item b,.review-preview-item small{display:block}
+.review-preview-item b{font-size:9.5px;color:#42554e}
+.review-preview-item small{font-size:8px;color:#98a39d;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.review-preview-item>svg{color:#a1aba5}
+.review-preview-icon{width:29px;height:29px;border-radius:9px;background:#f2f5f1;color:#708b77;display:grid;place-items:center;flex:0 0 auto;transition:transform .16s ease}
+.admin-review-preview .full-button{margin-top:12px}
+.approval-guidance{display:flex;flex-direction:column;gap:9px;margin-top:13px}
+.approval-guidance>div{display:flex;align-items:flex-start;gap:9px;padding:10px 11px;border:1px solid #edf1ed;border-radius:11px;background:#fcfdfb;color:#87928c}
+.approval-guidance svg{color:#719077;flex:0 0 auto;margin-top:1px}
+.approval-guidance span{font-size:8.5px;line-height:1.5}
+@media(max-width:950px){.admin-pulse-grid{grid-template-columns:1fr}.admin-pulse-metrics{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:640px){.admin-pulse-metrics{grid-template-columns:1fr 1fr}.admin-pulse-foot{align-items:flex-start;flex-direction:column}.admin-pulse-foot .text-link{align-self:flex-start}}
