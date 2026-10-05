@@ -37,7 +37,7 @@ assert.ok(app.includes("get('/admin/system-health')"), 'Administrator system-hea
 assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contract missing');
 assert.ok(app.includes('What needs your attention'), 'Employee action-center contract missing');
 assert.ok(app.includes('approved this month'), 'Employee WFH usage visibility contract missing');
-assert.ok(app.includes('Next company holiday'), 'Employee next-holiday contract missing');
+assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract missing');
 assert.ok(app.includes('path="/notifications"'), 'Employee notifications route contract missing');
 assert.ok(app.includes('get(\'/account/notifications\')'), 'Employee notifications API integration contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
