@@ -138,10 +138,8 @@ try {
   const afterLogout = await request('/auth/me', {
     headers: { Cookie: employeeSession.cookie }
   });
-  assert.equal(afterLogout.response.status, 200);
-  // Logout clears the browser cookie. The bearer-style value is still cryptographically
-  // valid because the application uses stateless sessions, so server-side invalidation is
-  // intentionally not part of this V1 contract.
+  assert.equal(afterLogout.response.status, 401);
+  assert.match(afterLogout.data?.error || '', /revoked/i);
 
   console.log('API integration smoke verification: PASS');
 } finally {
