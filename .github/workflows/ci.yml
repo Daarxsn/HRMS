@@ -39,3 +39,7 @@ jobs:
 
       - name: Run frontend smoke contracts
         run: npm run test:smoke --workspace client
+
+
+      - name: Build production API image
+        run: docker build -f server/Dockerfile -t falchion-xeniaa-api:ci server
