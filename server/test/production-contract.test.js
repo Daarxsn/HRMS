@@ -11,6 +11,7 @@ const workplace=fs.readFileSync(path.join(root,'src/routes/workplace.js'),'utf8'
 const attendance=fs.readFileSync(path.join(root,'src/routes/attendance.js'),'utf8');
 const leave=fs.readFileSync(path.join(root,'src/routes/leave.js'),'utf8');
 const admin=fs.readFileSync(path.join(root,'src/routes/admin.js'),'utf8');
+const validate=fs.readFileSync(path.join(root,'src/validate.js'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -32,5 +33,7 @@ assert.match(leave,/leaveMutationLimiter/);
 assert.match(admin,/adminMutationLimiter/);
 assert.match(admin,/system-health/);
 assert.match(admin,/mysql_version/);
+assert.match(validate,/request_id:req.requestId/);
+assert.match(validate,/requestId: req.requestId/);
 
 console.log('Production API contracts: PASS');
