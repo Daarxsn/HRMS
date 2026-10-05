@@ -14,6 +14,8 @@ const admin=fs.readFileSync(path.join(root,'src/routes/admin.js'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
+assert.match(index,/APP_VERSION/);
+assert.match(index,/BUILD_SHA/);
 assert.match(index,/X-Request-ID/);
 assert.match(index,/GCS_BUCKET/);
 assert.match(index,/APP_ORIGIN/);
@@ -28,5 +30,7 @@ assert.match(workplace,/uploadLimiter/);
 assert.match(attendance,/attendanceMutationLimiter/);
 assert.match(leave,/leaveMutationLimiter/);
 assert.match(admin,/adminMutationLimiter/);
+assert.match(admin,/system-health/);
+assert.match(admin,/mysql_version/);
 
 console.log('Production API contracts: PASS');
