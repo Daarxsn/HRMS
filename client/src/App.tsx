@@ -9,7 +9,7 @@ import {
   RefreshCw, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Timer, Trash2, Users, X,
   PanelLeftClose, UserRound, XCircle
 } from 'lucide-react';
-import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials } from './api.js';
+import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials } from './api';
 
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
