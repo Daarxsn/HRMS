@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.js';
@@ -8,6 +9,7 @@ import { attendanceStatus, indiaDate, indiaTime, isScheduledWorkday, netWorkedMi
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
+const adminMutationLimiter = rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`admin:${req.user.id}`});
 
 async function effectiveAttendance(from, to) {
   const fromDate = new Date(`${from}T12:00:00Z`);
@@ -81,7 +83,7 @@ router.get('/users', asyncRoute(async (req, res) => {
     FROM employees e ORDER BY e.role DESC, e.full_name`);
   res.json({ users });
 }));
-router.post('/users', asyncRoute(async (req, res) => {
+router.post('/users', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ employeeCode: z.string().trim().min(2).max(24), fullName: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
     userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).default('EMPLOYEE'), title: z.string().trim().max(120).default('Employee'), phone: z.string().trim().max(32).optional(),
     wfhEnabled: z.boolean().default(false), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
@@ -96,7 +98,7 @@ router.post('/users', asyncRoute(async (req, res) => {
   await audit({ actorId: req.user.id, action: 'EMPLOYEE_CREATED', entityType: 'employee', entityId: id, details: { employee_code: input.employeeCode, role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE' }, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
-router.patch('/users/:id', asyncRoute(async (req, res) => {
+router.patch('/users/:id', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ fullName: z.string().trim().min(2).max(120).optional(), email: z.string().trim().email().max(254).optional(), title: z.string().trim().max(120).optional(),
     phone: z.string().trim().max(32).nullable().optional(), userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).optional(), status: z.enum(['ACTIVE','INACTIVE']).optional(),
     wfhEnabled: z.boolean().optional(), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
@@ -136,7 +138,7 @@ router.get('/approvals', asyncRoute(async (req, res) => {
   res.json({ approvals: [...leave,...wfh,...correction,...flex].sort((a,b) => new Date(a.created_at)-new Date(b.created_at)) });
 }));
 
-router.post('/approvals/:type/:id', asyncRoute(async (req, res) => {
+router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ decision: z.enum(['APPROVED','REJECTED']), note: z.string().trim().max(1000).optional() }), req.body);
   const kind = req.params.type;
   if (!['leave','wfh','correction','flex'].includes(kind)) throw Object.assign(new Error('Unknown approval type.'), { status: 400 });
@@ -184,7 +186,7 @@ router.get('/settings', asyncRoute(async (req,res) => {
   const rows = await query('SELECT setting_key,setting_value,updated_at FROM system_settings ORDER BY setting_key');
   res.json({ settings:Object.fromEntries(rows.map((r)=>[r.setting_key, Number.isFinite(Number(r.setting_value)) && r.setting_value.trim() !== '' ? Number(r.setting_value) : r.setting_value])), updatedAt:rows[0]?.updated_at || null });
 }));
-router.put('/settings', asyncRoute(async (req,res) => {
+router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
   const schema = z.object({ office_name:z.string().trim().min(2).max(120).optional(), office_latitude:z.number().min(-90).max(90).optional(), office_longitude:z.number().min(-180).max(180).optional(),
     geofence_meters:z.number().int().min(20).max(1000).optional(), qr_ttl_seconds:z.number().int().min(30).max(600).optional(), wfh_monthly_cap:z.number().int().min(1).max(15).optional(),
     gps_max_accuracy_meters:z.number().int().min(20).max(250).optional() }).refine((x)=>Object.keys(x).length>0,'Change at least one setting.');
@@ -194,7 +196,7 @@ router.put('/settings', asyncRoute(async (req,res) => {
   res.json({ok:true});
 }));
 
-router.post('/qr', asyncRoute(async (req,res) => {
+router.post('/qr', adminMutationLimiter, asyncRoute(async (req,res) => {
   const settings = await query(`SELECT setting_key,setting_value FROM system_settings WHERE setting_key IN ('qr_ttl_seconds','office_name')`);
   const values = Object.fromEntries(settings.map((r)=>[r.setting_key,r.setting_value]));
   const ttl = Number(values.qr_ttl_seconds || POLICY.qrTtlSeconds);
@@ -206,7 +208,7 @@ router.post('/qr', asyncRoute(async (req,res) => {
   const base = configuredOrigin.replace(/\/$/,'');
   res.status(201).json({ id, token, expiresIn:ttl, expiresAt:new Date(Date.now()+ttl*1000).toISOString(), payload:`${base}/?qr=${encodeURIComponent(token)}` });
 }));
-router.delete('/qr/current', asyncRoute(async (req,res) => {
+router.delete('/qr/current', adminMutationLimiter, asyncRoute(async (req,res) => {
   const result = await query(`UPDATE qr_challenges SET revoked_at=UTC_TIMESTAMP() WHERE expires_at>UTC_TIMESTAMP() AND revoked_at IS NULL`);
   await audit({ actorId:req.user.id, action:'OFFICE_QR_REVOKED', entityType:'qr_challenge', details:{ count:result.affectedRows }, ipAddress:req.ip });
   res.json({ok:true});
