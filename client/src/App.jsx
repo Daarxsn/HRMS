@@ -16,6 +16,34 @@ const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 const today = todayLocal();
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('HRMS frontend error', error, info);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return <div className="loading-screen" role="alert">
+      <IconLogo />
+      <div className="card" style={{ maxWidth: 520, margin: '24px', textAlign: 'center' }}>
+        <div className="eyebrow">TEMPORARY ISSUE</div>
+        <h1>Something went wrong.</h1>
+        <p>We could not load this page safely. Refresh the page and try again.</p>
+        <button className="button button-primary" onClick={() => window.location.reload()}>Refresh</button>
+      </div>
+    </div>;
+  }
+}
+
 function IconLogo({ small=false }) {
   return <div className={`brand-mark${small?' brand-mark-small':''}`} aria-hidden="true"><span></span><span></span><span></span><span></span></div>;
 }
@@ -63,7 +91,7 @@ function App() {
   useEffect(()=>{ if(user)refreshNotifications(); },[user,refresh]);
   useEffect(()=>{ if(import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
   const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications}),[user,notifications]);
-  return <AppContext.Provider value={value}><BrowserRouter>{loading?<div className="loading-screen"><IconLogo/><Spinner large/></div>:user?<Shell/>:<LoginScreen demo={demo}/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppContext.Provider>;
+  return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><IconLogo/><Spinner large/></div>:user?<Shell/>:<LoginScreen demo={demo}/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
 }
 
 function LoginScreen({demo}) {
