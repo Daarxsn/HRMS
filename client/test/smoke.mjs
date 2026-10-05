@@ -10,18 +10,18 @@ const manifest = fs.readFileSync(path.join(root, 'public/manifest.webmanifest'),
 const sw = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
 
 const requiredRoutes = [
-  "path="/attendance"",
-  "path="/leave"",
-  "path="/wfh"",
-  "path="/out"",
-  "path="/calendar"",
-  "path="/profile"",
-  "path="/team"",
-  "path="/admin-attendance"",
-  "path="/approvals"",
-  "path="/reports"",
-  "path="/settings"",
-  "path="/audit""
+  "path="/attendance",,
+  "path="/leave",,
+  "path="/wfh",,
+  "path="/out",,
+  "path="/calendar",,
+  "path="/profile",,
+  "path="/team",,
+  "path="/admin-attendance",,
+  "path="/approvals",,
+  "path="/reports",,
+  "path="/settings",,
+  "path="/audit",
 ];
 for (const route of requiredRoutes) assert.ok(app.includes(route), `Missing frontend route contract: ${route}`);
 
