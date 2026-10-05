@@ -52,12 +52,12 @@ function Toast({ toast, onClose }) {
   if (!toast) return null;
   return <div className={`toast toast-${toast.type||'success'}`} role="status"><span className="toast-icon">{toast.type==='error'?<CircleAlert size={17}/>:<CircleCheck size={17}/>}</span><span>{toast.message}</span><button onClick={onClose} aria-label="Dismiss"><X size={15}/></button></div>;
 }
-function Spinner({ large=false }) { return <span className={`spinner${large?' spinner-large':''}`} aria-label="Loading"/>; }
+function Spinner({ large=false }) { return <span className={`spinner${large?' spinner-large':''}`} aria-label="Loading" role="status"/>; }
 function PageTitle({ eyebrow, title, description, action, children }) {
   return <div className="page-title"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{description&&<p>{description}</p>}{children}</div>{action&&<div className="page-title-action">{action}</div>}</div>;
 }
 function Button({ children, variant='primary', size='', icon:Icon, disabled, loading, ...props }) {
-  return <button className={`button button-${variant}${size?` button-${size}`:''}`} disabled={disabled||loading} {...props}>{loading?<Spinner/>:Icon?<Icon size={17} strokeWidth={1.9}/>:null}{children}</button>;
+  return <button className={`button button-${variant}${size?` button-${size}`:''}`} disabled={disabled||loading} aria-busy={loading||undefined} {...props}>{loading?<Spinner/>:Icon?<Icon size={17} strokeWidth={1.9}/>:null}{children}</button>;
 }
 function StatusPill({ value, children }) {
   const raw=value || children || '—';
@@ -295,8 +295,15 @@ function FlexModal({close,onDone}){
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/flex-requests',{date,startTime,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
   return <Modal title="Request a flexible start" subtitle="The policy allows 9:00–10:30 AM with manager approval." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Requested start</span><input type="time" min="09:00" max="10:30" value={startTime} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Context for your manager</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Share any details that would be helpful." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Request approval</Button></div></form></Modal>;
 }
-function Modal({title,subtitle,close,children}){return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="modal-card"><div className="modal-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={close} aria-label="Close"><X size={19}/></button></div>{children}</div></div>;}
-function InlineError({children}){return <div className="inline-alert alert-error"><CircleAlert size={16}/>{children}</div>;}
+function Modal({title,subtitle,close,children}){
+  useEffect(()=>{
+    const onKey=(event)=>{if(event.key==='Escape')close();};
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[close]);
+  return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={close} aria-label="Close"><X size={19}/></button></div>{children}</div></div>;
+}
+function InlineError({children}){return <div className="inline-alert alert-error" role="alert"><CircleAlert size={16}/>{children}</div>;}
 
 function LeavePage(){
   const {notify,refresh}=useApp();const [balances,setBalances]=useState([]);const [requests,setRequests]=useState([]);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [withdrawBusy,setWithdrawBusy]=useState(null);const [error,setError]=useState('');const [file,setFile]=useState(null);const [type,setType]=useState('CASUAL');const [startDate,setStart]=useState('');const [endDate,setEnd]=useState('');const [reason,setReason]=useState('');
