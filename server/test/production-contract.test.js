@@ -14,6 +14,10 @@ const admin=fs.readFileSync(path.join(root,'src/routes/admin.js'),'utf8');
 const validate=fs.readFileSync(path.join(root,'src/validate.js'),'utf8');
 const dbTest=fs.readFileSync(path.join(root,'test/database-smoke.mjs'),'utf8');
 const rollback=fs.readFileSync(path.join(root,'../.github/workflows/rollback-production.yml'),'utf8');
+const security=fs.readFileSync(path.join(root,'src/security.js'),'utf8');
+const auth=fs.readFileSync(path.join(root,'src/routes/auth.js'),'utf8');
+const sessionMigration=fs.readFileSync(path.join(root,'migrations/002_session_revocation.sql'),'utf8');
+const integration=fs.readFileSync(path.join(root,'test/integration.mjs'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -45,5 +49,11 @@ assert.match(rollback,/workflow_dispatch/);
 assert.match(rollback,/gcloud artifacts docker images describe/);
 assert.match(rollback,/gcloud run deploy/);
 assert.match(rollback,/Database migrations: not run during rollback/);
+assert.match(security,/session_version/);
+assert.match(security,/Your session has been revoked/);
+assert.match(auth,/session_version/);
+assert.match(auth,/AUTH_LOGOUT/);
+assert.match(sessionMigration,/ADD COLUMN session_version/);
+assert.match(integration,/API integration smoke verification: PASS/);
 
 console.log('Production API contracts: PASS');
