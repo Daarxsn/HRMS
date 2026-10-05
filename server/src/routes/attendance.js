@@ -70,7 +70,6 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   if(!isScheduledWorkday(date,new Set(dateHolidays.map((x)=>x.date)))) throw Object.assign(new Error('Attendance check-in is available Monday–Saturday, excluding company holidays.'),{status:403});
   const settings = await getSettings();
   let method = input.method;
-  if (method === 'GPS') verifyOfficeNetwork(req);
   let distance = null;
   if (method === 'GPS') {
     if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again, or use .'), { status: 400 });
