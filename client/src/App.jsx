@@ -329,7 +329,7 @@ function AttendancePage(){
         <Card className="attendance-action-card">
           <div className="attendance-action-copy">
             <span className="action-kicker"><span className={`pulse-dot${working?'':' pulse-muted'}`}/>{todayHoliday&&!working?todayHoliday.name.toUpperCase():working?'DAY IN PROGRESS':'TODAY · '+formatDate(today,{weekday:'long',day:'numeric',month:'long'})}</span>
-            <h2>{todayHoliday&&!working?'A scheduled day to pause.':working?'You're checked in.':'Start your workday.'}</h2>
+            <h2>{todayHoliday&&!working?'A scheduled day to pause.':working?"You're checked in.":'Start your workday.'}</h2>
             <p>{todayHoliday&&!working?`${todayHoliday.name} is a company holiday. There’s no check-in expected today.`:working?`You started at ${formatTime(current.check_in_at)}. Check out when you’re ready to wrap up.`:workplaceMode==='WFH'?'Your approved remote day does not require office location verification.':'Click check in and we’ll request your location once, verify the office geofence and confirm the office network.'}</p>
             <div className="checkin-action-row">
               {working
