@@ -72,10 +72,11 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   let method = input.method;
   let distance = null;
   if (method === 'GPS') {
-    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again, or use .'), { status: 400 });
+    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again.'), { status: 400 });
     if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area or use .'), { status: 422 });
     distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
-    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error(`You are about ${Math.round(distance)} m from the office, outside the ${settings.geofence_meters || POLICY.geofenceMeters} m check-in radius. .`), { status: 422 });
+    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error(`You are about ${Math.round(distance)} m from the office, outside the ${settings.geofence_meters || POLICY.geofenceMeters} m check-in radius.`), { status: 422 });
+    verifyOfficeNetwork(req);
   }
   if (method === 'WFH') {
     if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
@@ -89,7 +90,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   await transaction(async (connection) => {
     const [existing] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: req.user.id, date });
     if (existing[0]) throw Object.assign(new Error('Today’s attendance is already started.'), { status: 409 });
-        await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
+    await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
       VALUES (:id, :employee, :date, UTC_TIMESTAMP(), :method, :lat, :lon, :accuracy, :distance, :status, :approvedStart)`, {
       id, employee: req.user.id, date, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null,
       accuracy: method === 'GPS' ? input.accuracy : null, distance: method === 'GPS' ? distance : null, status, approvedStart
@@ -105,10 +106,11 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
   const settings = await getSettings();
   let distance = null;
   if (input.method === 'GPS') {
-    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again, or use .'), { status: 400 });
-    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. .'), { status: 422 });
+    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again.'), { status: 400 });
+    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area and try again.'), { status: 422 });
     distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
-    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error('You are outside the office radius.  to check out.'), { status: 422 });
+    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error('You are outside the office radius.'), { status: 422 });
+    verifyOfficeNetwork(req);
   }
   let result;
   await transaction(async (connection) => {
@@ -116,7 +118,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     if (!rows[0]) throw Object.assign(new Error('Check in first to finish today’s attendance.'), { status: 409 });
     if (rows[0].check_out_at) throw Object.assign(new Error('You have already checked out today.'), { status: 409 });
     if (input.method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
-        const method = input.method;
+    const method = input.method;
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
       id: rows[0].id, method, lat: input.method === 'GPS' ? input.latitude : null, lon: input.method === 'GPS' ? input.longitude : null, accuracy: input.method === 'GPS' ? input.accuracy : null
     });
