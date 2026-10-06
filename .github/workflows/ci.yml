@@ -79,6 +79,14 @@ jobs:
           DB_USER: root
           DB_PASSWORD: root
         run: npm run db:migrate
+      - name: Re-run migrations to verify idempotence and checksums
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run db:migrate
       - name: Seed and verify MySQL in CI
         env:
           NODE_ENV: development
