@@ -86,7 +86,7 @@ assert.match(productionSmoke,/Production Smoke Test/);
 assert.match(app,/GoogleLogin/);
 assert.match(app,/Secure Google sign-in/);
 assert.doesNotMatch(app,/Choose an account|Continue to preview|demoEmail|demo\.enabled/);
-assert.match(e2e,/Secure Google sign-in/);
+assert.match(e2e,/signInDev/);
 assert.doesNotMatch(e2e,/Choose an account|Continue to preview/);
 
 
