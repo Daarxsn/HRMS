@@ -17,7 +17,10 @@ async function getLeaveBalances(employee, connection = null) {
   const year = Number(today.slice(0, 4));
   const holidays = await execute(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE YEAR(holiday_date)=:year`, { year });
   const holidaySet = new Set(holidays.map((row) => row.date));
-  const requests = await execute(`SELECT leave_type, status, SUM(days) AS days FROM leave_requests WHERE employee_id=:employee AND YEAR(start_date)=:year GROUP BY leave_type, status`, { employee, year });
+  const [requests, policyRows] = await Promise.all([
+    execute(`SELECT leave_type, status, SUM(days) AS days FROM leave_requests WHERE employee_id=:employee AND YEAR(start_date)=:year GROUP BY leave_type, status`, { employee, year }),
+    execute(`SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('leave_casual_sl_entitlement','leave_earned_entitlement','leave_floating_entitlement')`)
+  ]);
   const byKey = new Map<string, number>();
   for (const row of requests as any[]) byKey.set(`${row.leave_type}:${row.status}`, Number(row.days));
   const userRows = await execute('SELECT joined_on, probation_end_date FROM employees WHERE id=:employee', { employee });
@@ -30,12 +33,16 @@ async function getLeaveBalances(employee, connection = null) {
     const probationMonth = Number(String(probation).slice(5, 7));
     const firstEligibleMonth = probationYear < year ? 1 : probationYear > year ? 13 : probationMonth + 1;
     const lastAccrualMonth = currentDay === new Date(year,currentMonth,0).getDate() ? currentMonth : currentMonth - 1;
-    earnedAccrued = Math.max(0, Math.min(15, (lastAccrualMonth - firstEligibleMonth + 1)));
+    earnedAccrued = Math.max(0, Math.min(earnedEntitlement, (lastAccrualMonth - firstEligibleMonth + 1)));
   }
   const sharedUsed = (byKey.get('CASUAL:APPROVED') || 0) + (byKey.get('SICK:APPROVED') || 0);
   const sharedPending = (byKey.get('CASUAL:PENDING') || 0) + (byKey.get('SICK:PENDING') || 0);
+  const policy = Object.fromEntries((policyRows as any[]).map((row) => [row.setting_key, Number(row.setting_value)]));
+  const casualEntitlement = Number.isFinite(policy.leave_casual_sl_entitlement) ? policy.leave_casual_sl_entitlement : 8;
+  const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
+  const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
   const definitions: Array<[string,string,number]> = [
-    ['CASUAL','Casual leave',8], ['SICK','Sick leave',8], ['EARNED','Earned leave',15], ['FLOATING','Floating leave',4]
+    ['CASUAL','Casual leave',casualEntitlement], ['SICK','Sick leave',casualEntitlement], ['EARNED','Earned leave',earnedEntitlement], ['FLOATING','Floating leave',floatingEntitlement]
   ];
   return definitions.map(([type, label, entitlement]) => {
     const accrued = type === 'EARNED' ? earnedAccrued : entitlement;
