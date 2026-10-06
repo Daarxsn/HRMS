@@ -39,12 +39,18 @@ router.post('/google', asyncRoute(async (req, res) => {
   const claims = ticket.getPayload();
   if (!claims?.email || claims.email_verified !== true || !claims.sub) return res.status(401).json({ error: 'Google could not verify this account.' });
   const email = claims.email.trim().toLowerCase();
-  const users = await query(`SELECT ${userSelect}, google_subject FROM employees WHERE LOWER(email)=:email AND status='ACTIVE' LIMIT 1`, { email });
-  if (!users[0]) return res.status(403).json({ error: 'This Google account has not been authorized by Falchion Xeniaa. Ask an administrator to add it.' });
-  const user = users[0];
-  if (user.google_subject && user.google_subject !== claims.sub) return res.status(403).json({ error: 'This account is linked to a different Google identity.' });
-  if (!user.google_subject) await query('UPDATE employees SET google_subject=:subject WHERE id=:id AND google_subject IS NULL', { subject: claims.sub, id: user.id });
-  delete user.google_subject;
+  const user = await transaction(async (connection) => {
+    const [users] = await connection.execute(`SELECT ${userSelect}, google_subject FROM employees WHERE LOWER(email)=:email AND status='ACTIVE' LIMIT 1 FOR UPDATE`, { email });
+    if (!users[0]) throw Object.assign(new Error('This Google account has not been authorized by Falchion Xeniaa. Ask an administrator to add it.'), { status: 403 });
+    const current = users[0];
+    if (current.google_subject && current.google_subject !== claims.sub) throw Object.assign(new Error('This account is linked to a different Google identity.'), { status: 403 });
+    if (!current.google_subject) {
+      await connection.execute('UPDATE employees SET google_subject=:subject WHERE id=:id AND google_subject IS NULL', { subject: claims.sub, id: current.id });
+      current.google_subject = claims.sub;
+    }
+    delete current.google_subject;
+    return current;
+  });
   res.cookie('fx_session', signToken(user), authCookieOptions()).json({ user });
   await audit({ actorId: user.id, action: 'AUTH_GOOGLE_SIGN_IN', entityType: 'employee', entityId: user.id, ipAddress: req.ip });
 }));
