@@ -187,7 +187,7 @@ router.post('/exits', asyncRoute(async (req, res) => {
 }));
 router.patch('/exits/:id/return', asyncRoute(async (req, res) => {
   const rows = await transaction(async (connection) => {
-    const [locked] = await connection.execute('SELECT id FROM temporary_exits WHERE id=:id AND employee_id=:employee FOR UPDATE', { id:req.params.id, employee:req.user.id });
+    const [locked] = await connection.execute('SELECT id, returned_at FROM temporary_exits WHERE id=:id AND employee_id=:employee FOR UPDATE', { id:req.params.id, employee:req.user.id });
     if (!locked[0] || locked[0].returned_at) throw Object.assign(new Error('This exit record is already closed or was not found.'), { status:404 });
     const [result] = await connection.execute('UPDATE temporary_exits SET returned_at=UTC_TIMESTAMP() WHERE id=:id AND employee_id=:employee AND returned_at IS NULL', { id:req.params.id, employee:req.user.id });
     return result;
