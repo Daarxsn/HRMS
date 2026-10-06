@@ -22,7 +22,7 @@ export async function requireAuth(req, res, next) {
   try {
     const token = req.cookies?.fx_session;
     if (!token) return res.status(401).json({ error: 'Sign in to continue.' });
-    const payload = jwt.verify(token, secret(), { issuer: 'falchion-xeniaa' });
+    const payload = jwt.verify(token, secret(), { issuer: 'falchion-xeniaa', algorithms: ['HS256'] });
     const rows = await query(`SELECT id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date, session_version
       FROM employees WHERE id = :id LIMIT 1`, { id: payload.sub });
     if (!rows[0] || rows[0].status !== 'ACTIVE') return res.status(401).json({ error: 'This account is not active.' });
