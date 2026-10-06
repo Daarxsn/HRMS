@@ -18,6 +18,11 @@ const security=fs.readFileSync(path.join(root,'src/security.ts'),'utf8');
 const auth=fs.readFileSync(path.join(root,'src/routes/auth.ts'),'utf8');
 const sessionMigration=fs.readFileSync(path.join(root,'migrations/002_session_revocation.sql'),'utf8');
 const integration=fs.readFileSync(path.join(root,'test/integration.ts'),'utf8');
+const seed=fs.readFileSync(path.join(root,'src/seed.ts'),'utf8');
+const vite=fs.readFileSync(path.join(root,'../client/vite.config.ts'),'utf8');
+const playwright=fs.readFileSync(path.join(root,'../playwright.config.ts'),'utf8');
+const preflight=fs.readFileSync(path.join(root,'../.github/workflows/production-preflight.yml'),'utf8');
+const productionSmoke=fs.readFileSync(path.join(root,'../.github/workflows/production-smoke.yml'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -62,6 +67,16 @@ assert.match(auth,/session_version/);
 assert.match(auth,/AUTH_LOGOUT/);
 assert.match(sessionMigration,/ADD COLUMN session_version/);
 assert.match(integration,/API integration smoke verification: PASS/);
+assert.match(seed,/NODE_ENV === 'production'/);
+assert.match(seed,/Database seeding is disabled in production/);
+assert.match(vite,/port: 3000/);
+assert.match(vite,/localhost:3001/);
+assert.match(playwright,/127\.0\.0\.1:3000/);
+assert.match(preflight,/Verify Secret Manager versions/);
+assert.match(preflight,/Verify private attachment bucket/);
+assert.match(preflight,/Verify production demo authentication is disabled/);
+assert.match(productionSmoke,/Check protected routes/);
+assert.match(productionSmoke,/Production Smoke Test/);
 
 
 assert.match(admin,/router\.get\('\/reports\.csv'/);
