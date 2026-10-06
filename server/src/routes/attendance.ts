@@ -85,7 +85,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   }
   const approved = await query(`SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date LIMIT 1`, { employee: req.user.id, date });
   const approvedStart = approved[0]?.approved_start_time || null;
-  const status = attendanceStatus(new Date(), approvedStart);
+  const status = attendanceStatus(new Date(), approvedStart, String(settings.late_threshold || POLICY.lateThreshold));
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
     const [existing] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: req.user.id, date });
