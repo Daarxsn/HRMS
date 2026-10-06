@@ -39,6 +39,7 @@ jobs:
       OFFICE_NETWORK_IPS: ${{ vars.OFFICE_NETWORK_IPS }}
       GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       DB_PASSWORD_SECRET: ${{ vars.DB_PASSWORD_SECRET }}
+      CLOUD_SQL_INSTANCE: ${{ vars.CLOUD_SQL_INSTANCE }}
       JWT_SECRET_NAME: ${{ vars.JWT_SECRET_NAME }}
       DB_PASSWORD_SECRET_VERSION: ${{ vars.DB_PASSWORD_SECRET_VERSION }}
       JWT_SECRET_VERSION: ${{ vars.JWT_SECRET_VERSION }}
@@ -67,7 +68,7 @@ jobs:
             PROJECT_ID REGION AR_REPOSITORY API_SERVICE MIGRATION_JOB
             CLOUD_SQL_CONNECTION RUNTIME_SERVICE_ACCOUNT WIF_PROVIDER
             DB_NAME DB_USER GCS_BUCKET APP_ORIGIN OFFICE_NETWORK_IPS GOOGLE_CLIENT_ID
-            DB_PASSWORD_SECRET JWT_SECRET_NAME
+            DB_PASSWORD_SECRET JWT_SECRET_NAME CLOUD_SQL_INSTANCE
             DB_PASSWORD_SECRET_VERSION JWT_SECRET_VERSION
           )
           for name in "${required[@]}"; do
@@ -87,6 +88,16 @@ jobs:
           echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
           gcloud builds submit server \
             --project="${PROJECT_ID}"             --tag="${IMAGE_URI}"
+
+      - name: Create pre-deployment Cloud SQL backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud sql backups create             --instance="${CLOUD_SQL_INSTANCE}"             --project="${PROJECT_ID}"             --description="HRMS pre-deployment backup | ${GITHUB_SHA}"
+          BACKUP="$(gcloud sql backups list             --instance="${CLOUD_SQL_INSTANCE}"             --project="${PROJECT_ID}"             --sort-by="~endTime"             --limit=1             --format="value(id,status,endTime)")"
+          test -n "${BACKUP}"
+          echo "BACKUP=${BACKUP}" >> "$GITHUB_ENV"
+          echo "Verified backup: ${BACKUP}"
 
       - name: Apply database migrations with Cloud Run Job
         shell: bash
@@ -123,6 +134,7 @@ jobs:
             echo "- Image: ${IMAGE_URI}"
             echo "- Cloud Run service: ${API_SERVICE}"
             echo "- API URL: ${API_URL}"
+            echo "- Pre-deployment backup: ${BACKUP}"
             echo "- Database migrations: completed"
             echo "- Liveness: passed"
             echo "- Readiness: passed"
