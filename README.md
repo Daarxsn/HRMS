@@ -7,9 +7,9 @@ A responsive employee and administrator workplace portal built with the locked s
 - Google Sign-In with an authorized-user allowlist. An administrator provisions an employee’s Google email first; no company email domain is enforced.
 - Administrator and employee roles, employee/intern account types, and account activation controls. No departments are modeled in V1.
 - Employee home, attendance history, profile, notification center, holiday calendar, leave and WFH request experiences.
-- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, office configuration, and expiring QR generation.
+- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, office configuration, and attendance review, audit trail and CSV reports.
 - Server-side GPS distance and accuracy checks at the time an employee chooses check-in or check-out. A GPS event stores one location verification record. There is no continuous location collection or background tracking.
-- Expiring office QR fallback. Each employee can use a shared current QR once per check-in and once per check-out while it is active. Refreshing/revoking codes is controlled by an administrator.
+- Attendance uses one-time GPS and office-network verification; QR attendance is retired in the current production policy.
 - 9:00 AM–6:00 PM schedule, Monday–Saturday work week, late at **9:30 AM or later**, fixed 30-minute lunch deduction, and approved flex starts between 9:00 AM and 10:30 AM.
 - Casual and sick leave share the locked 8-day annual pool; earned leave is 15 days/year with the policy’s 1-day-per-month accrual after probation; floating leave is 4 days/year. Sundays and company/national holidays are excluded from day-counting. A doctor’s note is required for sick leave of 3 or more consecutive calendar days.
 - Planned WFH requires at least 24 hours’ notice, emergency WFH can be requested on the same day, and approval is required. The typical monthly guideline defaults to 4 days and eligibility is individually enabled. Only one seeded demo employee has WFH enabled.
@@ -62,9 +62,9 @@ Use a separate, least-privilege application identity in each deployed environmen
 
 Copy `.env.example` to `server/.env`, then set the local database values. `JWT_SECRET` must be a private random value with at least 32 bytes. Never commit `.env`.
 
-For local preview without Google OAuth, leave `DEMO_AUTH_ENABLED=true`. This is development-only: the server forcibly disables demo sign-in in production. The seed data uses fictional `example.test` emails and is not a set of real company accounts.
+For local preview without Google OAuth, leave `DEMO_AUTH_ENABLED=true`. This is development-only: the server forcibly disables demo sign-in in production. The seed data uses fictional `example.test` emails and is not a set of real company accounts. The seed command hard-fails when `NODE_ENV=production`.
 
-For Google sign-in, create a **Web application** OAuth client in Google Cloud Console and add the local frontend origin (`http://localhost:5173`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used.
+For Google sign-in, create a **Web application** OAuth client in Google Cloud Console and add the local frontend origin (`http://localhost:3000`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used.
 
 ### 4. Apply schema and demo data
 
@@ -81,7 +81,7 @@ The seed inserts **10 fictional employee/intern accounts plus one administrator*
 npm run dev
 ```
 
-Open `http://localhost:5173`. Select an account from the Local Preview list, or configure Google OAuth. The API health checks are `http://localhost:8080/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
+Open `http://localhost:3000`. Select an account from the Local Preview list, or configure Google OAuth. The API health checks are `http://localhost:3001/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
 
 ## Phase 4 production launch
 
