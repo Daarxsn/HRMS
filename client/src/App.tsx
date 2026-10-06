@@ -83,7 +83,7 @@ function App() {
     Promise.allSettled([get('/auth/me')]).then(([me])=>{
       if(!live)return;
       if(me.status==='fulfilled')setUser(me.value.user);
-      if(me.status==='rejected') setBootError(me.reason?.message || 'We could not reach the HRMS server.');
+      if(me.status==='rejected' && me.reason?.status !== 401) setBootError(me.reason?.message || 'We could not reach the HRMS server.');
       setLoading(false);
     });
     return()=>{live=false;};
