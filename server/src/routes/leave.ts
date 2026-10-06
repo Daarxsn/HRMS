@@ -3,12 +3,12 @@ import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.ts';
-import { audit, requireAuth, notifyAdmins } from '../security.ts';
+import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.ts';
 import { asyncRoute, dateSchema, validate } from '../validate.ts';
 import { indiaDate, workingDaysInclusive } from '../policy.ts';
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requirePeople);
 const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 async function getLeaveBalances(employee, connection = null) {
