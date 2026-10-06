@@ -1,0 +1,95 @@
+name: Production Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      portal_url:
+        description: "Public HRMS portal URL"
+        required: true
+        type: string
+      api_url:
+        description: "Public HRMS API URL"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Public production smoke
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate URLs
+        env:
+          PORTAL_URL: ${{ inputs.portal_url }}
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          set -euo pipefail
+          [[ "${PORTAL_URL}" == https://* ]]
+          [[ "${API_URL}" == https://* ]]
+
+      - name: Check portal
+        env:
+          PORTAL_URL: ${{ inputs.portal_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 "${PORTAL_URL}/" >/dev/null
+
+      - name: Check API liveness and readiness
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/live" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/ready" >/dev/null
+
+      - name: Check protected routes
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          set -euo pipefail
+          for endpoint in /api/auth/me /api/attendance /api/leave /api/admin/dashboard; do
+            status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' "${API_URL}${endpoint}")"
+            test "${status}" = "401" || {
+              echo "::error::${endpoint} returned ${status}; expected anonymous HTTP 401."
+              exit 1
+            }
+          done
+
+      - name: Check production demo login is disabled
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
+            -X POST "${API_URL}/api/auth/demo" \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"blocked@example.test"}')"
+          test "${status}" = "404"
+
+      - name: Check security headers
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null "${API_URL}/api/health/live")"
+          printf '%s\n' "${headers}" | grep -qi '^x-content-type-options:'
+          printf '%s\n' "${headers}" | grep -qi '^x-frame-options:'
+
+      - name: Write smoke summary
+        run: |
+          {
+            echo "## Production smoke test"
+            echo ""
+            echo "- Portal reachable: PASS"
+            echo "- API liveness/readiness: PASS"
+            echo "- Protected routes require authentication: PASS"
+            echo "- Demo authentication disabled: PASS"
+            echo "- Security headers: PASS"
+          } >> "$GITHUB_STEP_SUMMARY"
