@@ -23,6 +23,8 @@ const vite=fs.readFileSync(path.join(root,'../client/vite.config.ts'),'utf8');
 const playwright=fs.readFileSync(path.join(root,'../playwright.config.ts'),'utf8');
 const preflight=fs.readFileSync(path.join(root,'../.github/workflows/production-preflight.yml'),'utf8');
 const productionSmoke=fs.readFileSync(path.join(root,'../.github/workflows/production-smoke.yml'),'utf8');
+const app=fs.readFileSync(path.join(root,'../client/src/App.tsx'),'utf8');
+const e2e=fs.readFileSync(path.join(root,'../e2e/smoke.spec.ts'),'utf8');
 
 assert.match(index,/health\/live/);
 assert.match(index,/health\/ready/);
@@ -77,6 +79,11 @@ assert.match(preflight,/Verify private attachment bucket/);
 assert.match(preflight,/Verify production demo authentication is disabled/);
 assert.match(productionSmoke,/Check protected routes/);
 assert.match(productionSmoke,/Production Smoke Test/);
+assert.match(app,/GoogleLogin/);
+assert.match(app,/Secure Google sign-in/);
+assert.doesNotMatch(app,/Choose an account|Continue to preview|demoEmail|demo\.enabled/);
+assert.match(e2e,/Secure Google sign-in/);
+assert.doesNotMatch(e2e,/Choose an account|Continue to preview/);
 
 
 assert.match(admin,/router\.get\('\/reports\.csv'/);
