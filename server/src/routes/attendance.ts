@@ -133,13 +133,17 @@ router.post('/corrections', attendanceMutationLimiter, asyncRoute(async (req, re
   if (input.date > indiaDate()) throw Object.assign(new Error('Choose today or an earlier date for an attendance correction.'), { status: 400 });
   const matching = await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', { employee: req.user.id, date: input.date });
   const id = crypto.randomUUID();
-  await query(`INSERT INTO attendance_correction_requests (id, employee_id, attendance_id, attendance_date, requested_check_in_at, requested_check_out_at, reason)
-    VALUES (:id, :employee, :attendance, :date, :checkIn, :checkOut, :reason)`, {
-    id, employee: req.user.id, attendance: matching[0]?.id || null, date: input.date,
-    checkIn: input.requestedCheckIn ? new Date(input.requestedCheckIn) : null,
-    checkOut: input.requestedCheckOut ? new Date(input.requestedCheckOut) : null, reason: input.reason
+  await transaction(async (connection) => {
+    const [locked] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee:req.user.id, date:input.date });
+    const attendanceId = locked[0]?.id || null;
+    await connection.execute(`INSERT INTO attendance_correction_requests (id, employee_id, attendance_id, attendance_date, requested_check_in_at, requested_check_out_at, reason)
+      VALUES (:id, :employee, :attendance, :date, :checkIn, :checkOut, :reason)`, {
+      id, employee: req.user.id, attendance: attendanceId, date: input.date,
+      checkIn: input.requestedCheckIn ? new Date(input.requestedCheckIn) : null,
+      checkOut: input.requestedCheckOut ? new Date(input.requestedCheckOut) : null, reason: input.reason
+    });
+    if (attendanceId) await connection.execute('UPDATE attendance_records SET correction_pending=TRUE WHERE id=:id', { id:attendanceId });
   });
-  if (matching[0]) await query('UPDATE attendance_records SET correction_pending=TRUE WHERE id=:id', { id: matching[0].id });
   await audit({ actorId: req.user.id, action: 'ATTENDANCE_CORRECTION_REQUESTED', entityType: 'attendance_correction', entityId: id, details: { date: input.date }, ipAddress: req.ip });
   await notifyAdmins('Attendance correction needs review', `${req.user.full_name} requested an attendance correction for ${input.date}.`, 'REQUEST', { type:'correction', id });
   res.status(201).json({ ok: true, id });
@@ -152,8 +156,12 @@ router.post('/flex-requests', attendanceMutationLimiter, asyncRoute(async (req, 
   const holidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date:input.date});
   if(!isScheduledWorkday(input.date,new Set(holidays.map((x)=>x.date)))) throw Object.assign(new Error('Choose a scheduled workday for your flex-start request.'),{status:400});
   const id = crypto.randomUUID();
-  await query(`INSERT INTO flex_start_requests (id, employee_id, request_date, requested_start_time, reason) VALUES (:id, :employee, :date, :time, :reason)`, {
-    id, employee: req.user.id, date: input.date, time: input.startTime, reason: input.reason
+  await transaction(async (connection) => {
+    const [existing] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
+    if (existing[0]) throw Object.assign(new Error('You already have a pending or approved flex-start request for this date.'), { status:409 });
+    await connection.execute(`INSERT INTO flex_start_requests (id, employee_id, request_date, requested_start_time, reason) VALUES (:id, :employee, :date, :time, :reason)`, {
+      id, employee: req.user.id, date: input.date, time: input.startTime, reason: input.reason
+    });
   });
   await audit({ actorId: req.user.id, action: 'FLEX_START_REQUESTED', entityType: 'flex_start_request', entityId: id, details: { date: input.date, start_time: input.startTime }, ipAddress: req.ip });
   await notifyAdmins('Flexible start needs review', `${req.user.full_name} requested a ${input.startTime} start on ${input.date}.`, 'REQUEST', { type:'flex', id });
@@ -166,18 +174,25 @@ router.get('/exits/current', asyncRoute(async (req, res) => {
 }));
 router.post('/exits', asyncRoute(async (req, res) => {
   const { reason } = validate(z.object({ reason: z.string().trim().max(500).optional() }), req.body || {});
-  const active = await query(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date AND check_out_at IS NULL`, { employee: req.user.id, date: indiaDate() });
-  if (!active[0]) throw Object.assign(new Error('Start attendance before recording a temporary exit.'), { status: 409 });
-  const open = await query(`SELECT id FROM temporary_exits WHERE employee_id=:employee AND attendance_id=:attendance AND returned_at IS NULL`, { employee: req.user.id, attendance: active[0].id });
-  if (open[0]) throw Object.assign(new Error('You already have an open temporary-exit record.'), { status: 409 });
   const id = crypto.randomUUID();
-  await query(`INSERT INTO temporary_exits (id, employee_id, attendance_id, left_at, reason) VALUES (:id, :employee, :attendance, UTC_TIMESTAMP(), :reason)`, { id, employee: req.user.id, attendance: active[0].id, reason: reason || null });
+  await transaction(async (connection) => {
+    const [active] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date AND check_out_at IS NULL FOR UPDATE`, { employee:req.user.id, date:indiaDate() });
+    if (!active[0]) throw Object.assign(new Error('Start attendance before recording a temporary exit.'), { status:409 });
+    const [open] = await connection.execute(`SELECT id FROM temporary_exits WHERE employee_id=:employee AND attendance_id=:attendance AND returned_at IS NULL FOR UPDATE`, { employee:req.user.id, attendance:active[0].id });
+    if (open[0]) throw Object.assign(new Error('You already have an open temporary-exit record.'), { status:409 });
+    await connection.execute(`INSERT INTO temporary_exits (id, employee_id, attendance_id, left_at, reason) VALUES (:id, :employee, :attendance, UTC_TIMESTAMP(), :reason)`, { id, employee:req.user.id, attendance:active[0].id, reason:reason || null });
+  });
   await audit({ actorId: req.user.id, action: 'TEMPORARY_EXIT_STARTED', entityType: 'temporary_exit', entityId: id, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
 router.patch('/exits/:id/return', asyncRoute(async (req, res) => {
-  const rows = await query(`UPDATE temporary_exits SET returned_at=UTC_TIMESTAMP() WHERE id=:id AND employee_id=:employee AND returned_at IS NULL`, { id: req.params.id, employee: req.user.id });
-  if (!rows.affectedRows) throw Object.assign(new Error('This exit record is already closed or was not found.'), { status: 404 });
+  const rows = await transaction(async (connection) => {
+    const [locked] = await connection.execute('SELECT id FROM temporary_exits WHERE id=:id AND employee_id=:employee FOR UPDATE', { id:req.params.id, employee:req.user.id });
+    if (!locked[0] || locked[0].returned_at) throw Object.assign(new Error('This exit record is already closed or was not found.'), { status:404 });
+    const [result] = await connection.execute('UPDATE temporary_exits SET returned_at=UTC_TIMESTAMP() WHERE id=:id AND employee_id=:employee AND returned_at IS NULL', { id:req.params.id, employee:req.user.id });
+    return result;
+  });
+  if (!rows.affectedRows) throw Object.assign(new Error('This exit record is already closed or was not found.'), { status:404 });
   await audit({ actorId: req.user.id, action: 'TEMPORARY_EXIT_RETURNED', entityType: 'temporary_exit', entityId: req.params.id, ipAddress: req.ip });
   res.json({ ok: true });
 }));
