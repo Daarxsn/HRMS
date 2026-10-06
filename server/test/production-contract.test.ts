@@ -60,4 +60,11 @@ assert.match(auth,/AUTH_LOGOUT/);
 assert.match(sessionMigration,/ADD COLUMN session_version/);
 assert.match(integration,/API integration smoke verification: PASS/);
 
+
+assert.match(admin,/router\.get\('\/reports\.csv'/);
+assert.match(admin,/Content-Type','text\/csv; charset=utf-8/);
+assert.match(admin,/Cache-Control','private, no-store/);
+assert.match(admin,/\^\[=\+\\-@\\t\\r\]/);
+assert.match(admin,/work_minutes_after_fixed_lunch/);
+
 console.log('Production API contracts: PASS');
