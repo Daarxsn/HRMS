@@ -12,10 +12,11 @@ try {
   ];
   for (const table of required) assert.ok(names.has(table), `Missing required table: ${table}`);
 
-  const [migrationRows] = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
+  const [migrationRows] = await pool.query('SELECT version, checksum FROM schema_migrations ORDER BY version');
   assert.ok(migrationRows.some((row) => row.version === '001_initial_schema.sql'), 'Initial schema migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '002_session_revocation.sql'), 'Session revocation migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '003_retire_qr_setting.sql'), 'QR retirement migration is not recorded');
+  assert.ok(migrationRows.every((row) => /^[a-f0-9]{64}$/.test(String(row.checksum || ''))), 'Every applied migration must have a SHA-256 checksum');
 
   const [employeeRows] = await pool.query("SELECT COUNT(*) AS total FROM employees WHERE status='ACTIVE'");
   assert.ok(Number(employeeRows[0].total) >= 11, 'Expected seeded local workforce plus administrator');
