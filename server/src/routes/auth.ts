@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { query, transaction } from '../db.ts';
-import { authCookieOptions, signToken, audit } from '../security.ts';
+import { authCookieOptions, signToken, audit, publicUser } from '../security.ts';
 import { requireAuth } from '../security.ts';
 import { asyncRoute } from '../validate.ts';
 
@@ -22,7 +22,7 @@ router.post('/demo', asyncRoute(async (req, res) => {
   const users = await query(`SELECT ${userSelect} FROM employees WHERE LOWER(email)=:email AND status='ACTIVE' LIMIT 1`, { email });
   if (!users[0]) return res.status(401).json({ error: 'This demo account is not available.' });
   const user = users[0];
-  res.cookie('fx_session', signToken(user), authCookieOptions()).json({ user });
+  res.cookie('fx_session', signToken(user), authCookieOptions()).json({ user: publicUser(user) });
   await audit({ actorId: user.id, action: 'AUTH_DEMO_SIGN_IN', entityType: 'employee', entityId: user.id, ipAddress: req.ip });
 }));
 
