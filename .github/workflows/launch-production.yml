@@ -1,0 +1,74 @@
+name: HRMS Production Launch
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Approved immutable release tag"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  uat-gate:
+    name: UAT approval gate
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify release and automated gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          SHA="$(git rev-list -n 1 "refs/tags/${{ inputs.release_tag }}")"
+          test -n "${SHA}"
+          git fetch origin main
+          git merge-base --is-ancestor "${SHA}" origin/main
+          for workflow in CI "Playwright E2E"; do
+            count="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${workflow}" --commit "${SHA}" --json conclusion --jq '[.[] | select(.conclusion=="success")] | length')"
+            if [[ "${count}" -lt 1 ]]; then
+              echo "::error::No successful ${workflow} run for release SHA ${SHA}"
+              exit 1
+            fi
+          done
+          echo "Release ${{ inputs.release_tag }} / ${SHA} passed automated UAT gates."
+
+  production:
+    name: Deploy approved release
+    needs: uat-gate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve release SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          SHA="$(git rev-list -n 1 "refs/tags/${{ inputs.release_tag }}")"
+          test -n "${SHA}"
+          echo "RELEASE_SHA=${SHA}" >> "$GITHUB_ENV"
+      - name: Trigger immutable production deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run "Deploy Production"             --repo "${GITHUB_REPOSITORY}"             --ref main             -f image_tag="${RELEASE_SHA}"
+          echo "Production deployment workflow triggered for ${RELEASE_SHA}."
+          echo "Monitor the Deploy Production workflow for migration and health verification."
