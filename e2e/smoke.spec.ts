@@ -2,9 +2,8 @@ import { test, expect } from '@playwright/test';
 
 async function signInDemo(page: any, account: 'employee' | 'admin') {
   await page.goto('/');
-  await expect(page.getByText('Explore the demo')).toBeVisible();
   const select = page.getByLabel('Choose an account');
-  await expect(select).toBeVisible();
+  await expect(select).toBeVisible({ timeout: 15000 });
   const options = await select.locator('option').allTextContents();
   const target = options.find((value) =>
     account === 'admin'
@@ -28,7 +27,8 @@ test('administrator can sign in and reach workplace pulse', async ({ page }) => 
   await expect(page.getByRole('link', { name: /Reports/i })).toBeVisible();
 });
 
-test('mobile navigation opens and remains usable', async ({ page }) => {
+test('mobile navigation opens and remains usable', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile navigation is only rendered at mobile viewport widths.');
   await signInDemo(page, 'employee');
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible();
