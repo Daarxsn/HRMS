@@ -84,7 +84,7 @@ export function elapsedMinutes(start, end) {
 export function netWorkedMinutes(start: any, end: any, fixedLunchMinutes: number = POLICY.fixedLunchMinutes) {
   return Math.max(0, elapsedMinutes(start, end) - fixedLunchMinutes);
 }
-export function attendanceStatus(checkIn, approvedStart, lateThreshold = POLICY.lateThreshold) {
+export function attendanceStatus(checkIn, approvedStart, lateThreshold: string = POLICY.lateThreshold) {
   const local = indiaParts(checkIn);
   const threshold = minutesOfTime(approvedStart || lateThreshold);
   const checkedAt = Number(local.hour) * 60 + Number(local.minute) + Number(local.second) / 60;
