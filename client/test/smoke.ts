@@ -55,4 +55,13 @@ for (const secretName of ['JWT_SECRET', 'DB_PASSWORD', 'GCS_PRIVATE_KEY']) {
   assert.ok(!app.includes(secretName) && !api.includes(secretName), `Frontend must not contain server secret name: ${secretName}`);
 }
 
+
+assert.ok(app.includes("const attended=rows.filter((r)=>r.status==='ON_TIME'||r.status==='LATE_ENTRY')"), 'Reports present-day metric contract missing');
+assert.ok(app.includes("const open=attended.filter((r)=>!r.check_out_at).length"), 'Reports open-shift metric contract missing');
+assert.ok(app.includes('PRESENT DAYS'), 'Reports present-days label contract missing');
+assert.ok(app.includes('OPEN SHIFTS'), 'Reports open-shifts label contract missing');
+assert.ok(app.includes('ABSENT'), 'Reports absent summary contract missing');
+assert.ok(app.includes('ON LEAVE'), 'Reports leave summary contract missing');
+assert.ok(app.includes('WFH'), 'Reports WFH summary contract missing');
+
 console.log('Frontend smoke contracts: PASS');
