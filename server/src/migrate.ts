@@ -29,7 +29,8 @@ try {
     checksum CHAR(64) NULL,
     applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB`);
-  await connection.query(`ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum CHAR(64) NULL`);
+  const [checksumColumns] = await connection.query(`SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'schema_migrations' AND column_name = 'checksum'`);
+  if (Number(checksumColumns[0]?.count) === 0) await connection.query('ALTER TABLE schema_migrations ADD COLUMN checksum CHAR(64) NULL');
 
   const [recordedRows] = await connection.query('SELECT version, checksum FROM schema_migrations');
   const knownFiles = new Set(files);
