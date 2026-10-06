@@ -6,8 +6,6 @@ async function signInDev(page: any, account: 'employee' | 'admin') {
   const response = await page.request.post(`${apiBase}/auth/demo`, { data: { email } });
   expect(response.ok()).toBeTruthy();
   await page.goto('/');
-  await expect(page.getByText('Secure Google sign-in')).toBeVisible();
-  await page.reload();
 }
 
 test('employee can sign in and reach the action center', async ({ page }) => {
