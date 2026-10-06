@@ -227,9 +227,11 @@ router.get('/reports.csv', asyncRoute(async (req,res) => {
   const from=String(req.query.from || `${indiaDate().slice(0,7)}-01`); const to=String(req.query.to || indiaDate());
   if(!dateSchema.safeParse(from).success||!dateSchema.safeParse(to).success||from>to) throw Object.assign(new Error('Choose a valid date range.'),{status:400});
   const rows=await effectiveAttendance(from,to);
+  const lunchRows=await query("SELECT setting_value FROM system_settings WHERE setting_key='fixed_lunch_minutes'");
+  const lunch=Number(lunchRows[0]?.setting_value || POLICY.fixedLunchMinutes);
   const columns=['employee_code','full_name','user_type','date','check_in_utc','check_out_utc','status','check_in_method','check_out_method','work_minutes_after_fixed_lunch','check_in_distance_m','check_in_accuracy_m'];
   const safe=(value)=>{let text=String(value ?? '');if(/^[=+\-@\t\r]/.test(text))text=`'${text}`;return `"${text.replaceAll('"','""')}"`;};
-  const lines=[columns.map(safe).join(','),...rows.map((r)=>[r.employee_code,r.full_name,r.user_type,r.attendance_date,r.check_in_at,r.check_out_at,r.status,r.check_in_method,r.check_out_method,r.check_in_at&&r.check_out_at?netWorkedMinutes(r.check_in_at,r.check_out_at):null,r.check_in_distance_m,r.check_in_accuracy_m].map(safe).join(','))];
+  const lines=[columns.map(safe).join(','),...rows.map((r)=>[r.employee_code,r.full_name,r.user_type,r.attendance_date,r.check_in_at,r.check_out_at,r.status,r.check_in_method,r.check_out_method,r.check_in_at&&r.check_out_at?netWorkedMinutes(r.check_in_at,r.check_out_at,lunch):null,r.check_in_distance_m,r.check_in_accuracy_m].map(safe).join(','))];
   res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="falchion-attendance-${from}-${to}.csv"`); res.setHeader('Cache-Control','private, no-store');
   res.send(`\uFEFF${lines.join('\r\n')}`);
 }));
