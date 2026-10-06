@@ -1,12 +1,17 @@
 import 'dotenv/config';
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from './db.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const migrationDir = path.join(here, '../migrations');
+const migrationCandidates = [path.join(here, '../migrations'), path.join(here, '../../migrations')];
+let migrationDir = '';
+for (const candidate of migrationCandidates) {
+  try { await access(candidate); migrationDir = candidate; break; } catch {}
+}
+if (!migrationDir) throw new Error('Migration directory could not be located.');
 const lockName = 'falchion_xeniaa_schema_migration';
 const files = (await readdir(migrationDir)).filter((f) => f.endsWith('.sql')).sort();
 
