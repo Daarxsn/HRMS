@@ -66,5 +66,12 @@ assert.match(admin,/Content-Type','text\/csv; charset=utf-8/);
 assert.match(admin,/Cache-Control','private, no-store/);
 assert.match(admin,/\^\[=\+\\-@\\t\\r\]/);
 assert.match(admin,/work_minutes_after_fixed_lunch/);
+assert.match(admin,/late_threshold/);
+assert.match(admin,/fixed_lunch_minutes/);
+assert.match(admin,/leave_casual_sl_entitlement/);
+assert.match(admin,/leave_earned_entitlement/);
+assert.match(admin,/leave_floating_entitlement/);
+assert.match(attendance,/late_threshold/);
+assert.match(auth,/APP_ORIGIN/);
 
 console.log('Production API contracts: PASS');
