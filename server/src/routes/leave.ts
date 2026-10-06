@@ -49,7 +49,7 @@ async function getLeaveBalances(employee, connection = null) {
     const used = type === 'CASUAL' || type === 'SICK' ? sharedUsed : byKey.get(`${type}:APPROVED`) || 0;
     const pending = type === 'CASUAL' || type === 'SICK' ? sharedPending : byKey.get(`${type}:PENDING`) || 0;
     const remaining = Math.max(0, accrued - used - pending);
-    return { type, label, entitlement, accrued, used, pending, remaining, note: type === 'EARNED' ? 'Accrues 1 day/month after probation, up to 15 days/year.' : type === 'CASUAL' || type === 'SICK' ? 'Casual and sick leave share one 8-day annual balance.' : null };
+    return { type, label, entitlement, accrued, used, pending, remaining, note: type === 'EARNED' ? `Accrues 1 day/month after probation, up to ${earnedEntitlement} days/year.` : type === 'CASUAL' || type === 'SICK' ? 'Casual and sick leave share one 8-day annual balance.' : null };
   });
 }
 
