@@ -1,0 +1,178 @@
+name: Production Readiness Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      portal_url:
+        description: "Exact public HRMS portal URL, for example https://portal.company.com"
+        required: true
+        type: string
+      api_url:
+        description: "Exact public HRMS API URL, for example https://api.company.com"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-preflight
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Verify production infrastructure and public endpoints
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      CLOUD_SQL_INSTANCE: ${{ vars.CLOUD_SQL_INSTANCE }}
+      DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DB_PASSWORD_SECRET: ${{ vars.DB_PASSWORD_SECRET }}
+      JWT_SECRET_NAME: ${{ vars.JWT_SECRET_NAME }}
+      DB_PASSWORD_SECRET_VERSION: ${{ vars.DB_PASSWORD_SECRET_VERSION }}
+      JWT_SECRET_VERSION: ${{ vars.JWT_SECRET_VERSION }}
+      GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+      APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      PORTAL_URL: ${{ inputs.portal_url }}
+      API_URL: ${{ inputs.api_url }}
+    steps:
+      - name: Validate production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            PROJECT_ID REGION CLOUD_SQL_INSTANCE DEPLOYER_SERVICE_ACCOUNT
+            RUNTIME_SERVICE_ACCOUNT WIF_PROVIDER DB_PASSWORD_SECRET JWT_SECRET_NAME
+            DB_PASSWORD_SECRET_VERSION JWT_SECRET_VERSION GCS_BUCKET APP_ORIGIN GOOGLE_CLIENT_ID
+            PORTAL_URL API_URL
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing production configuration: ${name}"
+              exit 1
+            fi
+          done
+          [[ "${PORTAL_URL}" == https://* ]]
+          [[ "${API_URL}" == https://* ]]
+          [[ "${APP_ORIGIN}" == "${PORTAL_URL}" ]] || {
+            echo "::error::APP_ORIGIN must exactly match the portal URL."
+            exit 1
+          }
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          version: ">= 363.0.0"
+
+      - name: Verify Cloud SQL instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud sql instances describe "${CLOUD_SQL_INSTANCE}" \
+            --project="${PROJECT_ID}" \
+            --format='value(name,state,dbVersion,settings.ipConfiguration.requireSsl)'
+
+      - name: Verify Secret Manager versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_STATE="$(gcloud secrets versions describe "${DB_PASSWORD_SECRET_VERSION}" --secret="${DB_PASSWORD_SECRET}" --project="${PROJECT_ID}" --format='value(state)')"
+          JWT_STATE="$(gcloud secrets versions describe "${JWT_SECRET_VERSION}" --secret="${JWT_SECRET_NAME}" --project="${PROJECT_ID}" --format='value(state)')"
+          test "${DB_STATE}" = "ENABLED"
+          test "${JWT_STATE}" = "ENABLED"
+          echo "DB password secret version: ENABLED"
+          echo "JWT secret version: ENABLED"
+
+      - name: Verify secret payloads without printing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          jwt_length="$(gcloud secrets versions access "${JWT_SECRET_VERSION}" --secret="${JWT_SECRET_NAME}" --project="${PROJECT_ID}" | wc -c)"
+          db_length="$(gcloud secrets versions access "${DB_PASSWORD_SECRET_VERSION}" --secret="${DB_PASSWORD_SECRET}" --project="${PROJECT_ID}" | wc -c)"
+          test "${jwt_length}" -ge 33 || {
+            echo "::error::JWT secret payload is shorter than the required 32 bytes."
+            exit 1
+          }
+          test "${db_length}" -gt 0 || {
+            echo "::error::Database password secret payload is empty."
+            exit 1
+          }
+
+      - name: Verify private attachment bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          bucket="gs://${GCS_BUCKET}"
+          prevention="$(gcloud storage buckets describe "${bucket}" --project="${PROJECT_ID}" --format='value(iamConfiguration.publicAccessPrevention)')"
+          test "${prevention}" = "enforced" || {
+            echo "::error::GCS public access prevention is not enforced."
+            exit 1
+          }
+          gcloud storage buckets describe "${bucket}" --project="${PROJECT_ID}" --format='value(name,location,iamConfiguration.publicAccessPrevention,versioning.enabled)'
+
+      - name: Verify public portal and API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 "${PORTAL_URL}/" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/live" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${API_URL}/api/health/ready" >/dev/null
+
+      - name: Verify exact-origin CORS and security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null "${API_URL}/api/health/live")"
+          printf '%s\n' "${headers}" | grep -qi '^strict-transport-security:'
+          printf '%s\n' "${headers}" | grep -qi '^x-content-type-options:'
+          printf '%s\n' "${headers}" | grep -qi '^x-frame-options:'
+          cors="$(curl --silent --show-error --max-time 20 -D - -o /dev/null \
+            -X OPTIONS "${API_URL}/api/auth/google" \
+            -H "Origin: ${PORTAL_URL}" \
+            -H "Access-Control-Request-Method: POST" |
+            tr -d '\r' | grep -i '^access-control-allow-origin:' | sed 's/^[^:]*:[[:space:]]*//')"
+          test "${cors}" = "${PORTAL_URL}" || {
+            echo "::error::Production CORS did not return the exact portal origin."
+            exit 1
+          }
+
+      - name: Verify production demo authentication is disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
+            -X POST "${API_URL}/api/auth/demo" \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"blocked@example.test"}')"
+          test "${status}" = "404"
+
+      - name: Write readiness summary
+        shell: bash
+        run: |
+          {
+            echo "## Production readiness preflight"
+            echo ""
+            echo "- Production configuration: PASS"
+            echo "- Cloud SQL instance: PASS"
+            echo "- Secret Manager versions and payload checks: PASS"
+            echo "- Private GCS bucket/public access prevention: PASS"
+            echo "- Portal/API TLS and reachability: PASS"
+            echo "- API/database readiness: PASS"
+            echo "- Exact-origin CORS/security headers: PASS"
+            echo "- Demo authentication disabled: PASS"
+            echo ""
+            echo "Secret values are never printed by this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
