@@ -7,7 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import { Storage } from '@google-cloud/storage';
 import { z } from 'zod';
 import { query, transaction } from '../db.ts';
-import { audit, requireAuth, notifyAdmins } from '../security.ts';
+import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.ts';
 import { asyncRoute, dateSchema, validate } from '../validate.ts';
 import { indiaDate, isScheduledWorkday } from '../policy.ts';
 
@@ -20,7 +20,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
   cb(allowed.includes(file.mimetype) ? null : Object.assign(new Error('Only PDF, JPG, or PNG files are accepted.'), { status: 400 }), allowed.includes(file.mimetype));
 } });
 
-router.post('/files', uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
+router.post('/files', requirePeople, uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) throw Object.assign(new Error('Choose a PDF, JPG, or PNG file up to 10 MB.'), { status: 400 });
   const signatures={
     'application/pdf':Buffer.from('%PDF-'),
@@ -73,12 +73,12 @@ router.get('/files/:id', asyncRoute(async (req, res) => {
   res.send(buffer);
 }));
 
-router.get('/wfh', asyncRoute(async (req, res) => {
+router.get('/wfh', requirePeople, asyncRoute(async (req, res) => {
   const requests = await query(`SELECT id, request_date, request_kind, reason, status, reviewer_note, created_at FROM wfh_requests WHERE employee_id=:employee ORDER BY request_date DESC LIMIT 100`, { employee: req.user.id });
   const setting = await query(`SELECT setting_value FROM system_settings WHERE setting_key='wfh_monthly_cap'`);
   res.json({ enabled: Boolean(req.user.wfh_enabled), monthlyCap: Number(setting[0]?.setting_value || 4), requests });
 }));
-router.post('/wfh', asyncRoute(async (req, res) => {
+router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, kind: z.enum(['PLANNED','EMERGENCY']), reason: z.string().trim().min(8).max(1000) }), req.body);
   if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH has not been enabled for this employee. Ask an administrator if your eligibility needs to change.'), { status: 403 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
