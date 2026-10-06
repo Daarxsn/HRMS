@@ -68,9 +68,12 @@ assert.match(admin,/\^\[=\+\\-@\\t\\r\]/);
 assert.match(admin,/work_minutes_after_fixed_lunch/);
 assert.match(admin,/late_threshold/);
 assert.match(admin,/fixed_lunch_minutes/);
+assert.match(admin,/const lunchRows=await query/);
+assert.match(admin,/netWorkedMinutes\(r\.check_in_at,r\.check_out_at,lunch\)/);
 assert.match(admin,/leave_casual_sl_entitlement/);
 assert.match(admin,/leave_earned_entitlement/);
 assert.match(admin,/leave_floating_entitlement/);
 assert.match(attendance,/late_threshold/);
+assert.match(attendance,/attendanceStatus\(checkIn, schedule\[0\]\?\.approved_start_time \|\| null, String\(settings\.late_threshold/);
 
 console.log('Production API contracts: PASS');
