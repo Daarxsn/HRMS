@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { readdir, readFile } from 'node:fs/promises';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from './db.ts';
@@ -20,18 +21,31 @@ try {
 
   await connection.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version VARCHAR(255) PRIMARY KEY,
+    checksum CHAR(64) NULL,
     applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB`);
+  await connection.query(`ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum CHAR(64) NULL`);
+
+  const [recordedRows] = await connection.query('SELECT version, checksum FROM schema_migrations');
+  const knownFiles = new Set(files);
+  for (const row of recordedRows) {
+    if (!knownFiles.has(row.version)) throw new Error(`Recorded migration is missing from source tree: ${row.version}`);
+  }
 
   for (const file of files) {
-    const [rows] = await connection.execute('SELECT version FROM schema_migrations WHERE version = ?', [file]);
-    if (rows.length) continue;
-
     const sql = await readFile(path.join(migrationDir, file), 'utf8');
+    const checksum = crypto.createHash('sha256').update(sql).digest('hex');
+    const [rows] = await connection.execute('SELECT version, checksum FROM schema_migrations WHERE version = ?', [file]);
+    if (rows.length) {
+      const recorded = rows[0].checksum;
+      if (recorded && recorded !== checksum) throw new Error(`Migration checksum mismatch for ${file}. Refusing to continue.`);
+      if (!recorded) await connection.execute('UPDATE schema_migrations SET checksum=? WHERE version=?', [checksum, file]);
+      continue;
+    }
     for (const statement of sql.split(';').map((s) => s.trim()).filter(Boolean)) {
       await connection.query(statement);
     }
-    await connection.execute('INSERT INTO schema_migrations (version) VALUES (?)', [file]);
+    await connection.execute('INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)', [file, checksum]);
     console.log(`Applied ${file}`);
   }
 } finally {
