@@ -38,6 +38,11 @@ test('Sunday, national holidays and company holidays are not scheduled attendanc
   assert.equal(isScheduledWorkday('2026-10-03',new Set(['2026-10-03'])), false);
 });
 
+test('work duration accepts an administrator-configured lunch duration', () => {
+  assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 12:30:00', 45), 495);
+  assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 03:50:00', 45), 0);
+});
+
 test('work duration always deducts the fixed 30-minute lunch and never goes below zero', () => {
   assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 12:30:00'), 510);
   assert.equal(netWorkedMinutes('2026-10-02 03:30:00', '2026-10-02 11:30:00'), 450);
