@@ -7,6 +7,13 @@ test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T04:00:00Z')), 'LATE_ENTRY');
 });
 
+test('a configurable late threshold is respected when no flex start is approved', () => {
+  assert.equal(attendanceStatus(new Date('2026-10-02T04:29:59Z'), null, '09:30'), 'ON_TIME');
+  assert.equal(attendanceStatus(new Date('2026-10-02T04:30:00Z'), null, '09:30'), 'LATE_ENTRY');
+  assert.equal(attendanceStatus(new Date('2026-10-02T05:00:00Z'), null, '10:30'), 'ON_TIME');
+  assert.equal(attendanceStatus(new Date('2026-10-02T05:00:01Z'), null, '10:30'), 'LATE_ENTRY');
+});
+
 test('an approved 10:30 AM flex start is respected to the minute and second', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T05:00:00Z'), '10:30:00'), 'ON_TIME');
   assert.equal(attendanceStatus(new Date('2026-10-02T05:00:01Z'), '10:30:00'), 'LATE_ENTRY');
