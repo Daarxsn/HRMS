@@ -32,5 +32,5 @@ test('mobile navigation opens and remains usable', async ({ page }, testInfo) =>
   await signInDemo(page, 'employee');
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Attendance' })).toBeVisible();
+  await expect(page.locator('nav.main-nav').getByRole('link', { name: 'Attendance', exact: true })).toBeVisible();
 });
