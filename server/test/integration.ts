@@ -133,7 +133,6 @@ try {
   assert.equal(adminHealth.data.databaseLatencyMs >= 0, true);
   assert.ok(adminHealth.data.mysqlVersion);
 
-  assert.equal(dashboard.response.status, 200);
   const adminAttendanceAttempt = await request('/attendance', {
     headers: { Cookie: adminSession.cookie }
   });
@@ -147,6 +146,8 @@ try {
   const dashboard = await request('/admin/dashboard', {
     headers: { Cookie: adminSession.cookie }
   });
+  assert.equal(dashboard.response.status, 200);
+  assert.ok(dashboard.data.stats);
   assert.equal(Number.isInteger(dashboard.data.stats.employees), true);
 
   const logout = await request('/auth/logout', {
