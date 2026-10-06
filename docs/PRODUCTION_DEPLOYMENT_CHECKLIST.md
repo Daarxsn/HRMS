@@ -66,3 +66,16 @@ The Vercel deployment should use the client directory as its root.
 ## Office network verification
 
 Office attendance is not based on the Wi-Fi SSID. The browser requests one-time geolocation permission, while the API verifies the request's observed network identity against the production `OFFICE_NETWORK_IPS` allow-list. Configure one or more stable public egress IPs for the office Wi-Fi, separated with semicolons. Do not use a consumer-device local IP such as 192.168.x.x in Cloud Run; the production API sees the office network's public egress address.
+
+
+## Final release controls (Phases 21–24)
+
+- Configure the protected GitHub `uat` environment with required HR/business reviewers.
+- Configure the protected GitHub `production` environment with required production approvers.
+- Configure `CLOUD_SQL_INSTANCE` for automated backups.
+- Run the scheduled/manual production backup workflow and verify a backup exists.
+- Run staging deployment and verify liveness/readiness.
+- Run Release Candidate for the exact staging-verified commit.
+- Complete HR/UAT sign-off for the immutable release tag.
+- Run HRMS Production Launch only after UAT approval.
+- Verify post-deploy health and business smoke tests.
