@@ -80,3 +80,7 @@ assert.match(attendance,/late_threshold/);
 assert.match(admin,/attendanceStatus\(checkIn, schedule\[0\]\?\.approved_start_time \|\| null, String\(settings\.late_threshold/);
 
 console.log('Production API contracts: PASS');
+
+assert.match(index,/uncaughtException/);
+assert.match(index,/unhandledRejection/);
+assert.match(index,/X-Request-ID/);
