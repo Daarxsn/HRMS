@@ -1,0 +1,62 @@
+name: Playwright E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: falchion_hrms_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: development
+      PORT: 8080
+      APP_ORIGIN: http://127.0.0.1:5173
+      DEMO_AUTH_ENABLED: true
+      JWT_SECRET: ci-e2e-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: falchion_hrms_e2e
+      DB_USER: root
+      DB_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@latest
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Seed E2E database
+        run: npm run db:seed
+      - name: Run Playwright E2E
+        run: npx playwright test
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
