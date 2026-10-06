@@ -1,0 +1,78 @@
+name: HRMS Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag, for example v1.0.1"
+        required: true
+        type: string
+      commit_sha:
+        description: "Exact main commit SHA to release"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and publish immutable release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Validate release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          git merge-base --is-ancestor "${{ inputs.commit_sha }}" origin/main
+          if git rev-parse --verify "refs/tags/${{ inputs.release_tag }}" >/dev/null 2>&1; then
+            echo "::error::Release tag already exists: ${{ inputs.release_tag }}"
+            exit 1
+          fi
+
+      - name: Verify CI and Playwright
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in CI "Playwright E2E"; do
+            count="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${workflow}" --commit "${{ inputs.commit_sha }}" --json conclusion --jq '[.[] | select(.conclusion=="success")] | length')"
+            if [[ "${count}" -lt 1 ]]; then
+              echo "::error::No successful ${workflow} run found for ${{ inputs.commit_sha }}"
+              exit 1
+            fi
+          done
+
+      - name: Verify staging deployment gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          count="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "Deploy Staging" --json conclusion,headSha --jq '[.[] | select(.headSha=="${{ inputs.commit_sha }}" and .conclusion=="success")] | length')"
+          if [[ "${count}" -lt 1 ]]; then
+            echo "::error::No successful staging deployment found for ${{ inputs.commit_sha }}"
+            exit 1
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${{ inputs.release_tag }}"             --repo "${GITHUB_REPOSITORY}"             --target "${{ inputs.commit_sha }}"             --title "HRMS ${{ inputs.release_tag }}"             --generate-notes
