@@ -18,6 +18,11 @@ const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 const BUILD_SHA = process.env.BUILD_SHA || 'development';
 const startedAt = Date.now();
+const logProcessFailure = (type: string, error: unknown) => {
+  console.error(JSON.stringify({ type, error: String((error as any)?.stack || (error as any)?.message || error) }));
+};
+process.on('uncaughtException', (error) => logProcessFailure('uncaught_exception', error));
+process.on('unhandledRejection', (error) => logProcessFailure('unhandled_rejection', error));
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');if(!process.env.GCS_BUCKET)throw new Error('Set GCS_BUCKET for private production attachments.');}
