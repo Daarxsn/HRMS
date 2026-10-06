@@ -7,12 +7,45 @@ on:
     branches: [main]
 
 jobs:
-  validate:
+  security:
+    name: Security audit
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Security audit
+        run: npm audit --omit=dev --audit-level=high
 
+  typecheck:
+    name: TypeScript validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check TypeScript server syntax
+        run: |
+          find server/src server/test -type f -name '*.ts' -print0 |
+            xargs -0 -n1 node --experimental-strip-types --check
+      - name: Typecheck frontend and backend
+        run: npm run typecheck
+
+  backend-tests:
+    name: Backend unit and contract tests
+    runs-on: ubuntu-latest
     services:
       mysql:
         image: mysql:8.4
@@ -26,34 +59,18 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Security audit dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Check TypeScript server syntax
-        run: |
-          find server/src server/test -type f -name '*.ts' -print0 |
-            xargs -0 -n1 node --experimental-strip-types --check
-
-      - name: Typecheck frontend and backend
-        run: npm run typecheck
-
       - name: Run backend unit and contract tests
         run: npm test
-
       - name: Apply MySQL migrations in CI
         env:
           DB_HOST: 127.0.0.1
@@ -62,7 +79,6 @@ jobs:
           DB_USER: root
           DB_PASSWORD: root
         run: npm run db:migrate
-
       - name: Seed and verify MySQL in CI
         env:
           NODE_ENV: development
@@ -75,6 +91,49 @@ jobs:
           npm run db:seed
           npm run db:verify --workspace server
 
+  api-integration:
+    name: API integration smoke
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: falchion_hrms_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply MySQL migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run db:migrate
+      - name: Seed database
+        env:
+          NODE_ENV: development
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run db:seed
       - name: Run API integration smoke test
         env:
           NODE_ENV: development
@@ -89,14 +148,41 @@ jobs:
           DB_PASSWORD: root
         run: npm run test:integration --workspace server
 
+  frontend:
+    name: Frontend build and smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: Build frontend and backend
         run: npm run build
-
       - name: Run frontend smoke contracts
         run: npm run test:smoke --workspace client
 
+  production-image:
+    name: Production API image
+    runs-on: ubuntu-latest
+    needs: [typecheck, backend-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build frontend and backend
+        run: npm run build
       - name: Build production API image
         run: docker build -f server/Dockerfile -t falchion-xeniaa-api:ci server
-
       - name: Inspect production API container user
         run: test "$(docker run --rm --entrypoint id falchion-xeniaa-api:ci -u)" = "1000"
