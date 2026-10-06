@@ -1,0 +1,73 @@
+name: Production Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: "Reason for the backup"
+        required: true
+        type: string
+  schedule:
+    - cron: "15 2 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Create and verify Cloud SQL backup
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      CLOUD_SQL_INSTANCE: ${{ vars.CLOUD_SQL_INSTANCE }}
+      DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+    steps:
+      - name: Validate backup configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PROJECT_ID REGION CLOUD_SQL_INSTANCE DEPLOYER_SERVICE_ACCOUNT WIF_PROVIDER; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing backup configuration: ${name}"
+              exit 1
+            fi
+          done
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          version: ">= 363.0.0"
+
+      - name: Create backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          DESCRIPTION="${{ inputs.description }}"
+          DESCRIPTION="${DESCRIPTION:-scheduled HRMS production backup}"
+          gcloud sql backups create             --instance="${CLOUD_SQL_INSTANCE}"             --project="${PROJECT_ID}"             --description="${DESCRIPTION} | run ${GITHUB_RUN_ID}"
+
+      - name: Verify latest backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          BACKUP="$(gcloud sql backups list             --instance="${CLOUD_SQL_INSTANCE}"             --project="${PROJECT_ID}"             --sort-by="~endTime"             --limit=1             --format="value(id,status,endTime)")"
+          test -n "${BACKUP}"
+          echo "Latest backup: ${BACKUP}"
+          echo "## Production backup" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Instance: ${CLOUD_SQL_INSTANCE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Latest verified backup: ${BACKUP}" >> "$GITHUB_STEP_SUMMARY"
