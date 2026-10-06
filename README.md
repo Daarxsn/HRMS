@@ -7,7 +7,7 @@ A responsive employee and administrator workplace portal built with the locked s
 - Google Sign-In with an authorized-user allowlist. An administrator provisions an employee’s Google email first; no company email domain is enforced.
 - Administrator and employee roles, employee/intern account types, and account activation controls. No departments are modeled in V1.
 - Employee home, attendance history, profile, notification center, holiday calendar, leave and WFH request experiences.
-- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, office configuration, and attendance review, audit trail and CSV reports.
+- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, and office configuration.
 - Server-side GPS distance and accuracy checks at the time an employee chooses check-in or check-out. A GPS event stores one location verification record. There is no continuous location collection or background tracking.
 - Attendance uses one-time GPS and office-network verification; QR attendance is retired in the current production policy.
 - 9:00 AM–6:00 PM schedule, Monday–Saturday work week, late at **9:30 AM or later**, fixed 30-minute lunch deduction, and approved flex starts between 9:00 AM and 10:30 AM.
