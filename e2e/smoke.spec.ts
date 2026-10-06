@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 
 async function signInDev(page: any, account: 'employee' | 'admin') {
   const email = account === 'admin' ? 'om.admin@example.test' : 'aarav.mehta@example.test';
-  const response = await page.request.post('/api/auth/demo', { data: { email } });
+  const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:3001/api';
+  const response = await page.request.post(`${apiBase}/auth/demo`, { data: { email } });
   expect(response.ok()).toBeTruthy();
   await page.goto('/');
   await expect(page.getByText('Secure Google sign-in')).toBeVisible();
