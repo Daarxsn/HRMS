@@ -84,9 +84,9 @@ export function elapsedMinutes(start, end) {
 export function netWorkedMinutes(start: any, end: any, fixedLunchMinutes: number = POLICY.fixedLunchMinutes) {
   return Math.max(0, elapsedMinutes(start, end) - fixedLunchMinutes);
 }
-export function attendanceStatus(checkIn, approvedStart) {
+export function attendanceStatus(checkIn, approvedStart, lateThreshold = POLICY.lateThreshold) {
   const local = indiaParts(checkIn);
-  const threshold = approvedStart ? minutesOfTime(approvedStart) : minutesOfTime(POLICY.lateThreshold);
+  const threshold = minutesOfTime(approvedStart || lateThreshold);
   const checkedAt = Number(local.hour) * 60 + Number(local.minute) + Number(local.second) / 60;
   return (approvedStart ? checkedAt <= threshold : checkedAt < threshold) ? 'ON_TIME' : 'LATE_ENTRY';
 }
