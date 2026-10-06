@@ -8,7 +8,7 @@ import { asyncRoute, dateSchema, validate } from '../validate.ts';
 import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.ts';
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requirePeople);
 const attendanceMutationLimiter = rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 function officeNetworkConfig() {
