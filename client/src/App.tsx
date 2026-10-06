@@ -72,7 +72,6 @@ function CardHeading({ title, subtitle, action }) { return <div className="card-
 function App() {
   const [user,setUser]=useState(null);
   const [loading,setLoading]=useState(true);
-  const [demo,setDemo]=useState({enabled:false,users:[]});
   const [toast,setToast]=useState(null);
   const [bootError,setBootError]=useState('');
   const [notifications,setNotifications]=useState({unread:0,notifications:[]});
@@ -81,11 +80,10 @@ function App() {
   const refreshNotifications=async()=>{if(!user)return;try{setNotifications(await get('/account/notifications'));}catch{}}
   useEffect(()=>{
     let live=true;
-    Promise.allSettled([get('/auth/me'),get('/auth/demo-users')]).then(([me,d])=>{
+    Promise.allSettled([get('/auth/me')]).then(([me])=>{
       if(!live)return;
       if(me.status==='fulfilled')setUser(me.value.user);
-      if(d.status==='fulfilled')setDemo(d.value);
-      if(me.status==='rejected' && d.status==='rejected') setBootError(me.reason?.message || 'We could not reach the HRMS server.');
+      if(me.status==='rejected') setBootError(me.reason?.message || 'We could not reach the HRMS server.');
       setLoading(false);
     });
     return()=>{live=false;};
@@ -103,30 +101,22 @@ function App() {
   useEffect(()=>{ if(import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
   const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications}),[user,notifications]);
   const retryBoot=()=>{setBootError('');setLoading(true);window.location.reload();};
-  return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><IconLogo/><Spinner large/></div>:bootError?<div className="loading-screen" role="alert"><IconLogo/><div className="card" style={{maxWidth:520,margin:'24px',textAlign:'center'}}><div className="eyebrow">CONNECTION ISSUE</div><h1>We could not reach the portal.</h1><p>{bootError}</p><button className="button button-primary" onClick={retryBoot}>Try again</button></div></div>:user?<Shell/>:<LoginScreen demo={demo}/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
+  return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><IconLogo/><Spinner large/></div>:bootError?<div className="loading-screen" role="alert"><IconLogo/><div className="card" style={{maxWidth:520,margin:'24px',textAlign:'center'}}><div className="eyebrow">CONNECTION ISSUE</div><h1>We could not reach the portal.</h1><p>{bootError}</p><button className="button button-primary" onClick={retryBoot}>Try again</button></div></div>:user?<Shell/>:<LoginScreen/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
 }
 
-function LoginScreen({demo}) {
-  const {setUser,notify}=useApp();
+function LoginScreen() {
+  const {setUser}=useApp();
   const [busy,setBusy]=useState(false);
-  const [demoEmail,setDemoEmail]=useState('');
   const [error,setError]=useState('');
   const signIn=async(credential)=>{
     setBusy(true);setError('');
     try { const result=await post('/auth/google',{credential});setUser(result.user); }
     catch(e){setError(e.message);setBusy(false);}
   };
-  const demoSignIn=async()=>{
-    if(!demoEmail)return;
-    setBusy(true);setError('');
-    try{const result=await post('/auth/demo',{email:demoEmail});setUser(result.user);notify(`Welcome back, ${result.user.full_name.split(' ')[0]}.`);}
-    catch(e){setError(e.message);setBusy(false);}
-  };
   return <div className="login-page">
     <div className="login-art"><div className="login-art-top"><IconLogo/><span>FALCHION <b>XENIAA</b></span></div><div className="login-art-copy"><div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div><h1>Good work<br/><em>starts here.</em></h1><p>One thoughtful place for your workday, your time away, and the people you work with.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-note"><Sparkles size={15}/> Built around people, not presence</div></div><div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div></div>
     <div className="login-panel"><div className="login-panel-inner"><div className="mobile-login-brand"><IconLogo/><span>FALCHION <b>XENIAA</b></span></div><div className="eyebrow">THE PEOPLE PORTAL</div><h2>Welcome in.</h2><p className="login-lede">Sign in with the Google account your administrator has added.</p>
       {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
-      {demo.enabled&&<div className="demo-box"><div className="demo-heading"><div><span className="demo-tag">LOCAL PREVIEW</span><h3>Explore the demo</h3></div><span className="demo-count">{demo.users.length} accounts</span></div><label className="field-label" htmlFor="demoAccount">Choose an account</label><div className="select-wrap"><select id="demoAccount" value={demoEmail} onChange={(e)=>setDemoEmail(e.target.value)}><option value="">Select an employee or admin</option>{demo.users.map((person)=><option key={person.id} value={person.email}>{person.role==='ADMIN'?'Admin · ':''}{person.full_name} — {person.title}</option>)}</select><ChevronDown size={15}/></div><Button variant="dark" className="demo-continue" onClick={demoSignIn} disabled={!demoEmail} loading={busy}>Continue to preview <ArrowRight size={16}/></Button><p>Demo access is available only in local development. No password is stored.</p></div>}
       {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
       <div className="login-trust"><span><LockKeyholeIcon/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
     </div><div className="login-footer">Need access? Contact your Falchion Xeniaa administrator.</div></div>
