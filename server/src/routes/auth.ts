@@ -55,7 +55,7 @@ router.post('/google', asyncRoute(async (req, res) => {
   await audit({ actorId: user.id, action: 'AUTH_GOOGLE_SIGN_IN', entityType: 'employee', entityId: user.id, ipAddress: req.ip });
 }));
 
-router.get('/me', requireAuth, asyncRoute(async (req, res) => res.json({ user: req.user })));
+router.get('/me', requireAuth, asyncRoute(async (req, res) => res.json({ user: publicUser(req.user) })));
 router.post('/logout', requireAuth, asyncRoute(async (req, res) => {
   await transaction(async (connection) => {
     await connection.execute('UPDATE employees SET session_version = session_version + 1 WHERE id=:id', { id: req.user.id });
