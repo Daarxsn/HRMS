@@ -220,7 +220,9 @@ router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
     fixed_lunch_minutes:z.number().int().min(0).max(180).optional(), leave_casual_sl_entitlement:z.number().int().min(0).max(30).optional(),
     leave_earned_entitlement:z.number().int().min(0).max(30).optional(), leave_floating_entitlement:z.number().int().min(0).max(15).optional() }).refine((x)=>Object.keys(x).length>0,'Change at least one setting.');
   const input = validate(schema,req.body);
-  for (const [key,value] of Object.entries(input)) await query(`INSERT INTO system_settings (setting_key,setting_value,updated_by) VALUES (:key,:value,:actor) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)`, { key,value:String(value),actor:req.user.id });
+  await transaction(async (connection) => {
+    for (const [key,value] of Object.entries(input)) await connection.execute(`INSERT INTO system_settings (setting_key,setting_value,updated_by) VALUES (:key,:value,:actor) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)`, { key,value:String(value),actor:req.user.id });
+  });
   await audit({ actorId:req.user.id, action:'SYSTEM_SETTINGS_UPDATED', entityType:'system_settings', details:{ fields:Object.keys(input) }, ipAddress:req.ip });
   res.json({ok:true});
 }));
