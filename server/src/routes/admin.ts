@@ -183,7 +183,9 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       if (!checkIn) throw Object.assign(new Error('The correction needs a check-in time before it can be approved.'), { status: 400 });
       if (checkOut && new Date(checkOut) < new Date(checkIn)) throw Object.assign(new Error('Check-out must be after check-in.'), { status: 400 });
       const [schedule] = await connection.execute('SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date', { employee: item.employee_id, date: item.attendance_date });
-      const status = attendanceStatus(checkIn, schedule[0]?.approved_start_time || null);
+      const settingsRows = await connection.execute('SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN (\'late_threshold\')');
+      const settings = Object.fromEntries(settingsRows[0].map((row:any) => [row.setting_key, row.setting_value]));
+      const status = attendanceStatus(checkIn, schedule[0]?.approved_start_time || null, String(settings.late_threshold || POLICY.lateThreshold));
       if (existing[0]) {
         await connection.execute(`UPDATE attendance_records SET check_in_at=:checkIn,check_out_at=:checkOut,status=:status,correction_pending=FALSE,check_in_method=COALESCE(check_in_method,'ADMIN'),check_out_method=IF(:checkOut IS NULL,check_out_method,'ADMIN') WHERE id=:id`, { checkIn, checkOut: checkOut || null, status, id: existing[0].id });
       } else {
