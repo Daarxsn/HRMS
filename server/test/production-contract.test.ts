@@ -74,6 +74,6 @@ assert.match(admin,/leave_casual_sl_entitlement/);
 assert.match(admin,/leave_earned_entitlement/);
 assert.match(admin,/leave_floating_entitlement/);
 assert.match(attendance,/late_threshold/);
-assert.match(attendance,/attendanceStatus\(checkIn, schedule\[0\]\?\.approved_start_time \|\| null, String\(settings\.late_threshold/);
+assert.match(admin,/attendanceStatus\(checkIn, schedule\[0\]\?\.approved_start_time \|\| null, String\(settings\.late_threshold/);
 
 console.log('Production API contracts: PASS');
