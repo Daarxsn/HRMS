@@ -94,11 +94,19 @@ try {
   assert.equal(employeeMe.response.status, 200);
   assert.equal(employeeMe.data.user.id, employeeSession.user.id);
   assert.equal(employeeMe.data.user.role, 'EMPLOYEE');
+  assert.equal(employeeMe.data.user.user_type, 'EMPLOYEE');
+  assert.equal(employeeMe.data.user.platform, 'PEOPLE');
+  assert.equal(employeeMe.data.user.landingPath, '/');
 
   const employeeAdminAttempt = await request('/admin/system-health', {
     headers: { Cookie: employeeSession.cookie }
   });
   assert.equal(employeeAdminAttempt.response.status, 403);
+
+  const employeeAdminReportAttempt = await request('/admin/reports.csv', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(employeeAdminReportAttempt.response.status, 403);
 
   const attendanceValidation = await request('/attendance/check-in', {
     method: 'POST',
@@ -113,6 +121,9 @@ try {
   });
   assert.equal(adminMe.response.status, 200);
   assert.equal(adminMe.data.user.role, 'ADMIN');
+  assert.equal(adminMe.data.user.user_type, 'ADMIN');
+  assert.equal(adminMe.data.user.platform, 'ADMIN');
+  assert.equal(adminMe.data.user.landingPath, '/admin');
 
   const adminHealth = await request('/admin/system-health', {
     headers: { Cookie: adminSession.cookie }
@@ -122,11 +133,20 @@ try {
   assert.equal(adminHealth.data.databaseLatencyMs >= 0, true);
   assert.ok(adminHealth.data.mysqlVersion);
 
+  assert.equal(dashboard.response.status, 200);
+  const adminAttendanceAttempt = await request('/attendance', {
+    headers: { Cookie: adminSession.cookie }
+  });
+  assert.equal(adminAttendanceAttempt.response.status, 403);
+
+  const adminLeaveAttempt = await request('/leave', {
+    headers: { Cookie: adminSession.cookie }
+  });
+  assert.equal(adminLeaveAttempt.response.status, 403);
+
   const dashboard = await request('/admin/dashboard', {
     headers: { Cookie: adminSession.cookie }
   });
-  assert.equal(dashboard.response.status, 200);
-  assert.ok(dashboard.data.stats);
   assert.equal(Number.isInteger(dashboard.data.stats.employees), true);
 
   const logout = await request('/auth/logout', {
