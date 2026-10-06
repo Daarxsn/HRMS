@@ -27,6 +27,10 @@ async function getLeaveBalances(employee, connection = null) {
   const probation = userRows[0]?.probation_end_date;
   const currentMonth = Number(today.slice(5, 7));
   const currentDay = Number(today.slice(8, 10));
+  const policy = Object.fromEntries((policyRows as any[]).map((row) => [row.setting_key, Number(row.setting_value)]));
+  const casualEntitlement = Number.isFinite(policy.leave_casual_sl_entitlement) ? policy.leave_casual_sl_entitlement : 8;
+  const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
+  const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
   let earnedAccrued = 0;
   if (probation && probation <= today) {
     const probationYear = Number(String(probation).slice(0, 4));
@@ -37,10 +41,6 @@ async function getLeaveBalances(employee, connection = null) {
   }
   const sharedUsed = (byKey.get('CASUAL:APPROVED') || 0) + (byKey.get('SICK:APPROVED') || 0);
   const sharedPending = (byKey.get('CASUAL:PENDING') || 0) + (byKey.get('SICK:PENDING') || 0);
-  const policy = Object.fromEntries((policyRows as any[]).map((row) => [row.setting_key, Number(row.setting_value)]));
-  const casualEntitlement = Number.isFinite(policy.leave_casual_sl_entitlement) ? policy.leave_casual_sl_entitlement : 8;
-  const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
-  const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
   const definitions: Array<[string,string,number]> = [
     ['CASUAL','Casual leave',casualEntitlement], ['SICK','Sick leave',casualEntitlement], ['EARNED','Earned leave',earnedEntitlement], ['FLOATING','Floating leave',floatingEntitlement]
   ];
