@@ -111,17 +111,17 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
 router.get('/calendar', asyncRoute(async (req, res) => {
   const year = Number(req.query.year || indiaDate().slice(0,4));
   if (!Number.isInteger(year) || year < 2020 || year > 2100) throw Object.assign(new Error('Choose a valid year.'), { status: 400 });
-  const rows = await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date, name FROM company_holidays WHERE YEAR(holiday_date)=:year`, { year });
-  const holidays = new Map<string, string>(rows.map((row: any) => [String(row.date), String(row.name)] as [string, string]));
+  const rows = await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date, name, holiday_kind AS kind FROM company_holidays WHERE YEAR(holiday_date)=:year`, { year });
+  const holidays = new Map<string, {name:string,kind:'FIXED'|'FLOATING'}>(rows.map((row: any) => [String(row.date), {name:String(row.name), kind:row.kind==='FLOATING'?'FLOATING':'FIXED'}]));
   const nationalHolidays: Array<[number,number,string]> = [[1,26,'Republic Day'],[8,15,'Independence Day'],[10,2,'Gandhi Jayanti']];
-  for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, name);
-  res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,name]) => ({ date, name })) });
+  for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, {name,kind:'FIXED'});
+  res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,item]) => ({ date, name:item.name, kind:item.kind })) });
 }));
 router.post('/calendar', asyncRoute(async (req, res) => {
   if (req.user.role !== 'ADMIN') throw Object.assign(new Error('Administrator access is required.'), { status: 403 });
-  const input = validate(z.object({ date: dateSchema, name: z.string().trim().min(2).max(160) }), req.body);
-  await query(`INSERT INTO company_holidays (holiday_date, name, created_by) VALUES (:date, :name, :actor)
-    ON DUPLICATE KEY UPDATE name=VALUES(name), created_by=VALUES(created_by)`, { date: input.date, name: input.name, actor: req.user.id });
+  const input = validate(z.object({ date: dateSchema, name: z.string().trim().min(2).max(160), kind: z.enum(['FIXED','FLOATING']).default('FLOATING') }), req.body);
+  await query(`INSERT INTO company_holidays (holiday_date, name, holiday_kind, created_by) VALUES (:date, :name, :kind, :actor)
+    ON DUPLICATE KEY UPDATE name=VALUES(name), holiday_kind=VALUES(holiday_kind), created_by=VALUES(created_by)`, { date: input.date, name: input.name, kind: input.kind, actor: req.user.id });
   await audit({ actorId: req.user.id, action: 'HOLIDAY_ADDED', entityType: 'holiday', details: input, ipAddress: req.ip });
   res.status(201).json({ ok: true });
 }));
