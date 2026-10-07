@@ -7,14 +7,16 @@ A responsive employee and administrator workplace portal built with the locked s
 - Google Sign-In with an authorized-user allowlist. An administrator provisions an employee’s Google email first; no company email domain is enforced.
 - Administrator and employee roles, employee/intern account types, and account activation controls. No departments are modeled in V1.
 - Employee home, attendance history, profile, notification center, holiday calendar, leave and WFH request experiences.
-- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, and office configuration.
+- Administrator overview, people management, attendance review, request approvals, audit trail, CSV reports, leave reporting, and office configuration.
+- Employee and administrator profile photos with private storage, plus branch, department, position and mobile contact fields.
 - Server-side GPS distance and accuracy checks at the time an employee chooses check-in or check-out. A GPS event stores one location verification record. There is no continuous location collection or background tracking.
 - Attendance uses one-time GPS and office-network verification; QR attendance is retired in the current production policy.
 - 9:00 AM–6:00 PM schedule, Monday–Saturday work week, late at **9:30 AM or later**, fixed 30-minute lunch deduction, and approved flex starts between 9:00 AM and 10:30 AM.
 - Casual and sick leave share the locked 8-day annual pool; earned leave is 15 days/year with the policy’s 1-day-per-month accrual after probation; floating leave is 4 days/year. Sundays and company/national holidays are excluded from day-counting. A doctor’s note is required for sick leave of 3 or more consecutive calendar days.
-- Planned WFH requires at least 24 hours’ notice, emergency WFH can be requested on the same day, and approval is required. The typical monthly guideline defaults to 4 days and eligibility is individually enabled. Only one seeded demo employee has WFH enabled.
+- Planned WFH requires at least 24 hours’ notice, emergency WFH can be requested on the same day, and approval is required. The typical monthly guideline defaults to 4 days and eligibility is individually enabled. The WFH module is shown only to users with WFH access.
 - Temporary exit/return timestamps, attendance correction requests, flex-start approvals, in-app notifications, private leave attachments, holiday management, and append-only-style audit entries.
 - PWA manifest and a small static shell cache. API responses and personal data are never placed in the offline cache.
+- Brand system follows the supplied Falchion Xeniaa guidelines: Sansation for titles, Open Sans for UI/body, and the approved Gold, Saffron Red, Charcoal, Platinum and White palette.
 - Production API containers run as the non-root `node` user and shut down gracefully on SIGTERM. Liveness and database-backed readiness health endpoints are available.
 - Sensitive attendance, leave, administrator mutation and file-upload endpoints use per-user rate limits in addition to the API-wide limit.
 - Security basics: secure HTTP-only session cookie, short-lived signed session, Google token verification, server-side role checks, exact-origin CORS, Helmet, request validation, sign-in rate limiting, least-data location records, CSV formula-injection protection, and private GCS attachment storage. The npm locks pin `uuid` 11.1.1 through an override to address a transitive Google SDK advisory; the affected SDK call sites use the compatible `v4` API.
@@ -64,14 +66,13 @@ Copy `.env.example` to `server/.env`, then set the local database values. `JWT_S
 
 For local HRMS use, configure Google sign-in with the Web client ID shown in `.env.example` and add the local frontend origin (`http://localhost:3000`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used. Demo sign-in remains disabled in production, and the seed data uses fictional `example.test` emails for automated/local testing only.
 
-### 4. Apply schema and demo data
+### 4. Apply schema
 
 ```sh
 npm run db:migrate
-npm run db:seed
 ```
 
-The seed inserts **10 fictional employee/intern accounts plus one administrator**, default office and policy settings, the national holidays for 2026, and WFH access for one demo employee. It is for local preview only; do not run it in the production database.
+Test/demo fixture seeding is opt-in and isolated. To populate an automated test database only, set `HRMS_TEST_SEED_ENABLED=true` and run `npm run db:seed`. Production seeding is blocked. Real company employees should be provisioned through administrator workflows or an approved production data-import process.
 
 ### 5. Start the app
 
@@ -161,7 +162,9 @@ Vite environment variables are embedded at build time. Redeploy the frontend aft
 | Lunch | Fixed 30 minutes, deducted at checkout; no manual break tracking |
 | Leave | Shared casual/sick 8; earned 15; floating 4 |
 | WFH | Individually enabled; typical cap 4/month |
-| QR expiry | 120 seconds |
+| Holiday colors | Fixed = Saffron Red; Floating = Yellow |
+| Profile photos | Private 5 MB max JPG/PNG/WebP |
+| QR expiry | Retired from current production attendance policy |
 
 The policy PDFs in the referenced conversation are reflected in the code’s leave, flex-start, WFH, and trust/no-spyware behaviors. The locked leave allocation supplied later in that conversation takes precedence over any differing wording in the source documents.
 
