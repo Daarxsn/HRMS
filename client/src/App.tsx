@@ -3,14 +3,14 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import {
-  Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, Calendar,
+  Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, Camera, Calendar,
   CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck,
   CircleHelp, CircleUserRound, ClipboardCheck, Clock3, Download, FileClock, FileText, Filter,
   Fingerprint, Gauge, House, LogIn, LogOut, MapPin, Menu, MoreHorizontal, Plus,
   RefreshCw, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Timer, Trash2, Users, X,
   PanelLeftClose, UserRound, XCircle
 } from 'lucide-react';
-import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials } from './api';
+import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
 
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
@@ -45,7 +45,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 function IconLogo({ small=false }) {
-  return <div className={`brand-mark${small?' brand-mark-small':''}`} aria-hidden="true"><span></span><span></span><span></span><span></span></div>;
+  return <span className={`brand-mark-image${small?' brand-mark-image-small':''}`} aria-hidden="true"><img src="/falchion-mark.png" alt="" /></span>;
 }
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
@@ -151,7 +151,7 @@ function Shell(){
   const [bellOpen,setBellOpen]=useState(false);
   const isAdmin=user.role==='ADMIN';
   const location=useLocation();
-  const nav=isAdmin?adminNav:employeeNav;
+  const nav=isAdmin?adminNav:employeeNav.filter((item)=>item.to!=='/wfh'||user.wfh_enabled);
   const logout=async()=>{try{await post('/auth/logout');}catch{}setUser(null);};
   useEffect(()=>{setMobileOpen(false);setBellOpen(false);},[location.pathname]);
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
