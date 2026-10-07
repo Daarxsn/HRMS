@@ -134,9 +134,10 @@ jobs:
           DB_USER: root
           DB_PASSWORD: root
         run: npm run db:migrate
-      - name: Seed database
+      - name: Seed isolated test database
         env:
           NODE_ENV: development
+          HRMS_TEST_SEED_ENABLED: true
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_NAME: falchion_hrms_ci
