@@ -150,7 +150,7 @@ This repository deploys as one Vercel **Services** project: the Vite portal hand
    - `JWT_SECRET` (a private random value of at least 32 bytes)
    - `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` (the same Web client ID)
    - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL_MODE=REQUIRED`
-   - `GCS_BUCKET` and, when required by the chosen Google authentication method, `GOOGLE_CLOUD_PROJECT`
+   - `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_SERVICE_ACCOUNT_JSON` (the full service-account JSON for Vercel only)
    - `VITE_API_URL=/api` (or leave it unset; the portal defaults to this same-origin path)
    - `DEMO_AUTH_ENABLED=false`
 3. Add the Vercel preview URL(s) needed for testing and the final portal domain to the Google OAuth client's **Authorized JavaScript origins**. The Google Identity credential flow used here does not use an OAuth redirect callback.
