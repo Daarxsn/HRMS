@@ -268,148 +268,21 @@ function AdminHome(){
 
 function AttendancePage(){
   const {notify,refresh}=useApp();
-  const [rows,setRows]=useState([]);
-  const [todayHoliday,setTodayHoliday]=useState(null);
-  const [loading,setLoading]=useState(true);
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState('');
-  const [correctionOpen,setCorrectionOpen]=useState(false);
-  const [flexOpen,setFlexOpen]=useState(false);
-  const [exit,setExit]=useState(null);
-  const [workplaceMode,setWorkplaceMode]=useState('OFFICE');const [verificationStage,setVerificationStage]=useState('idle');
-
-  const load=async()=>{
-    setLoading(true);
-    try{
-      const [a,x,c]=await Promise.all([
-        get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),
-        get('/attendance/exits/current'),
-        get(`/calendar?year=${today.slice(0,4)}`)
-      ]);
-      setRows(a.records||[]);
-      setExit(x.exit);
-      setTodayHoliday(c.holidays.find((h)=>h.date===today)||null);
-    }catch(e){setError(e.message);}
-    finally{setLoading(false);}
-  };
-
+  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);
+  const load=async()=>{setLoading(true);setError('');try{const [a,c]=await Promise.all([get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`)]);setRows(a.records||[]);setTodayHoliday((c.holidays||[]).find((h)=>h.date===today)||null);}catch(e){setError(e.message);}finally{setLoading(false);}};
   useEffect(()=>{load();},[]);
-
-  const current=rows.find((r)=>r.attendance_date===today);
-  const working=current?.check_in_at&&!current.check_out_at;
-
-  const captureLocation=()=>new Promise((resolve,reject)=>{
-    if(!navigator.geolocation){
-      reject(new Error('This browser does not support location. Use a supported browser or device.'));
-      return;
-    }
-    const requestLocation=()=>navigator.geolocation.getCurrentPosition(
-      ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
-      (geoError)=>{
-        const message = geoError?.code===1
-          ? 'Location permission is required for office attendance. Allow location access for this site and try again.'
-          : geoError?.code===2
-            ? 'Your location could not be determined. Move to a clearer area and try again.'
-            : geoError?.code===3
-              ? 'Location lookup took too long. Try again.'
-              : 'Location access is unavailable. Check the browser location permission and try again.';
-        reject(new Error(message));
-      },
-      {enableHighAccuracy:true,timeout:12000,maximumAge:0}
-    );
-
-    if(navigator.permissions?.query){
-      navigator.permissions.query({name:'geolocation'})
-        .then((permission)=>{
-          if(permission.state==='denied'){
-            reject(new Error('Location permission is blocked for this site. Allow Location access for localhost in Safari settings, then try again.'));
-            return;
-          }
-          requestLocation();
-        })
-        .catch(requestLocation);
-    }else{
-      requestLocation();
-    }
-  });
-
-  const punch=async(type,method='GPS')=>{
-    setBusy(true);
-    setError('');
-    setVerificationStage(method==='GPS'?'location':'network');
-    try{
-      let geo={};
-      if(method==='GPS'){
-        setVerificationStage('location');
-        geo=await captureLocation();
-        setVerificationStage('network');
-      }
-      const result=await post(`/attendance/${type}`,{method,...geo});
-      setVerificationStage('success');
-      setWorkplaceMode('OFFICE');
-      notify(type==='check-in'
-        ? `You're checked in${result.status==='LATE_ENTRY'?' — recorded as a late entry':''}.`
-        : "You're checked out. Have a good evening.");
-      await load();
-      refresh();
-    }catch(e){
-      setVerificationStage('idle');
-      setError(e.message);
-    }finally{
-      setBusy(false);
-    }
-  };
-
+  const current=rows.find((r)=>r.attendance_date===today);const statusLabel=todayHoliday?'Holiday':current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';
   return <>
-    <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="Arrive, verify once, and start your workday." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
-    {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss"><X size={15}/></button></div>}
-    <div className="attendance-layout">
-      <div className="attendance-main-col">
-        <Card className="attendance-action-card">
-          <div className="attendance-action-copy">
-            <span className="action-kicker"><span className={`pulse-dot${working?'':' pulse-muted'}`}/>{todayHoliday&&!working?todayHoliday.name.toUpperCase():working?'DAY IN PROGRESS':'TODAY · '+formatDate(today,{weekday:'long',day:'numeric',month:'long'})}</span>
-            <h2>{todayHoliday&&!working?'A scheduled day to pause.':working?"You're checked in.":'Start your workday.'}</h2>
-            <p>{todayHoliday&&!working?`${todayHoliday.name} is a company holiday. There’s no check-in expected today.`:working?`You started at ${formatTime(current.check_in_at)}. Check out when you’re ready to wrap up.`:workplaceMode==='WFH'?'Your approved remote day does not require office location verification.':'Click check in and we’ll request your location once, verify the office geofence and confirm the office network.'}</p>
-            {busy&&workplaceMode==='OFFICE' && <div className="verification-panel" role="status" aria-live="polite">
-              <div className="verification-line">
-                <span className={`verification-step ${verificationStage==='location'?'verification-active':'verification-done'}`}>{verificationStage==='location'?<Spinner/>:<Check size={13}/>}</span>
-                <span><b>{verificationStage==='location'?'Verifying your location':'Location verified'}</b><small>{verificationStage==='location'?'Waiting for the browser’s one-time location result.':'GPS accuracy and the 80 m office radius passed.'}</small></span>
-              </div>
-              <div className="verification-line">
-                <span className={`verification-step ${verificationStage==='network'?'verification-active':verificationStage==='success'?'verification-done':''}`}>{verificationStage==='network'?<Spinner/>:verificationStage==='success'?<Check size={13}/>:<span>2</span>}</span>
-                <span><b>{verificationStage==='network'?'Verifying office network':verificationStage==='success'?'Office network verified':'Office network check'}</b><small>{verificationStage==='network'?'Confirming that this request came through the approved office network.':'Checked by the HRMS server; no Wi-Fi name is collected.'}</small></span>
-              </div>
-            </div>}
-            <div className="checkin-action-row">
-              {working
-                ? <Button onClick={()=>punch('check-out',current.check_in_method==='WFH'?'WFH':'GPS')} loading={busy} icon={LogOut}>Check out</Button>
-                : todayHoliday
-                  ? <Link className="button button-soft" to="/calendar"><CalendarDays size={16}/> View holiday calendar</Link>
-                  : <><Button onClick={()=>workplaceMode==='WFH'?punch('check-in','WFH'):punch('check-in','GPS')} loading={busy} icon={LogIn}>{busy?(verificationStage==='location'?'Verifying location…':verificationStage==='network'?'Verifying office network…':'Checking in…'):workplaceMode==='WFH'?'Start remote day':'Check in at office'}</Button><button className={`mode-switch${workplaceMode==='WFH'?' mode-switch-active':''}`} onClick={()=>setWorkplaceMode(workplaceMode==='WFH'?'OFFICE':'WFH')}><House size={15}/>{workplaceMode==='WFH'?'Remote work selected':'Working from home'}</button></>
-              }
-            </div>
-            <div className="checkin-meta">
-              <span><MapPin size={14}/>{todayHoliday&&!working?todayHoliday.name:workplaceMode==='WFH'?'Approved remote work':'Pune HQ · 80 m radius'}</span>
-              <span><ShieldCheck size={14}/>{workplaceMode==='WFH'?'WFH approved':'Location + office Wi-Fi verification'}</span>
-            </div>
-          </div>
-          <div className="attendance-status-art"><div className="status-orbit status-orbit1"/><div className="status-orbit status-orbit2"/><div className="status-clock"><Clock3 size={37}/><span>{working?'IN':todayHoliday?'HOL':'—'}</span></div><small>Report time · 9:00–9:30 AM</small></div>
-        </Card>
-        <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Day-by-day, without the noise.</p></div><span className="date-range-label"><CalendarDays size={15}/> {today.slice(0,4)}</span></div>
-        <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>DAY TYPE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:rows.length?rows.map((r)=><tr key={r.id}><td><b>{formatDate(r.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td><span className="table-type"><span className="type-dot"/>{r.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">Your attendance records will appear here.</div></td></tr>}</tbody></table></div></Card>
-      </div>
-      <div className="attendance-side-col">
-        <Card className="schedule-card"><span className="side-card-icon"><Sun size={18}/></span><h3>Today’s rhythm</h3><p>A steady schedule that leaves space for life.</p><div className="schedule-row"><span>Report time</span><b>9:00 AM – 9:30 AM</b></div><div className="schedule-row"><span>Lunch</span><b>30 minutes · fixed</b></div><div className="schedule-row"><span>Working days</span><b>Monday to Saturday</b></div><div className="schedule-policy"><ShieldCheck size={14}/><span>Office check-in verifies <b>your location + office Wi-Fi</b>. There is no background tracking.</span></div></Card>
-        <Card className="help-card"><div className="help-top"><span><CircleHelp size={17}/></span><h3>Need to correct a day?</h3></div><p>Forgot to check out, or had a location issue? Ask an administrator to review a correction.</p><button className="text-link" onClick={()=>setCorrectionOpen(true)}>Request correction <ArrowRight size={14}/></button></Card>
-        <Card className="help-card flex-help"><div className="help-top"><span><Timer size={17}/></span><h3>Need a flex start?</h3></div><p>Request an adjusted start between 9:00 and 10:30 AM for manager approval.</p><button className="text-link" onClick={()=>setFlexOpen(true)}>Request flex start <ArrowRight size={14}/></button></Card>
-        <Card className="wfh-shortcut"><span className="wfh-short-icon"><House size={17}/></span><b>Remote day?</b><small>WFH is separate from office attendance verification.</small><Link to="/wfh">See WFH requests <ArrowRight size={13}/></Link></Card>
-      </div>
-    </div>
+    <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="A clear history of your attendance without exposing worked-hour details." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
+    {error&&<InlineError>{error}</InlineError>}
+    <Card className="attendance-overview-card attendance-redesign"><div className="attendance-overview-main"><div className="eyebrow">TODAY · ${today}</div><h2>{todayHoliday?todayHoliday.name:statusLabel==='Complete'?'Attendance recorded.':statusLabel==='In progress'?`You checked in at ${formatTime(current.check_in_at)}.`:'Your attendance starts from Overview.'}</h2><p>{todayHoliday?'No attendance action is expected today.':statusLabel==='Complete'?'Today’s attendance record is complete.':statusLabel==='In progress'?'Your attendance is in progress. Check out later from the Overview.':'Use the Overview page for the check-in and check-out action.'}</p><div className="attendance-overview-meta"><span><Clock3 size={15}/> Report time · 9:00–9:30 AM</span><span><ShieldCheck size={15}/> One-time verification</span><span><MapPin size={15}/> Pune HQ</span></div></div><div className="attendance-overview-state"><div className="attendance-state-ring"><Clock3 size={28}/></div><b>{statusLabel}</b>{!todayHoliday&&<Link className="button button-primary button-small" to="/">Go to Overview</Link>}</div></Card>
+    <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Dates, day type and attendance status only.</p></div><span className="date-range-label"><CalendarDays size={15}/> {today.slice(0,4)}</span></div>
+    <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>DAY TYPE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:rows.length?rows.map((r)=><tr key={r.id}><td><b>{formatDate(r.attendance_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td><span className="table-type"><span className="type-dot"/>{r.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">Your attendance records will appear here.</div></td></tr>}</tbody></table></div></Card>
+    <div className="attendance-support-grid"><Card className="help-card"><div className="help-top"><span><CircleHelp size={17}/></span><h3>Need to correct a day?</h3></div><p>Forgot to check in, check out, or had a location issue? Ask an administrator to review the day.</p><button className="text-link" onClick={()=>setCorrectionOpen(true)}>Request correction <ArrowRight size={14}/></button></Card><Card className="help-card flex-help"><div className="help-top"><span><Timer size={17}/></span><h3>Need a flex start?</h3></div><p>Request an adjusted start between 9:00 and 10:30 AM for administrator approval.</p><button className="text-link" onClick={()=>setFlexOpen(true)}>Request flex start <ArrowRight size={14}/></button></Card></div>
     {correctionOpen&&<CorrectionModal close={()=>setCorrectionOpen(false)} onDone={()=>{setCorrectionOpen(false);notify('Your correction request was sent for review.');load();}}/>}
     {flexOpen&&<FlexModal close={()=>setFlexOpen(false)} onDone={()=>{setFlexOpen(false);notify('Your flex-start request was sent to the administrator.');refresh();}}/>}
   </>;
 }
-
 function CorrectionModal({close,onDone}){
   const [date,setDate]=useState(today);const [checkIn,setCheckIn]=useState('');const [checkOut,setCheckOut]=useState('');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/corrections',{date,requestedCheckIn:checkIn?new Date(checkIn).toISOString():undefined,requestedCheckOut:checkOut?new Date(checkOut).toISOString():undefined,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
