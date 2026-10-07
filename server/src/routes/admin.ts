@@ -174,7 +174,7 @@ router.post('/users/:id/photo', adminMutationLimiter, profilePhotoUpload.single(
   await deleteProfilePhoto(rows[0].profile_photo_key);
   await audit({actorId:req.user.id,action:'EMPLOYEE_PROFILE_PHOTO_UPDATED',entityType:'employee',entityId:req.params.id,details:{content_type:req.file.mimetype},ipAddress:req.ip});
   res.status(201).json({ok:true});
-});
+}));
 
 router.delete('/users/:id/photo', adminMutationLimiter, asyncRoute(async (req,res)=>{
   const rows=await query('SELECT profile_photo_key FROM employees WHERE id=:id LIMIT 1',{id:req.params.id});
@@ -183,7 +183,7 @@ router.delete('/users/:id/photo', adminMutationLimiter, asyncRoute(async (req,re
   await deleteProfilePhoto(rows[0].profile_photo_key);
   await audit({actorId:req.user.id,action:'EMPLOYEE_PROFILE_PHOTO_REMOVED',entityType:'employee',entityId:req.params.id,ipAddress:req.ip});
   res.json({ok:true});
-});
+}));
 
 router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
   const rows=await query('SELECT profile_photo_key,profile_photo_content_type,profile_photo_filename FROM employees WHERE id=:id LIMIT 1',{id:req.params.id});
@@ -195,7 +195,7 @@ router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
   res.setHeader('Cache-Control','private, no-store');
   if(typeof file === 'object' && file && typeof file.pipe === 'function') file.on('error',()=>{if(!res.headersSent)res.status(404).end();}).pipe(res);
   else res.send(file);
-});
+}));
 router.get('/attendance', asyncRoute(async (req, res) => {
   const from = String(req.query.from || indiaDate());
   const to = String(req.query.to || from);
@@ -288,7 +288,7 @@ router.get('/leave-report', asyncRoute(async (req,res)=>{
     ORDER BY r.start_date DESC,r.created_at DESC`,{from,to});
   const summary={requested:rows.length,approved:rows.filter((r)=>r.status==='APPROVED').length,pending:rows.filter((r)=>r.status==='PENDING').length,rejected:rows.filter((r)=>r.status==='REJECTED').length,approvedDays:rows.filter((r)=>r.status==='APPROVED').reduce((sum,r)=>sum+Number(r.days||0),0)};
   res.json({from,to,summary,requests:rows});
-});
+}));
 router.get('/reports.csv', asyncRoute(async (req,res) => {
   const from=String(req.query.from || `${indiaDate().slice(0,7)}-01`); const to=String(req.query.to || indiaDate());
   if(!dateSchema.safeParse(from).success||!dateSchema.safeParse(to).success||from>to) throw Object.assign(new Error('Choose a valid date range.'),{status:400});
