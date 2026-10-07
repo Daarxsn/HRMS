@@ -17,8 +17,24 @@ if (process.env.NODE_ENV === 'production' && !process.env.GCS_BUCKET) {
   throw new Error('GCS_BUCKET is required in production so profile photos use durable private object storage.');
 }
 
+const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
+let serviceAccountCredentials: Record<string, unknown> | undefined;
+if (serviceAccountJson) {
+  try {
+    serviceAccountCredentials = JSON.parse(serviceAccountJson);
+  } catch {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON must contain valid service-account JSON.');
+  }
+}
+if (process.env.VERCEL === '1' && process.env.GCS_BUCKET && !serviceAccountCredentials) {
+  throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is required on Vercel when GCS_BUCKET is configured.');
+}
+
 const storage = process.env.GCS_BUCKET
-  ? new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT })
+  ? new Storage({
+      projectId: process.env.GOOGLE_CLOUD_PROJECT,
+      ...(serviceAccountCredentials ? { credentials: serviceAccountCredentials } : {})
+    })
   : null;
 
 const suffixFor = (contentType: string) => contentType === 'image/jpeg' ? '.jpg' : contentType === 'image/png' ? '.png' : '.webp';
