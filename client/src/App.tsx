@@ -45,7 +45,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 function IconLogo({ small=false }) {
-  return <span className={`brand-mark-image${small?' brand-mark-image-small':''}`} aria-hidden="true"><img src="/falchion-mark.png" alt="" /></span>;
+  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/falchion-xeniaa-logo.png" alt="Falchion Xeniaa" /></span>;
 }
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
@@ -115,8 +115,8 @@ function LoginScreen() {
     catch(e){setError(e.message);setBusy(false);}
   };
   return <div className="login-page">
-    <div className="login-art"><div className="login-art-top"><IconLogo/><span>FALCHION <b>XENIAA</b></span></div><div className="login-art-copy"><div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div><h1>Good work<br/><em>starts here.</em></h1><p>One thoughtful place for your workday, your time away, and the people you work with.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-note"><Sparkles size={15}/> Built around people, not presence</div></div><div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div></div>
-    <div className="login-panel"><div className="login-panel-inner"><div className="mobile-login-brand"><IconLogo/><span>FALCHION <b>XENIAA</b></span></div><div className="eyebrow">THE PEOPLE PORTAL</div><h2>Welcome in.</h2><p className="login-lede">Sign in with the Google account your administrator has added.</p>
+    <div className="login-art"><div className="login-art-top"><IconLogo/></div><div className="login-art-copy"><div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div><h1>Good work<br/><em>starts here.</em></h1><p>One thoughtful place for your workday, your time away, and the people you work with.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-note"><Sparkles size={15}/> Built around people, not presence</div></div><div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div></div>
+    <div className="login-panel"><div className="login-panel-inner"><div className="mobile-login-brand"><IconLogo/></div><div className="eyebrow">THE PEOPLE PORTAL</div><h2>Welcome in.</h2><p className="login-lede">Sign in with the Google account your administrator has added.</p>
       {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
       {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
       <div className="login-trust"><span><LockKeyholeIcon/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
