@@ -148,6 +148,39 @@ router.patch('/users/:id', adminMutationLimiter, asyncRoute(async (req, res) => 
   res.json({ ok: true });
 }));
 
+router.post('/users/:id/photo', adminMutationLimiter, profilePhotoUpload.single('photo'), asyncRoute(async (req,res)=>{
+  if(!req.file) throw Object.assign(new Error('Choose a JPG, PNG, or WebP profile photo up to 5 MB.'),{status:400});
+  verifyImageSignature(req.file.buffer,req.file.mimetype);
+  const rows=await query('SELECT id,profile_photo_key FROM employees WHERE id=:id LIMIT 1',{id:req.params.id});
+  if(!rows[0]) throw Object.assign(new Error('Employee not found.'),{status:404});
+  const saved=await saveProfilePhoto(req.params.id,req.file);
+  try { await query('UPDATE employees SET profile_photo_key=:key,profile_photo_content_type=:type,profile_photo_filename=:filename WHERE id=:id',{key:saved.key,type:saved.contentType,filename:saved.filename,id:req.params.id}); }
+  catch(error) { await deleteProfilePhoto(saved.key); throw error; }
+  await deleteProfilePhoto(rows[0].profile_photo_key);
+  await audit({actorId:req.user.id,action:'EMPLOYEE_PROFILE_PHOTO_UPDATED',entityType:'employee',entityId:req.params.id,details:{content_type:req.file.mimetype},ipAddress:req.ip});
+  res.status(201).json({ok:true});
+});
+
+router.delete('/users/:id/photo', adminMutationLimiter, asyncRoute(async (req,res)=>{
+  const rows=await query('SELECT profile_photo_key FROM employees WHERE id=:id LIMIT 1',{id:req.params.id});
+  if(!rows[0]) throw Object.assign(new Error('Employee not found.'),{status:404});
+  await query('UPDATE employees SET profile_photo_key=NULL,profile_photo_content_type=NULL,profile_photo_filename=NULL WHERE id=:id',{id:req.params.id});
+  await deleteProfilePhoto(rows[0].profile_photo_key);
+  await audit({actorId:req.user.id,action:'EMPLOYEE_PROFILE_PHOTO_REMOVED',entityType:'employee',entityId:req.params.id,ipAddress:req.ip});
+  res.json({ok:true});
+});
+
+router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
+  const rows=await query('SELECT profile_photo_key,profile_photo_content_type,profile_photo_filename FROM employees WHERE id=:id LIMIT 1',{id:req.params.id});
+  const photo=rows[0];
+  if(!photo?.profile_photo_key) return res.status(404).end();
+  const file=await readProfilePhoto(photo.profile_photo_key);
+  res.setHeader('Content-Type',photo.profile_photo_content_type||'image/jpeg');
+  res.setHeader('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(photo.profile_photo_filename||'profile-photo'));
+  res.setHeader('Cache-Control','private, no-store');
+  if(typeof file === 'object' && file && typeof file.pipe === 'function') file.on('error',()=>{if(!res.headersSent)res.status(404).end();}).pipe(res);
+  else res.send(file);
+});
 router.get('/attendance', asyncRoute(async (req, res) => {
   const from = String(req.query.from || indiaDate());
   const to = String(req.query.to || from);
