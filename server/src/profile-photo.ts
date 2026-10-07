@@ -19,7 +19,9 @@ const storage = process.env.GCS_BUCKET
 
 const suffixFor = (contentType: string) => contentType === 'image/jpeg' ? '.jpg' : contentType === 'image/png' ? '.png' : '.webp';
 
-export async function saveProfilePhoto(employeeId: string, file: Express.Multer.File) {
+export type ProfilePhotoFile = { buffer: Buffer; mimetype: string; originalname: string };
+
+export async function saveProfilePhoto(employeeId: string, file: ProfilePhotoFile) {
   const id = crypto.randomUUID();
   const key = `${employeeId}/profile/${id}${suffixFor(file.mimetype)}`;
   const localPath = path.resolve(process.cwd(), 'private-uploads', key);
