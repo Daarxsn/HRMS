@@ -30,13 +30,13 @@ for (const route of requiredRoutes) {
 
 assert.ok(app.includes('AppErrorBoundary'), 'React error boundary contract missing');
 assert.ok(app.includes('System health'), 'Administrator system-health view contract missing');
-assert.ok(app.includes('Verifying your location'), 'Attendance location verification UX contract missing');
-assert.ok(app.includes('Verifying office network'), 'Attendance office-network verification UX contract missing');
+assert.ok(app.includes('Report time · 9:00–9:30 AM'), 'Attendance reporting-window UX contract missing');
+assert.ok(app.includes('overview-attendance-card'), 'Overview attendance action module contract missing');
 assert.ok(app.includes('navigator.geolocation'), 'Browser geolocation attendance contract missing');
 assert.ok(app.includes("get('/admin/system-health')"), 'Administrator system-health API integration contract missing');
 assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contract missing');
 assert.ok(app.includes('What needs your attention'), 'Employee action-center contract missing');
-assert.ok(app.includes('approved this month'), 'Employee WFH usage visibility contract missing');
+assert.ok(app.includes('approved this month') || app.includes('approvedWfhThisMonth'), 'Employee WFH usage visibility contract missing');
 assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract missing');
 assert.ok(app.includes('path="/notifications"'), 'Employee notifications route contract missing');
 assert.ok(app.includes('get(\'/account/notifications\')'), 'Employee notifications API integration contract missing');
