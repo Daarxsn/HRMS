@@ -8,7 +8,7 @@ import { asyncRoute } from '../validate.ts';
 
 const router = Router();
 const googleClient = new OAuth2Client();
-const userSelect = `id, employee_code, full_name, email, role, user_type, status, title, phone, wfh_enabled, joined_on, probation_end_date, session_version`;
+const userSelect = `id, employee_code, full_name, email, role, user_type, status, title, phone, branch, department, position, profile_photo_key, wfh_enabled, joined_on, probation_end_date, session_version`;
 
 router.get('/demo-users', asyncRoute(async (req, res) => {
   if (process.env.NODE_ENV === 'production' || process.env.DEMO_AUTH_ENABLED !== 'true') return res.json({ enabled: false, users: [] });
