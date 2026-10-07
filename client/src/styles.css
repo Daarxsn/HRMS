@@ -104,3 +104,134 @@
 .approval-guidance span{font-size:8.5px;line-height:1.5}
 @media(max-width:950px){.admin-pulse-grid{grid-template-columns:1fr}.admin-pulse-metrics{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:640px){.admin-pulse-metrics{grid-template-columns:1fr 1fr}.admin-pulse-foot{align-items:flex-start;flex-direction:column}.admin-pulse-foot .text-link{align-self:flex-start}}
+
+
+/* Falchion Xeniaa brand system — source: FX Brand Guidelines */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Sansation:wght@300;400;700&display=swap');
+
+:root{
+  --ink:#111111;
+  --muted:#666666;
+  --line:#dedee0;
+  --paper:#FFFFFF;
+  --canvas:#F4F4F5;
+  --charcoal:#111111;
+  --gold:#DAAF51;
+  --saffron:#931314;
+  --green:#67AF7A;
+  --yellow:#F5C25C;
+  --red:#F25138;
+}
+
+body,button,input,select,textarea{font-family:'Open Sans',sans-serif;}
+h1,h2,h3,h4,.page-title h1,.card-heading h2,.login-panel h2,.login-art-copy h1,.hero-text h2,.calendar-toolbar h2,.profile-name-row h2{
+  font-family:'Sansation',sans-serif;
+}
+body{font-size:14px;background:var(--canvas);color:var(--ink);}
+.page-title h1{font-size:34px;line-height:1.18;color:var(--charcoal);}
+.page-title p{font-size:14px;}
+.eyebrow{font-size:11px;color:#666666;}
+.card-heading h2{font-size:17px;color:var(--charcoal);}
+.card-heading p{font-size:12px;}
+.nav-link{font-size:13px;color:#555555;}
+.nav-caption{font-size:10px;color:#666666;}
+.workspace-chip b{font-size:13px;}
+.workspace-chip small{font-size:11px;}
+.brand-wordmark{font-family:'Sansation',sans-serif;font-size:14px;color:var(--charcoal);}
+.brand-wordmark b{color:var(--saffron);}
+.brand-wordmark small{font-family:'Open Sans',sans-serif;font-size:9px;color:#666666;}
+.brand-mark-image{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--charcoal);border-radius:8px;padding:5px;overflow:hidden;flex:0 0 auto;}
+.brand-mark-image img{width:100%;height:100%;object-fit:contain;display:block;}
+.brand-mark-image-small{width:28px;height:28px;border-radius:7px;padding:4px;}
+
+.button{min-height:44px;border-radius:8px;padding:0 18px;background:var(--saffron);color:var(--paper);font-size:14px;}
+.button:hover:not(:disabled){background:var(--saffron);box-shadow:0 5px 12px rgba(147,19,20,.14);}
+.button-soft{background:var(--paper);color:var(--charcoal);border-color:var(--gold);}
+.button-soft:hover:not(:disabled){background:#F4F4F5;}
+.button-dark{background:var(--charcoal);}
+.button-light{background:var(--paper);color:var(--charcoal);border-color:var(--gold);}
+.button-danger{background:var(--saffron);}
+.text-link,.text-button{color:var(--saffron);font-size:13px;}
+.text-link:hover,.text-button:hover{color:var(--saffron);}
+.nav-active{background:rgba(218,175,81,.20);color:var(--charcoal)!important;}
+.nav-active svg{color:var(--saffron)!important;}
+.nav-count{background:rgba(218,175,81,.35);color:var(--charcoal);}
+.status{font-size:10px;}
+.status-on-time,.status-approved,.status-active{background:rgba(103,175,122,.16);color:#3f744b;}
+.status-late-entry,.status-rejected,.status-inactive{background:rgba(242,81,56,.12);color:var(--saffron);}
+.status-pending{background:rgba(245,194,92,.22);color:#73550d;}
+.status-working-remotely,.status-wfh{background:rgba(245,194,92,.18);color:#73550d;}
+table th{font-size:10px;color:#666666;}
+table td{font-size:12px;color:#555555;}
+.person-cell b{font-size:12px;color:var(--charcoal);}
+.person-cell small{font-size:11px;}
+.form-field>span,.field-label{font-size:12px;color:#555555;}
+.form-field input,.form-field select,.form-field textarea{font-size:14px;}
+.login-lede{font-size:14px;}
+.login-panel h2{font-size:38px;}
+.login-art-copy h1{font-family:'Sansation',sans-serif;}
+.sidebar-note p{font-size:11px;}
+.app-footer{font-size:10px;}
+.overview-attendance-card{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:24px 26px;margin:0 0 22px;background:var(--paper);border:1px solid var(--gold);border-radius:14px;}
+.overview-attendance-copy{min-width:0;}
+.overview-attendance-copy h2{margin:5px 0 7px;font-size:24px;color:var(--charcoal);}
+.overview-attendance-copy p{margin:0;max-width:760px;font-size:13px;line-height:1.6;color:#555555;}
+.overview-attendance-action{display:flex;align-items:center;gap:15px;flex-wrap:wrap;justify-content:flex-end;}
+.report-window{font-size:12px;color:#666666;white-space:nowrap;}
+.overview-attendance-done{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:#3f744b;font-weight:700;}
+.profile-cover{position:relative;}
+.profile-avatar-photo{overflow:hidden;}
+.profile-avatar-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.profile-photo-actions{position:absolute;left:22px;bottom:16px;display:flex;gap:8px;align-items:center;}
+.photo-button{display:inline-flex;align-items:center;gap:7px;background:var(--paper);border:1px solid var(--gold);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;color:var(--charcoal);cursor:pointer;}
+.photo-button input{display:none;}
+.photo-remove-button{border:1px solid var(--saffron);background:var(--paper);color:var(--saffron);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;}
+.profile-details-expanded{grid-template-columns:repeat(2,minmax(0,1fr));}
+.form-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;}
+.table-avatar-photo{display:inline-flex;position:relative;cursor:pointer;}
+.table-avatar-photo input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.table-avatar-photo .avatar{overflow:hidden;}
+.table-avatar-photo img{width:100%;height:100%;object-fit:cover;}
+.leave-type-group{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;}
+.leave-type-switch{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper);}
+.leave-type-switch button{border:0;background:var(--paper);padding:10px 12px;color:#666666;font-size:13px;font-weight:600;}
+.leave-type-switch button.active{background:rgba(218,175,81,.20);color:var(--charcoal);}
+.field-help{display:block;margin-top:6px;font-size:11px;color:#666666;line-height:1.45;}
+.holiday-color-guide{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:-8px 0 16px;color:#555555;font-size:12px;}
+.holiday-color-guide span{display:inline-flex;align-items:center;gap:7px;font-weight:600;}
+.holiday-color-guide small{color:#666666;}
+.holiday-color-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.holiday-fixed-dot{background:var(--saffron);}
+.holiday-floating-dot{background:var(--yellow);}
+.calendar-holiday-fixed{background:rgba(147,19,20,.10)!important;border-color:rgba(147,19,20,.28)!important;}
+.calendar-holiday-floating{background:rgba(245,194,92,.24)!important;border-color:rgba(218,175,81,.45)!important;}
+.calendar-holiday-fixed small{color:var(--saffron);}
+.calendar-holiday-floating small{color:#73550d;}
+.holiday-row-fixed .holiday-pin{color:var(--saffron);background:rgba(147,19,20,.10);}
+.holiday-row-floating .holiday-pin{color:#73550d;background:rgba(245,194,92,.25);}
+.legend-fixed{background:var(--saffron);}
+.legend-floating{background:var(--yellow);}
+.schedule-row b{font-size:13px;}
+.locked-policy small{font-size:12px;}
+.admin-dashboard-attendance{margin-top:24px;}
+.report-leave-card{margin-top:24px;}
+.report-leave-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.report-leave-summary .summary-box{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--paper);}
+.report-leave-summary small{display:block;font-size:10px;color:#666666;letter-spacing:.08em;}
+.report-leave-summary b{display:block;font-size:22px;color:var(--charcoal);margin-top:4px;}
+.attendance-redesign{border:1px solid var(--gold)!important;}
+.attendance-action-card{background:var(--charcoal)!important;color:var(--paper);}
+.attendance-action-card .action-kicker,.attendance-action-card p,.attendance-action-card .checkin-meta{color:#F4F4F5;}
+@media (max-width:900px){
+  .overview-attendance-card{align-items:flex-start;flex-direction:column;}
+  .overview-attendance-action{justify-content:flex-start;}
+  .form-three,.leave-type-group{grid-template-columns:1fr;}
+  .profile-details-expanded{grid-template-columns:1fr;}
+  .report-leave-summary{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:600px){
+  .page-wrap{padding:22px 16px 34px;}
+  .page-title h1{font-size:30px;}
+  .overview-attendance-card{padding:19px;}
+  .overview-attendance-copy h2{font-size:21px;}
+}
