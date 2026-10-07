@@ -76,22 +76,28 @@ app.use('/api/account',accountRoutes);
 app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
 app.use(errorHandler);
 
-const port=Number(process.env.PORT || 8080);
-const server=app.listen(port,()=>console.log(JSON.stringify({type:'server_started',service:'falchion-xeniaa-api',port,node_env:process.env.NODE_ENV||'development'})));
-server.requestTimeout=30000;
-server.headersTimeout=35000;
-server.keepAliveTimeout=5000;
-server.maxRequestsPerSocket=1000;
-let shuttingDown=false;
-const stop=async(signal)=>{
-  if(shuttingDown)return;
-  shuttingDown=true;
-  console.log(JSON.stringify({type:'server_shutdown',signal}));
-  const force=setTimeout(()=>process.exit(1),10000);
-  (force as any).unref?.();
-  server.close(async()=>{
-    try { await pool.end(); clearTimeout(force); process.exit(0); }
-    catch(error){ console.error(JSON.stringify({type:'server_shutdown_error',error:String(error?.message||error)})); process.exit(1); }
-  });
-};
-process.on('SIGTERM',()=>stop('SIGTERM')); process.on('SIGINT',()=>stop('SIGINT'));
+export default app;
+
+// Vercel imports the Express application as a function. Local development and
+// container deployments retain the listener and graceful shutdown behavior.
+if (process.env.VERCEL !== '1') {
+  const port=Number(process.env.PORT || 8080);
+  const server=app.listen(port,()=>console.log(JSON.stringify({type:'server_started',service:'falchion-xeniaa-api',port,node_env:process.env.NODE_ENV||'development'})));
+  server.requestTimeout=30000;
+  server.headersTimeout=35000;
+  server.keepAliveTimeout=5000;
+  server.maxRequestsPerSocket=1000;
+  let shuttingDown=false;
+  const stop=async(signal)=>{
+    if(shuttingDown)return;
+    shuttingDown=true;
+    console.log(JSON.stringify({type:'server_shutdown',signal}));
+    const force=setTimeout(()=>process.exit(1),10000);
+    (force as any).unref?.();
+    server.close(async()=>{
+      try { await pool.end(); clearTimeout(force); process.exit(0); }
+      catch(error){ console.error(JSON.stringify({type:'server_shutdown_error',error:String(error?.message||error)})); process.exit(1); }
+    });
+  };
+  process.on('SIGTERM',()=>stop('SIGTERM')); process.on('SIGINT',()=>stop('SIGINT'));
+}
