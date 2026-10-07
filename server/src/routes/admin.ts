@@ -52,32 +52,47 @@ async function effectiveAttendance(from, to) {
 
 router.get('/dashboard', asyncRoute(async (req, res) => {
   const today = indiaDate();
-  const [people, attendance, pending, recent] = await Promise.all([
+  const [people, attendance, pending, out, effectiveToday, peopleDetail] = await Promise.all([
     query(`SELECT COUNT(*) AS total, SUM(status='ACTIVE') AS active FROM employees WHERE role='EMPLOYEE'`),
     query(`SELECT COUNT(*) AS total, SUM(status='ON_TIME') AS on_time, SUM(status='LATE_ENTRY') AS late, SUM(check_out_at IS NULL) AS still_in
       FROM attendance_records WHERE attendance_date=:today`, { today }),
     query(`SELECT (SELECT COUNT(*) FROM leave_requests WHERE status='PENDING') + (SELECT COUNT(*) FROM wfh_requests WHERE status='PENDING') +
       (SELECT COUNT(*) FROM attendance_correction_requests WHERE status='PENDING') + (SELECT COUNT(*) FROM flex_start_requests WHERE status='PENDING') AS total`),
-    query(`SELECT a.id, a.attendance_date, a.check_in_at, a.check_out_at, a.check_in_distance_m, a.status, a.check_in_method,
-      e.full_name, e.employee_code FROM attendance_records a JOIN employees e ON e.id=a.employee_id
-      WHERE a.attendance_date=:today ORDER BY a.check_in_at DESC LIMIT 8`, { today })
-  ]);
-  const [out, effectiveToday] = await Promise.all([
     query(`SELECT x.id,x.left_at,x.reason,e.full_name,e.employee_code FROM temporary_exits x
       JOIN attendance_records a ON a.id=x.attendance_id JOIN employees e ON e.id=x.employee_id
       WHERE a.attendance_date=:today AND x.returned_at IS NULL ORDER BY x.left_at DESC`, { today }),
-    effectiveAttendance(today,today)
+    effectiveAttendance(today,today),
+    query(`SELECT id,full_name,employee_code,user_type,title FROM employees WHERE role='EMPLOYEE' AND status='ACTIVE' ORDER BY full_name`)
   ]);
   const holidayRows=await query(`SELECT name FROM company_holidays WHERE holiday_date=:today LIMIT 1`,{today});
-  const nationalNames=new Map([[`${today.slice(0,4)}-01-26`,'Republic Day'],[`${today.slice(0,4)}-08-15`,'Independence Day'],[`${today.slice(0,4)}-10-02`,'Gandhi Jayanti']]);
+  const year=today.slice(0,4);
+  const nationalNames=new Map([[year+'-01-26','Republic Day'],[year+'-08-15','Independence Day'],[year+'-10-02','Gandhi Jayanti']]);
   const officeHoliday=!isScheduledWorkday(today,new Set(holidayRows.length?[today]:[]));
-  const holidayName=holidayRows[0]?.name||nationalNames.get(today)||(new Date(`${today}T12:00:00Z`).getUTCDay()===0?'Sunday':'');
+  const holidayName=holidayRows[0]?.name||nationalNames.get(today)||(new Date(today+'T12:00:00Z').getUTCDay()===0?'Sunday':'');
   const absenceCount=effectiveToday.filter((row)=>row.status==='ABSENT').length;
   const leaveCount=effectiveToday.filter((row)=>row.status==='ON_LEAVE').length;
   const approvedWfhCount=effectiveToday.filter((row)=>row.status==='WFH').length;
+  const attendanceMap=new Map(effectiveToday.map((row)=>[row.employee_id,row]));
+  const recent=peopleDetail.map((person)=>{
+    const row=attendanceMap.get(person.id);
+    return {
+      id:row?.id||person.id,
+      employee_id:person.id,
+      attendance_date:today,
+      check_in_at:row?.check_in_at||null,
+      check_out_at:row?.check_out_at||null,
+      check_in_method:row?.check_in_method||null,
+      check_out_method:row?.check_out_method||null,
+      status:row?.status||null,
+      full_name:person.full_name,
+      employee_code:person.employee_code,
+      user_type:person.user_type,
+      title:person.title,
+      worked_minutes:row?.check_in_at&&row?.check_out_at?netWorkedMinutes(row.check_in_at,row.check_out_at,POLICY.fixedLunchMinutes):null
+    };
+  });
   res.json({ date: today, officeHoliday, holidayName, stats: { employees: Number(people[0].active || 0), present: Number(attendance[0].total || 0), onTime: Number(attendance[0].on_time || 0), late: Number(attendance[0].late || 0), stillIn: Number(attendance[0].still_in || 0), pending: Number(pending[0].total || 0), outNow: out.length, absent:absenceCount, onLeave:leaveCount, approvedWfh:approvedWfhCount }, temporaryExits:out, recent });
 }));
-
 router.get('/system-health', asyncRoute(async (req, res) => {
   const started = process.hrtime.bigint();
   const [rows] = await pool.query('SELECT VERSION() AS mysql_version, UTC_TIMESTAMP() AS database_time');
