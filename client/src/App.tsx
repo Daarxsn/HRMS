@@ -45,7 +45,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 function IconLogo({ small=false }) {
-  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/falchion-xeniaa-logo.png" alt="Falchion Xeniaa" /></span>;
+  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/falchion-horizontal-logo.png" alt="Falchion Xeniaa" /></span>;
 }
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
@@ -396,15 +396,23 @@ function ProfilePage(){
   const [photoBusy,setPhotoBusy]=useState(false);
   const [error,setError]=useState('');
   const [photoVersion,setPhotoVersion]=useState(Date.now());
-  useEffect(()=>{get('/account/profile').then((r)=>{setProfile(r.profile);setPhone(r.profile.phone||'');setPhotoVersion(Date.now());}).catch((e)=>setError(e.message));},[]);
+
+  useEffect(()=>{
+    get('/account/profile')
+      .then((r)=>{setProfile(r.profile);setPhone(r.profile.phone||'');setPhotoVersion(Date.now());})
+      .catch((e)=>setError(e.message));
+  },[]);
+
   const save=async(e)=>{
     e.preventDefault();setBusy(true);setError('');
     try{
       await patch('/account/profile',{phone:phone||null});
       const updated={...profile,phone:phone||null};
-      setProfile(updated);setUser(updated);notify('Your profile details are up to date.');
-    }catch(e){setError(e.message);}finally{setBusy(false);}
+      setProfile(updated);setUser({...user,phone:phone||null});notify('Your contact details were saved.');
+    }catch(e){setError(e.message);}
+    finally{setBusy(false);}
   };
+
   const uploadPhoto=async(e)=>{
     const file=e.target.files?.[0]||null;e.target.value='';
     if(!file)return;
@@ -413,57 +421,98 @@ function ProfilePage(){
     try{
       const form=new FormData();form.append('photo',file);
       await post('/account/profile/photo',form);
-      const updated={...profile,profile_photo_available:true};
-      setProfile(updated);setUser({...user,profile_photo_available:true});setPhotoVersion(Date.now());notify('Profile photo updated.');
-    }catch(e){setError(e.message);}finally{setPhotoBusy(false);}
+      setProfile((p)=>({...p,profile_photo_available:true}));
+      setUser((u)=>({...u,profile_photo_available:true}));
+      setPhotoVersion(Date.now());
+      notify('Profile photo updated.');
+    }catch(e){setError(e.message);}
+    finally{setPhotoBusy(false);}
   };
+
   const removePhoto=async()=>{
     setPhotoBusy(true);setError('');
-    try{await del('/account/profile/photo');const updated={...profile,profile_photo_available:false};setProfile(updated);setUser({...user,profile_photo_available:false});setPhotoVersion(Date.now());notify('Profile photo removed.');}
-    catch(e){setError(e.message);}finally{setPhotoBusy(false);}
+    try{
+      await del('/account/profile/photo');
+      setProfile((p)=>({...p,profile_photo_available:false}));
+      setUser((u)=>({...u,profile_photo_available:false}));
+      setPhotoVersion(Date.now());
+      notify('Profile photo removed.');
+    }catch(e){setError(e.message);}
+    finally{setPhotoBusy(false);}
   };
-  const photoSrc=profile.profile_photo_available?assetUrl('/account/profile/photo')+'?v='+photoVersion:null;
-  return <><PageTitle eyebrow="YOUR DETAILS, YOURS TO UPDATE" title="My profile" description="Keep your work identity, contact details and organization information current."/>
+
+  const photoSrc=profile.profile_photo_available?assetUrl('/account/profile/photo')+`?v=${photoVersion}`:null;
+  const displayRole=profile.role==='ADMIN'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee';
+
+  return <>
+    <PageTitle
+      eyebrow="YOUR DETAILS, YOURS TO UPDATE"
+      title="My profile"
+      description="Keep your work identity, contact details and organization information current."
+    />
+
     {error&&<InlineError>{error}</InlineError>}
-    <div className="profile-layout">
-      <Card className="profile-card">
-        <div className="profile-cover">
-          <div className="profile-avatar-large profile-avatar-photo">{photoSrc?<img src={photoSrc} alt={profile.full_name}/>:initials(profile.full_name)}</div>
-          <div className="profile-cover-art"><span/><span/><span/></div>
-          <div className="profile-photo-actions">
-            <label className="photo-button"><Camera size={14}/>{photoBusy?'Updating…':'Change photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>
-            {profile.profile_photo_available&&<button className="photo-remove-button" type="button" onClick={removePhoto} disabled={photoBusy}>Remove</button>}
+
+    <div className="profile-page">
+      <Card className="profile-identity-card">
+        <div className="profile-identity">
+          <div className="profile-identity-avatar">
+            {photoSrc?<img src={photoSrc} alt={profile.full_name}/>:initials(profile.full_name)}
           </div>
+          <div className="profile-identity-copy">
+            <h2>{profile.full_name}</h2>
+            <p>{profile.position||profile.title} <span>·</span> {displayRole}</p>
+            <div className="profile-identity-meta">
+              <span>{profile.employee_code}</span>
+              <span>{profile.department||'General'}</span>
+              <span>{profile.branch||'Pune'}</span>
+            </div>
+          </div>
+          <StatusPill value={profile.status}/>
         </div>
-        <div className="profile-main">
-          <div className="profile-name-row"><div><h2>{profile.full_name}</h2><p>{profile.position||profile.title} <span>·</span> {profile.role==='ADMIN'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee'}</p></div><StatusPill value={profile.status}/></div>
-          <div className="profile-divider"/>
-          <div className="profile-details-grid profile-details-expanded">
-            <div><span>Employee ID</span><b>{profile.employee_code}</b></div>
-            <div><span>Work email</span><b>{profile.email}</b></div>
-            <div><span>Mobile</span><b>{profile.phone||'Not added'}</b></div>
-            <div><span>Branch</span><b>{profile.branch||'Pune'}</b></div>
-            <div><span>Department</span><b>{profile.department||'General'}</b></div>
-            <div><span>Position</span><b>{profile.position||profile.title}</b></div>
-            <div><span>Joined</span><b>{formatDate(profile.joined_on)}</b></div>
-            <div><span>Probation ends</span><b>{profile.probation_end_date?formatDate(profile.probation_end_date):'Not set'}</b></div>
-            <div><span>Reports to</span><b>{profile.manager||'Falchion Xeniaa administrator'}</b></div>
-            <div><span>WFH access</span><b>{profile.wfh_enabled?'Enabled':'Not enabled'}</b></div>
-          </div>
+        <div className="profile-photo-actions profile-photo-actions-clean">
+          <label className="photo-button"><Camera size={15}/>{photoBusy?'Updating…':'Change photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>
+          {profile.profile_photo_available&&<button className="photo-remove-button" type="button" onClick={removePhoto} disabled={photoBusy}>Remove</button>}
         </div>
       </Card>
-      <Card className="profile-edit-card">
-        <CardHeading title="Contact details" subtitle="Your name, work email and access are managed by administrators."/>
-        <form className="form-stack" onSubmit={save}>
+
+      <Card className="profile-info-card">
+        <div className="profile-info-heading">
+          <div><span className="profile-info-icon"><BriefcaseBusiness size={18}/></span><div><h2>Work information</h2><p>Your organization and employment details.</p></div></div>
+        </div>
+        <div className="profile-info-grid">
+          <div><span>Employee ID</span><b>{profile.employee_code}</b></div>
+          <div><span>Work email</span><b className="profile-value-wrap">{profile.email}</b></div>
+          <div><span>Position</span><b>{profile.position||profile.title||'Employee'}</b></div>
+          <div><span>Department</span><b>{profile.department||'General'}</b></div>
+          <div><span>Branch</span><b>{profile.branch||'Pune'}</b></div>
+          <div><span>Employment type</span><b>{displayRole==='Administrator'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee'}</b></div>
+          <div><span>Joining date</span><b>{formatDate(profile.joined_on)}</b></div>
+          <div><span>Probation ends</span><b>{profile.probation_end_date?formatDate(profile.probation_end_date):'Not set'}</b></div>
+          <div><span>Reports to</span><b>{profile.manager||'Falchion Xeniaa administrator'}</b></div>
+          <div><span>WFH access</span><b>{profile.wfh_enabled?'Enabled':'Not enabled'}</b></div>
+          <div><span>Status</span><b><StatusPill value={profile.status}/></b></div>
+        </div>
+      </Card>
+
+      <Card className="profile-info-card profile-contact-card">
+        <div className="profile-info-heading">
+          <div><span className="profile-info-icon"><CircleUserRound size={18}/></span><div><h2>Contact details</h2><p>Your name and work email are controlled by administrators. You can update your mobile number.</p></div></div>
+        </div>
+        <form className="profile-contact-form" onSubmit={save}>
           <label className="form-field"><span>Full name</span><input value={profile.full_name} disabled/></label>
           <label className="form-field"><span>Work email</span><input value={profile.email} disabled/></label>
-          <label className="form-field"><span>Phone number</span><input type="tel" value={phone} maxLength="32" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …"/></label>
-          <div className="profile-security"><ShieldCheck size={15}/><span>Google Sign-In keeps your account secure. Role, branch, department and position remain controlled by administrators.</span></div>
-          <Button type="submit" loading={busy}>Save contact details</Button>
+          <label className="form-field"><span>Mobile number</span><input type="tel" value={phone} maxLength="32" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …"/></label>
+          <div className="profile-security"><ShieldCheck size={16}/><span>Google Sign-In secures access. Role, branch, department and position remain administrator-controlled.</span></div>
+          <Button type="submit" loading={busy}>Save mobile number</Button>
         </form>
       </Card>
+
+      <Card className="privacy-card">
+        <div className="privacy-icon"><ShieldCheck size={18}/></div>
+        <div><b>Trust is part of how we work.</b><p>Falchion Xeniaa does not use spyware, screen recording, webcam watching or keyboard tracking. Location is requested only when you choose an attendance action.</p></div>
+      </Card>
     </div>
-    <Card className="privacy-card"><div className="privacy-icon"><ShieldCheck size={18}/></div><div><b>Trust is part of how we work.</b><p>Falchion Xeniaa does not use spyware, screen recording, webcam watching or keyboard tracking. Your location is requested only when you choose a GPS attendance action.</p></div></Card>
   </>;
 }
 
