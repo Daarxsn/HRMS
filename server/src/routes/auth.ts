@@ -51,7 +51,7 @@ router.post('/google', asyncRoute(async (req, res) => {
     delete current.google_subject;
     return current;
   });
-  res.cookie('fx_session', signToken(user), authCookieOptions()).json({ user });
+  res.cookie('fx_session', signToken(user), authCookieOptions()).json({ user: publicUser(user) });
   await audit({ actorId: user.id, action: 'AUTH_GOOGLE_SIGN_IN', entityType: 'employee', entityId: user.id, ipAddress: req.ip });
 }));
 
