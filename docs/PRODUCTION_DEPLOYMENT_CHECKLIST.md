@@ -43,12 +43,25 @@ Run migrations before directing production traffic to a new application version.
 
 ## Vercel configuration
 
-Set:
+Import the repository as one **Services** project, with root directory `./`; do not import the client and server as separate projects.
 
-- VITE_API_URL=https://api.<company-domain>/api
-- VITE_GOOGLE_CLIENT_ID=<same web client id>
+Set these Vercel environment variables:
 
-The Vercel deployment should use the client directory as its root.
+- `NODE_ENV=production`
+- `APP_ORIGIN=https://<exact portal domain>`
+- `JWT_SECRET=<private random value of at least 32 bytes>`
+- `GOOGLE_CLIENT_ID=<web client id>`
+- `VITE_GOOGLE_CLIENT_ID=<same web client id>`
+- `VITE_API_URL=/api` (or leave unset)
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `DB_SSL_MODE=REQUIRED`
+- `GCS_BUCKET=<private-bucket>`
+- `GOOGLE_CLOUD_PROJECT=<project-id>`
+- `GOOGLE_SERVICE_ACCOUNT_JSON=<full JSON for a minimally scoped GCS service account>`
+- `OFFICE_NETWORK_IPS=<semicolon-separated public office egress IPs>`
+- `DEMO_AUTH_ENABLED=false`
+
+Register each required Vercel preview URL and the final portal URL as an Authorized JavaScript origin in Google OAuth. Apply migrations outside Vercel before deploying. Do not place any server secret in a `VITE_*` variable.
 
 ## Acceptance checks
 
