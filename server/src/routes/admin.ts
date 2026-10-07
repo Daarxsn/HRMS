@@ -263,6 +263,17 @@ router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
   res.json({ok:true});
 }));
 
+router.get('/leave-report', asyncRoute(async (req,res)=>{
+  const from=String(req.query.from || `${indiaDate().slice(0,4)}-01-01`);
+  const to=String(req.query.to || indiaDate());
+  if(!dateSchema.safeParse(from).success || !dateSchema.safeParse(to).success || from>to) throw Object.assign(new Error('Choose a valid leave-report date range.'),{status:400});
+  const rows=await query(`SELECT r.id,r.leave_type,DATE_FORMAT(r.start_date,'%Y-%m-%d') AS start_date,DATE_FORMAT(r.end_date,'%Y-%m-%d') AS end_date,r.days,r.reason,r.status,r.created_at,e.employee_code,e.full_name,e.user_type
+    FROM leave_requests r JOIN employees e ON e.id=r.employee_id
+    WHERE r.start_date<=:to AND r.end_date>=:from
+    ORDER BY r.start_date DESC,r.created_at DESC`,{from,to});
+  const summary={requested:rows.length,approved:rows.filter((r)=>r.status==='APPROVED').length,pending:rows.filter((r)=>r.status==='PENDING').length,rejected:rows.filter((r)=>r.status==='REJECTED').length,approvedDays:rows.filter((r)=>r.status==='APPROVED').reduce((sum,r)=>sum+Number(r.days||0),0)};
+  res.json({from,to,summary,requests:rows});
+});
 router.get('/reports.csv', asyncRoute(async (req,res) => {
   const from=String(req.query.from || `${indiaDate().slice(0,7)}-01`); const to=String(req.query.to || indiaDate());
   if(!dateSchema.safeParse(from).success||!dateSchema.safeParse(to).success||from>to) throw Object.assign(new Error('Choose a valid date range.'),{status:400});
