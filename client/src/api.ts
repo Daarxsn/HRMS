@@ -1,7 +1,8 @@
 export interface RequestOptions extends RequestInit {}
 export interface ApiError extends Error { status?: number; requestId?: string | null; code?: string }
 
-const base = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export const assetUrl = (path: string) => `${apiBase}${path.startsWith('/') ? path : `/${path}`}`;
 
 export async function request(path: string, options: RequestOptions = {}): Promise<any> {
   const headers = new Headers(options.headers || {});
@@ -15,7 +16,7 @@ export async function request(path: string, options: RequestOptions = {}): Promi
   const authEndpoint = /^\/auth\/(me|google|demo|logout)(?:\/|$)/.test(normalizedPath);
 
   try {
-    const response = await fetch(`${base}${normalizedPath}`, {
+    const response = await fetch(`${apiBase}${normalizedPath}`, {
       ...options,
       headers,
       credentials: 'include',
