@@ -141,13 +141,25 @@ The API is ready for deployment; no Google Cloud account, project, client secret
 
 ## Vercel deployment
 
-1. Import the project into Vercel and set the **Root Directory** to `client`.
-2. Add `VITE_API_URL=https://api.<your-company-domain>/api` and `VITE_GOOGLE_CLIENT_ID=<same Web client ID>` in Vercel’s production environment.
-3. Add the portal origin to the OAuth client’s Authorized JavaScript origins. Add the deployed API to the Cloud Run `APP_ORIGIN` allowlist.
-4. Deploy the Vite static frontend. The included `vercel.json` rewrites client-side routes to `index.html`.
+This repository deploys as one Vercel **Services** project: the Vite portal handles `/`, and the Express API handles `/api`. The root `vercel.json` uses Vercel's current `experimentalServices` configuration. Do not import `client` and `server` as separate projects.
 
-Vite environment variables are embedded at build time. Redeploy the frontend after changing either `VITE_*` setting.
+1. Import the repository with **Root Directory** set to `./`, then select **Services** as the project framework.
+2. Add the required production values to the Vercel project environment (Production and Preview as appropriate):
+   - `NODE_ENV=production`
+   - `APP_ORIGIN=https://<the-exact-Vercel-or-custom-domain>`
+   - `JWT_SECRET` (a private random value of at least 32 bytes)
+   - `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` (the same Web client ID)
+   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL_MODE=REQUIRED`
+   - `GCS_BUCKET` and, when required by the chosen Google authentication method, `GOOGLE_CLOUD_PROJECT`
+   - `VITE_API_URL=/api` (or leave it unset; the portal defaults to this same-origin path)
+   - `DEMO_AUTH_ENABLED=false`
+3. Add the Vercel preview URL(s) needed for testing and the final portal domain to the Google OAuth client's **Authorized JavaScript origins**. The Google Identity credential flow used here does not use an OAuth redirect callback.
+4. Apply the MySQL migrations from a trusted environment before directing real traffic to the application. Vercel deployments must not run migrations automatically.
+5. Deploy a preview and verify `/api/health/live`, `/api/health/ready`, sign-in, a protected API request, and a profile-photo upload/read cycle.
 
+Vercel Functions have ephemeral local storage. Production profile photos use the configured private Google Cloud Storage bucket; the `server/private-uploads/` fallback is for development only. The database must accept encrypted remote connections from Vercel and should have a connection limit sized for function concurrency.
+
+Vite environment values are embedded at build time. Redeploy the portal after changing either `VITE_API_URL` or `VITE_GOOGLE_CLIENT_ID`.
 ## Locked policy defaults
 
 | Setting | Default |
