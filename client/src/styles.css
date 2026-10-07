@@ -250,3 +250,36 @@ table td{font-size:12px;color:#555555;}
 .attendance-support-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px;}
 .admin-dashboard-attendance{margin-bottom:26px;}
 @media(max-width:800px){.attendance-overview-card{flex-direction:column;align-items:flex-start}.attendance-overview-state{align-items:flex-start}.attendance-support-grid{grid-template-columns:1fr}.form-three{grid-template-columns:1fr}.overview-attendance-card{flex-direction:column;align-items:flex-start}}
+
+
+/* Brand color and legibility refinements */
+.login-art{background:#111111;color:#FFFFFF;}
+.login-art-top{color:#FFFFFF;}
+.login-art-top b{color:#DAAF51;}
+.login-art-top .brand-mark-image{background:#111111;border:1px solid #DAAF51;}
+.login-art-copy h1{color:#FFFFFF;font-family:'Sansation',sans-serif;font-size:clamp(48px,6vw,75px);}
+.login-art-copy h1 em{color:#F5C25C;}
+.login-art-copy>p{color:#F4F4F5;font-size:15px;}
+.art-label{color:#DAAF51;font-size:10px;}
+.hero,.attendance-action-card{background:#111111!important;color:#FFFFFF;}
+.hero-kicker,.action-kicker{color:#DAAF51;font-size:10px;}
+.hero-text h2,.attendance-action-copy h2{color:#FFFFFF;font-family:'Sansation',sans-serif;font-size:28px;}
+.hero-text p,.attendance-action-copy>p{color:#F4F4F5;font-size:13px;}
+.hero-date{background:#DAAF51!important;color:#111111!important;}
+.stat-label{font-size:11px;color:#666666;}
+.stat-value{font-family:'Sansation',sans-serif;font-size:32px;color:#111111;}
+.stat-meta{font-size:11px;color:#666666;}
+.presence-legend>div{font-size:11px;color:#666666;}
+.presence-legend b{font-size:11px;color:#111111;}
+.attendance-window{font-size:11px;color:#666666;}
+.admin-intro{background:rgba(218,175,81,.12);border-color:rgba(218,175,81,.35);}
+.admin-intro b{font-size:12px;color:#111111;}
+.admin-intro span{font-size:11px;color:#666666;}
+.topbar .office-status{background:rgba(218,175,81,.14);color:#111111;font-size:11px;}
+.topbar .pulse-dot{background:#DAAF51;box-shadow:0 0 0 3px rgba(218,175,81,.16);}
+.sidebar{background:#FFFFFF;border-right-color:#DEDEE0;}
+.workspace-chip{background:#F4F4F5;border-color:#DEDEE0;}
+.workspace-avatar{background:#111111;color:#DAAF51;}
+.nav-link{font-size:13px;}
+.nav-link:hover{background:rgba(218,175,81,.10);color:#111111;}
+.notification-dot{background:#F25138;}
