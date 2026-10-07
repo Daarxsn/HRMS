@@ -26,6 +26,7 @@ jobs:
           --health-retries=20
     env:
       NODE_ENV: development
+      HRMS_TEST_SEED_ENABLED: true
       PORT: 3001
       APP_ORIGIN: http://127.0.0.1:3000
       DEMO_AUTH_ENABLED: true
