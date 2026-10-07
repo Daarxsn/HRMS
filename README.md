@@ -38,7 +38,7 @@ This archive is the working Falchion Xeniaa application project. It is structure
 
 - Node.js 22 or newer and npm
 - MySQL 8.0 or newer
-- A Google OAuth Web client to exercise Google sign-in (optional for local preview)
+- A Google OAuth Web client to exercise Google sign-in
 
 ### 1. Install packages
 
@@ -62,9 +62,7 @@ Use a separate, least-privilege application identity in each deployed environmen
 
 Copy `.env.example` to `server/.env`, then set the local database values. `JWT_SECRET` must be a private random value with at least 32 bytes. Never commit `.env`.
 
-For local preview without Google OAuth, leave `DEMO_AUTH_ENABLED=true`. This is development-only: the server forcibly disables demo sign-in in production. The seed data uses fictional `example.test` emails and is not a set of real company accounts. The seed command hard-fails when `NODE_ENV=production`.
-
-For Google sign-in, create a **Web application** OAuth client in Google Cloud Console and add the local frontend origin (`http://localhost:3000`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used.
+For local HRMS use, configure Google sign-in with the Web client ID shown in `.env.example` and add the local frontend origin (`http://localhost:3000`) under Authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` in `server/.env` and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The app authorizes a Google identity only when its verified email matches an active employee record; no domain allowlist is used. Demo sign-in remains disabled in production, and the seed data uses fictional `example.test` emails for automated/local testing only.
 
 ### 4. Apply schema and demo data
 
@@ -81,7 +79,7 @@ The seed inserts **10 fictional employee/intern accounts plus one administrator*
 npm run dev
 ```
 
-Open `http://localhost:3000`. Select an account from the Local Preview list, or configure Google OAuth. The API health checks are `http://localhost:3001/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
+Open `http://localhost:3000` and use **Continue with Google**. The signed-in Google account must already be provisioned as an active HRMS employee/intern/administrator. The API health checks are `http://localhost:3001/api/health`, `/api/health/live` and `/api/health/ready`. The readiness endpoint verifies database connectivity.
 
 ## Phase 4 production launch
 
