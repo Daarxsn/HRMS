@@ -6,6 +6,10 @@ if (process.env.NODE_ENV === 'production') {
   throw new Error('Database seeding is disabled in production. Use approved production migrations and real employee provisioning instead.');
 }
 
+if (process.env.HRMS_TEST_SEED_ENABLED !== 'true') {
+  throw new Error('Test/demo seeding is disabled by default. Set HRMS_TEST_SEED_ENABLED=true only for isolated CI/test databases.');
+}
+
 const people = [
   ['FX-0001','Om Shah','om.admin@example.test','ADMIN','ADMIN','Founder & administrator',false],
   ['FX-0002','Aarav Mehta','aarav.mehta@example.test','EMPLOYEE','EMPLOYEE','Product designer',true],
@@ -48,7 +52,7 @@ try {
       await connection.execute('INSERT IGNORE INTO company_holidays (holiday_date, name, created_by) VALUES (?, ?, ?)', [date,label,adminId]);
     }
     await connection.commit();
-    console.log(`Seeded ${people.length - 1} employee/intern accounts and one administrator. Demo sign-in is development-only.`);
+    console.log(`Seeded ${people.length} isolated test employee/admin fixtures.`);
   } catch (error) {
     await connection.rollback();
     throw error;
