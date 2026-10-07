@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../db.ts';
-import { audit, requireAuth } from '../security.ts';
+import { audit, requireAuth, publicUser } from '../security.ts';
 import { asyncRoute, validate } from '../validate.ts';
 import { profilePhotoUpload, saveProfilePhoto, deleteProfilePhoto, readProfilePhoto, verifyImageSignature } from '../profile-photo.ts';
 
@@ -51,7 +51,7 @@ router.get('/profile/photo', asyncRoute(async (req,res)=>{
 
 router.get('/profile', asyncRoute(async (req,res)=>{
   const managers=await query(`SELECT full_name FROM employees WHERE id=(SELECT reporting_manager_id FROM employees WHERE id=:id)`,{id:req.user.id});
-  res.json({profile:{...req.user,manager:managers[0]?.full_name || null}});
+  res.json({profile:{...publicUser(req.user),manager:managers[0]?.full_name || null}});
 }));
 router.patch('/profile', asyncRoute(async(req,res)=>{
   const input=validate(z.object({phone:z.string().trim().max(32).nullable().optional()}),req.body);
