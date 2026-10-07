@@ -106,11 +106,12 @@ function App() {
 
 function LoginScreen() {
   const {setUser}=useApp();
+  const navigate=useNavigate();
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const signIn=async(credential)=>{
     setBusy(true);setError('');
-    try { const result=await post('/auth/google',{credential});setUser(result.user); }
+    try { const result=await post('/auth/google',{credential});setUser(result.user);navigate(result.user.landingPath || (result.user.platform==='ADMIN'?'/admin':'/'),{replace:true}); }
     catch(e){setError(e.message);setBusy(false);}
   };
   return <div className="login-page">
@@ -134,14 +135,14 @@ const employeeNav=[
   {to:'/calendar',label:'Holiday calendar',icon:Calendar}
 ];
 const adminNav=[
-  {to:'/',label:'Overview',icon:Gauge},
-  {to:'/team',label:'People',icon:Users},
-  {to:'/admin-attendance',label:'Attendance',icon:Clock3},
-  {to:'/approvals',label:'Requests',icon:ClipboardCheck},
-  {to:'/reports',label:'Reports',icon:Activity},
-  {to:'/settings',label:'Office settings',icon:Settings},
-  {to:'/audit',label:'Audit trail',icon:ShieldCheck},
-  {to:'/calendar',label:'Holiday calendar',icon:Calendar}
+  {to:'/admin',label:'Overview',icon:Gauge},
+  {to:'/admin/team',label:'People',icon:Users},
+  {to:'/admin/attendance',label:'Attendance',icon:Clock3},
+  {to:'/admin/approvals',label:'Requests',icon:ClipboardCheck},
+  {to:'/admin/reports',label:'Reports',icon:Activity},
+  {to:'/admin/settings',label:'Office settings',icon:Settings},
+  {to:'/admin/audit',label:'Audit trail',icon:ShieldCheck},
+  {to:'/admin/calendar',label:'Holiday calendar',icon:Calendar}
 ];
 
 function Shell(){
@@ -153,11 +154,11 @@ function Shell(){
   const nav=isAdmin?adminNav:employeeNav;
   const logout=async()=>{try{await post('/auth/logout');}catch{}setUser(null);};
   useEffect(()=>{setMobileOpen(false);setBellOpen(false);},[location.pathname]);
-  const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':'Overview');
+  const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
   return <div className="app-shell">
     {mobileOpen&&<button className="mobile-scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
     <aside className={`sidebar${mobileOpen?' sidebar-open':''}`}>
-      <Link to="/" className="sidebar-brand"><IconLogo/><span className="brand-wordmark">FALCHION <b>XENIAA</b><small>PEOPLE PORTAL</small></span><button className="sidebar-collapse" aria-label="Close menu" onClick={(e)=>{e.preventDefault();setMobileOpen(false);}}><PanelLeftClose size={17}/></button></Link>
+      <Link to={isAdmin?'/admin':'/'} className="sidebar-brand"><IconLogo/><span className="brand-wordmark">FALCHION <b>XENIAA</b><small>PEOPLE PORTAL</small></span><button className="sidebar-collapse" aria-label="Close menu" onClick={(e)=>{e.preventDefault();setMobileOpen(false);}}><PanelLeftClose size={17}/></button></Link>
       <div className="workspace-chip"><span className="workspace-avatar">FX</span><span><b>Falchion Xeniaa</b><small>Pune · {isAdmin?'Administrator':'People'}</small></span><ChevronDown size={14}/></div>
       <div className="nav-caption">WORKSPACE</div>
       <nav className="main-nav">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{item.to==='/approvals'&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
@@ -166,8 +167,10 @@ function Shell(){
       <div className="sidebar-user"><div className="avatar avatar-sand">{initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{user.role==='ADMIN'?'Administrator':user.user_type==='INTERN'?'Intern':'Employee'}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
     <main className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top">{initials(user.full_name)}</Link></div></header>
-      <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<AdminHome/>:<EmployeeHome/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/>
-        <Route path="/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin-attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div>
+      <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
+        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/>
+        <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/>
+        <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div>
       <footer className="app-footer"><span>Falchion Xeniaa · People portal</span><span>Built on trust <span className="footer-dot">·</span> {new Date().getFullYear()}</span></footer>
     </main>
   </div>;
