@@ -13,6 +13,10 @@ export const profilePhotoUpload = multer({
   }
 });
 
+if (process.env.NODE_ENV === 'production' && !process.env.GCS_BUCKET) {
+  throw new Error('GCS_BUCKET is required in production so profile photos use durable private object storage.');
+}
+
 const storage = process.env.GCS_BUCKET
   ? new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT })
   : null;
