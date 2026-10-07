@@ -6,6 +6,7 @@ import { pool, query, transaction } from '../db.ts';
 import { audit, notify, requireAdmin, requireAuth } from '../security.ts';
 import { asyncRoute, dateSchema, validate } from '../validate.ts';
 import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.ts';
+import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.ts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -103,28 +104,30 @@ router.get('/system-health', asyncRoute(async (req, res) => {
 }));
 
 router.get('/users', asyncRoute(async (req, res) => {
-  const users = await query(`SELECT e.id, e.employee_code, e.full_name, e.email, e.role, e.user_type, e.status, e.title, e.phone, e.wfh_enabled, e.joined_on,
+  const users = await query(`SELECT e.id, e.employee_code, e.full_name, e.email, e.role, e.user_type, e.status, e.title, e.position, e.branch, e.department, e.phone, e.profile_photo_key, e.wfh_enabled, e.joined_on,
     e.probation_end_date, (SELECT COUNT(*) FROM attendance_records a WHERE a.employee_id=e.id AND a.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND a.status='LATE_ENTRY') AS late_count
     FROM employees e ORDER BY e.role DESC, e.full_name`);
   res.json({ users });
 }));
 router.post('/users', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ employeeCode: z.string().trim().min(2).max(24), fullName: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
-    userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).default('EMPLOYEE'), title: z.string().trim().max(120).default('Employee'), phone: z.string().trim().max(32).optional(),
+    userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).default('EMPLOYEE'), title: z.string().trim().max(120).default('Employee'), position: z.string().trim().min(2).max(120).default('Employee'), branch: z.string().trim().min(2).max(100).default('Pune'), department: z.string().trim().min(2).max(120).default('General'), phone: z.string().trim().max(32).optional(),
     wfhEnabled: z.boolean().default(false), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
   }), req.body);
   const id = crypto.randomUUID();
   const userType = input.userType;
-  await query(`INSERT INTO employees (id, employee_code, full_name, email, role, user_type, title, phone, joined_on, probation_end_date, wfh_enabled)
-    VALUES (:id,:code,:name,:email,:role,:userType,:title,:phone,:joined,:probation,:wfh)`, {
+  const joined = input.joinedOn || indiaDate();
+  const probation = input.probationEndDate ?? (() => { const d = new Date(`${joined}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 4); return d.toISOString().slice(0,10); })();
+  await query(`INSERT INTO employees (id, employee_code, full_name, email, role, user_type, title, position, branch, department, phone, joined_on, probation_end_date, wfh_enabled)
+    VALUES (:id,:code,:name,:email,:role,:userType,:title,:position,:branch,:department,:phone,:joined,:probation,:wfh)`, {
     id, code: input.employeeCode, name: input.fullName, email: input.email.toLowerCase(), role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE', userType,
-    title: input.title || 'Employee', phone: input.phone || null, joined: input.joinedOn || indiaDate(), probation: input.probationEndDate || null, wfh: input.wfhEnabled
+    title: input.title || input.position || 'Employee', position: input.position || input.title || 'Employee', branch: input.branch, department: input.department, phone: input.phone || null, joined, probation, wfh: input.wfhEnabled
   });
   await audit({ actorId: req.user.id, action: 'EMPLOYEE_CREATED', entityType: 'employee', entityId: id, details: { employee_code: input.employeeCode, role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE' }, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
 router.patch('/users/:id', adminMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ fullName: z.string().trim().min(2).max(120).optional(), email: z.string().trim().email().max(254).optional(), title: z.string().trim().max(120).optional(),
+  const input = validate(z.object({ fullName: z.string().trim().min(2).max(120).optional(), email: z.string().trim().email().max(254).optional(), title: z.string().trim().max(120).optional(), position: z.string().trim().min(2).max(120).optional(), branch: z.string().trim().min(2).max(100).optional(), department: z.string().trim().min(2).max(120).optional(),
     phone: z.string().trim().max(32).nullable().optional(), userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).optional(), status: z.enum(['ACTIVE','INACTIVE']).optional(),
     wfhEnabled: z.boolean().optional(), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
   }).refine((body) => Object.keys(body).length > 0, 'Make at least one change.'), req.body);
@@ -132,7 +135,7 @@ router.patch('/users/:id', adminMutationLimiter, asyncRoute(async (req, res) => 
   const [user] = await query('SELECT id FROM employees WHERE id=:id', { id: req.params.id });
   if (!user) throw Object.assign(new Error('Employee not found.'), { status: 404 });
   const fields = {
-    fullName:['full_name',input.fullName], email:['email',input.email?.toLowerCase()], title:['title',input.title], phone:['phone',input.phone],
+    fullName:['full_name',input.fullName], email:['email',input.email?.toLowerCase()], title:['title',input.title], position:['position',input.position], branch:['branch',input.branch], department:['department',input.department], phone:['phone',input.phone],
     userType:['user_type',input.userType], status:['status',input.status], wfhEnabled:['wfh_enabled',input.wfhEnabled], joinedOn:['joined_on',input.joinedOn], probationEndDate:['probation_end_date',input.probationEndDate]
   };
   const values: any[] = [];
