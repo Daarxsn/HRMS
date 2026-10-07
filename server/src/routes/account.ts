@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query } from '../db.ts';
 import { audit, requireAuth } from '../security.ts';
 import { asyncRoute, validate } from '../validate.ts';
+import { profilePhotoUpload, saveProfilePhoto, deleteProfilePhoto, readProfilePhoto, verifyImageSignature } from '../profile-photo.ts';
 
 const router = Router();
 router.use(requireAuth);
