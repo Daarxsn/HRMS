@@ -45,7 +45,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 function IconLogo({ small=false }) {
-  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/falchion-horizontal-logo.png" alt="Falchion Xeniaa" /></span>;
+  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/pwa-icon.svg" alt="" /></span>;
 }
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
