@@ -27,7 +27,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');if(!process.env.GCS_BUCKET)throw new Error('Set GCS_BUCKET for private production attachments.');}
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-const allowedOrigins = new Set((process.env.APP_ORIGIN || 'http://localhost:5173').split(',').map((x)=>x.trim()).filter(Boolean));
+const allowedOrigins = new Set((process.env.APP_ORIGIN || 'http://localhost:3000').split(',').map((x)=>x.trim()).filter(Boolean));
 app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.has(origin)) return callback(null,true);
