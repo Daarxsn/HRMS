@@ -90,7 +90,7 @@ function App() {
     });
     return()=>{live=false;};
   },[]);
-  useEffect(()=>{ if(user)refreshNotifications(); },[user,refresh]);
+  useEffect(()=>{ if(!user)return; refreshNotifications(); const timer=window.setInterval(refreshNotifications,60000); return()=>window.clearInterval(timer); },[user,refresh]);
   useEffect(()=>{
     const onSessionExpired=()=>{
       setUser(null);
