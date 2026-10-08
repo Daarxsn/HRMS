@@ -63,7 +63,7 @@ function StatusPill({ value, children }) {
   const raw=value || children || '—';
   const key=String(raw).toLowerCase().replaceAll('_','-').replaceAll(' ','-');
   const labels={on_time:'On time',late_entry:'Late entry',pending:'Pending',approved:'Approved',rejected:'Declined',cancelled:'Withdrawn',active:'Active',inactive:'Inactive',wfh:'Working remotely',on_leave:'On leave',gps:'GPS verified',absent:'Absent'};
-  return <span className={`status status-${key}`}>{labels[String(raw).toLowerCase()]||raw}</span>;
+  return <span className={`status status-${key}`}><i className="status-dot" aria-hidden="true"/>{labels[String(raw).toLowerCase()]||raw}</span>;
 }
 function EmptyState({ icon:Icon=FileText, title, body, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={21}/></span><h3>{title}</h3><p>{body}</p>{action}</div>; }
 function Card({ children, className='' }) { return <section className={`card ${className}`}>{children}</section>; }
