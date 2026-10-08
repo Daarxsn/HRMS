@@ -1182,3 +1182,15 @@ td{height:64px;padding:9px 20px;font-size:12px}
   .hero-art{right:-45px!important;top:8px!important;opacity:.18}
   .hero-bottom{left:21px!important;right:21px!important}
 }
+
+/* Critical contrast + final flagship tuning */
+.attendance-overview-card{background:#111111!important;color:#FFFFFF!important;border:1px solid rgba(218,175,81,.82)!important;box-shadow:0 18px 42px rgba(17,17,17,.12)!important}
+.attendance-overview-card .eyebrow{color:#DAAF51!important}
+.attendance-overview-card h2,.attendance-overview-card p,.attendance-overview-card .attendance-overview-meta span{color:#FFFFFF!important}
+.attendance-overview-card .attendance-state-ring{border-color:#DAAF51!important;background:rgba(218,175,81,.12)!important;color:#F5C25C!important}
+.attendance-overview-card .button-soft{background:#FFFFFF!important;color:#111111!important;border-color:#DAAF51!important}
+.attendance-overview-card .button-soft:hover:not(:disabled){background:#F4F4F5!important}
+.hero-text h2,.hero-text p,.hero-kicker,.hero-time{position:relative;z-index:5}
+.hero-insight-card{z-index:8}
+.calendar-main-stage{margin-top:4px}
+.holiday-section{padding-bottom:10px}
