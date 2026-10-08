@@ -197,7 +197,24 @@ function EmployeeHome(){
   const completedDays=weekProgress.filter((day)=>day.completed).length;const remainingDays=weekProgress.filter((day)=>day.working&&day.date>=today&&!day.completed).length;const shared=balance.find((b)=>b.type==='CASUAL');const floating=balance.find((b)=>b.type==='FLOATING');const pendingLeave=leaveRequests.filter((item)=>item.status==='PENDING').length;const pendingWfh=wfhData.requests.filter((item)=>item.status==='PENDING').length;const approvedWfhThisMonth=wfhData.requests.filter((item)=>item.status==='APPROVED'&&String(item.request_date).slice(0,7)===today.slice(0,7)).length;const nextHoliday=calendarHolidays.find((item)=>item.date>today);const unread=Number(notifications?.unread||0);const [punchBusy,setPunchBusy]=useState(false);const [punchError,setPunchError]=useState('');const approvedWfhToday=wfhData.enabled&&wfhData.requests.some((item)=>item.request_date===today&&item.status==='APPROVED');
   const quickLocation=()=>new Promise((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
-    navigator.geolocation.getCurrentPosition(({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),()=>reject(new Error('Location access is required for office check-in.')), {enableHighAccuracy:true,timeout:12000,maximumAge:0});
+    let best=null;let watchId=null;let timeoutId=null;let settled=false;
+    const finish=(error,value)=>{if(settled)return;settled=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(timeoutId!==null)globalThis.clearTimeout(timeoutId);error?reject(error):resolve(value);};
+    const handlePosition=({coords})=>{
+      const candidate={latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy};
+      if(!best||candidate.accuracy<best.accuracy)best=candidate;
+      if(candidate.accuracy<=100)finish(null,candidate);
+    };
+    const handleError=(error)=>{
+      if(settled)return;
+      if(error.code===1)finish(new Error('Location access is required for office check-in. Allow location access for this site and try again.'));
+      else if(best&&best.accuracy<=100)finish(null,best);
+    };
+    watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+    timeoutId=globalThis.setTimeout(()=>{
+      if(best&&best.accuracy<=100)finish(null,best);
+      else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'));
+      else finish(new Error('We could not get your current location. Allow location access and try again.'));
+    },10000);
   });
   const quickPunch=async(type)=>{
     setPunchBusy(true);setPunchError('');
