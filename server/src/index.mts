@@ -27,10 +27,21 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');}
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-const allowedOrigins = new Set((process.env.APP_ORIGIN || 'http://localhost:3000').split(',').map((x)=>x.trim()).filter(Boolean));
+function normalizeOrigin(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+}
+const allowedOrigins = new Set((process.env.APP_ORIGIN || 'http://localhost:3000').split(',').map(normalizeOrigin).filter(Boolean));
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) return callback(null,true);
+    if (!origin || allowedOrigins.has(normalizeOrigin(origin))) return callback(null,true);
     return callback(null,false);
   },
   credentials:true
@@ -51,7 +62,7 @@ app.use('/api',rateLimit({windowMs:15*60*1000,limit:600,standardHeaders:true,leg
 app.use('/api',(req,res,next)=>{
   if(!['POST','PUT','PATCH','DELETE'].includes(req.method))return next();
   const origin=req.get('Origin');
-  if(origin&&!allowedOrigins.has(origin))return res.status(403).json({error:'This request did not come from the Falchion Xeniaa portal.'});
+  if(origin&&!allowedOrigins.has(normalizeOrigin(origin)))return res.status(403).json({error:'This request did not come from the Falchion Xeniaa portal.'});
   next();
 });
 app.use(express.json({ limit:'100kb', strict:true }));
