@@ -3,7 +3,7 @@ import { access, readdir, readFile } from 'node:fs/promises';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './db.ts';
+import { pool } from './db.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const migrationCandidates = [path.join(here, '../migrations'), path.join(here, '../../migrations')];
