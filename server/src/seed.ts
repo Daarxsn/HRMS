@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { pool } from './db.ts';
+import { pool } from './db.mts';
 
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Database seeding is disabled in production. Use approved production migrations and real employee provisioning instead.');
