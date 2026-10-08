@@ -245,15 +245,15 @@ function EmployeeHome(){
         <div className="hero-actions">{holiday?<Link className="button button-light" to="/calendar"><CalendarDays size={16}/> View holiday calendar <ArrowRight size={16}/></Link>:todayRow?.check_in_at?<Link className="button button-light" to="/attendance">{todayRow.check_out_at?"Review today":"Check out when you leave"}<ArrowRight size={16}/></Link>:<Link className="button button-light" to="/attendance"><LogIn size={16}/> Check in <ArrowRight size={16}/></Link>}<span className="hero-time">{new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}).format(time)} IST</span></div>
       </div>
       <div className="hero-art"><div className="hero-date"><span>{new Intl.DateTimeFormat("en-IN",{weekday:"short",timeZone:"Asia/Kolkata"}).format(time)}</span><b>{new Intl.DateTimeFormat("en-IN",{day:"2-digit",timeZone:"Asia/Kolkata"}).format(time)}</b><small>{new Intl.DateTimeFormat("en-IN",{month:"short",timeZone:"Asia/Kolkata"}).format(time)}</small></div><div className="hero-ring ring-a"/><div className="hero-ring ring-b"/><div className="hero-plant"><span/><span/><span/><span/><i/></div></div>
-      <div className="hero-insight-card">
-        <div className="hero-insight-head"><span><i className="pulse-dot"/> TODAY&apos;S PULSE</span><small>{todayRow?.check_in_at?(todayRow.check_out_at?"COMPLETE":"IN PROGRESS"):"NOT STARTED"}</small></div>
-        <div className="hero-insight-main"><b>{todayRow?.check_in_at?(todayRow.check_out_at?"Day complete":"Checked in"):(holiday?"Holiday":"Ready to begin")}</b><span>{holiday?"Attendance is not expected today.":todayRow?.check_in_at?"Started at "+formatTime(todayRow.check_in_at)+".":"Your check-in is one tap away."}</span></div>
-        <div className="hero-insight-grid">
-          <div><small>LEAVE</small><b>{earned?.remaining??"—"} <em>days</em></b></div>
-          <div><small>WEEK</small><b>{completedDays}<em> / {week.filter(d=>d.working).length}</em></b></div>
-          <div><small>NEXT HOLIDAY</small><b>{nextHoliday?formatDate(nextHoliday.date,{day:"numeric",month:"short"}):"Clear"}</b></div>
+      <div className="hero-pulse-strip">
+        <div className="hero-pulse-status">
+          <span className="hero-pulse-live"><i className="pulse-dot"/> TODAY&apos;S PULSE</span>
+          <b>{todayRow?.check_in_at?(todayRow.check_out_at?'Day complete':'In progress'):(holiday?'Holiday':'Ready to begin')}</b>
+          <small>{holiday?'No attendance is expected today.':todayRow?.check_in_at?'Your workday is underway.':'Your next step is one tap away.'}</small>
         </div>
-        <div className="hero-progress"><span style={{width:Math.min(100,Math.round((completedDays/Math.max(1,week.filter(d=>d.working).length))*100))+"%"}}/></div>
+        <div className="hero-pulse-stat"><small>LEAVE</small><b>{earned?.remaining??'—'} <em>days</em></b></div>
+        <div className="hero-pulse-stat"><small>WEEK</small><b>{completedDays}<em> / {week.filter(d=>d.working).length}</em></b></div>
+        <div className="hero-pulse-stat"><small>NEXT HOLIDAY</small><b>{nextHoliday?formatDate(nextHoliday.date,{day:"numeric",month:"short"}):"Clear"}</b></div>
       </div>
       <div className="hero-bottom"><span><MapPin size={14}/> Falchion Xeniaa · Pune HQ</span><span>Mon–Sat <b>·</b> Report by 9:30 AM</span></div>
     </section>
