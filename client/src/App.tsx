@@ -158,7 +158,13 @@ function Shell(){
   return <div className="app-shell">
     {mobileOpen&&<button className="mobile-scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
     <aside className={`sidebar${mobileOpen?' sidebar-open':''}`}>
-      <Link to={isAdmin?'/admin':'/'} className="sidebar-brand"><IconLogo/><span className="brand-wordmark">FALCHION <b>XENIAA</b><small>PEOPLE PORTAL</small></span><button className="sidebar-collapse" aria-label="Close menu" onClick={(e)=>{e.preventDefault();setMobileOpen(false);}}><PanelLeftClose size={17}/></button></Link>
+      <div className="sidebar-brand">
+        <Link to={isAdmin?'/admin':'/'} className="sidebar-brand-link" aria-label="Falchion Xeniaa People Portal">
+          <span className="brand-logo-wrap"><IconLogo/><span className="brand-logo-glow"/></span>
+          <span className="brand-wordmark"><strong>FALCHION</strong> <b>XENIAA</b><small>PEOPLE PORTAL</small></span>
+        </Link>
+        <button className="sidebar-collapse" aria-label="Close menu" onClick={()=>setMobileOpen(false)}><PanelLeftClose size={17}/></button>
+      </div>
       <div className="workspace-chip"><span className="workspace-avatar">FX</span><span><b>Falchion Xeniaa</b><small>Pune · {isAdmin?'Administrator':'People'}</small></span><ChevronDown size={14}/></div>
       <div className="nav-caption">WORKSPACE</div>
       <nav className="main-nav">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
