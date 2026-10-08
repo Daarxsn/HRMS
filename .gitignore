@@ -5,3 +5,16 @@ server/private-uploads/*
 !server/private-uploads/.gitkeep
 *.log
 .DS_Store
+
+# Local environment files
+.env.*
+!.env.example
+
+# Build output
+server/dist/
+
+# Local database exports/backups
+*.sql
+
+# Local patch/backup files
+*.patch
