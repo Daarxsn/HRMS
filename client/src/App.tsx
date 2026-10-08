@@ -320,13 +320,50 @@ function AttendancePage(){
     <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="A clear history of your attendance without exposing worked-hour details." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
     {error&&<InlineError>{error}</InlineError>}
     <Card className="attendance-overview-card attendance-redesign"><div className="attendance-overview-main"><div className="eyebrow">TODAY · ${today}</div><h2>{todayHoliday?todayHoliday.name:statusLabel==='Complete'?'Attendance recorded.':statusLabel==='In progress'?`You checked in at ${formatTime(current.check_in_at)}.`:'Your attendance starts from Overview.'}</h2><p>{todayHoliday?'No attendance action is expected today.':statusLabel==='Complete'?'Today’s attendance record is complete.':statusLabel==='In progress'?'Your attendance is in progress. Check out later from the Overview.':'Use the Overview page for the check-in and check-out action.'}</p><div className="attendance-overview-meta"><span><Clock3 size={15}/> Report time · 9:00–9:30 AM</span><span><ShieldCheck size={15}/> One-time verification</span><span><MapPin size={15}/> Pune HQ</span></div></div><div className="attendance-overview-state"><div className="attendance-state-ring"><Clock3 size={28}/></div><b>{statusLabel}</b>{!todayHoliday&&<Link className="button button-primary button-small" to="/">Go to Overview</Link>}</div></Card>
-    <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Dates, day type and attendance status only.</p></div><span className="date-range-label"><CalendarDays size={15}/> {today.slice(0,4)}</span></div>
-    <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>DAY TYPE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:rows.length?rows.map((r)=><tr key={r.id}><td><b>{formatDate(r.attendance_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td><span className="table-type"><span className="type-dot"/>{r.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">Your attendance records will appear here.</div></td></tr>}</tbody></table></div></Card>
+    <AttendanceHistoryExplorer rows={rows} loading={loading} />
     <div className="attendance-support-grid"><Card className="help-card"><div className="help-top"><span><CircleHelp size={17}/></span><h3>Need to correct a day?</h3></div><p>Forgot to check in, check out, or had a location issue? Ask an administrator to review the day.</p><button className="text-link" onClick={()=>setCorrectionOpen(true)}>Request correction <ArrowRight size={14}/></button></Card><Card className="help-card flex-help"><div className="help-top"><span><Timer size={17}/></span><h3>Need a flex start?</h3></div><p>Request an adjusted start between 9:00 and 10:30 AM for administrator approval.</p><button className="text-link" onClick={()=>setFlexOpen(true)}>Request flex start <ArrowRight size={14}/></button></Card></div>
     {correctionOpen&&<CorrectionModal close={()=>setCorrectionOpen(false)} onDone={()=>{setCorrectionOpen(false);notify('Your correction request was sent for review.');load();}}/>}
     {flexOpen&&<FlexModal close={()=>setFlexOpen(false)} onDone={()=>{setFlexOpen(false);notify('Your flex-start request was sent to the administrator.');refresh();}}/>}
   </>;
 }
+
+function AttendanceHistoryExplorer({rows,loading}){
+  const [month,setMonth]=useState(()=>new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1));
+  const [selected,setSelected]=useState(today);
+  const year=month.getFullYear();const monthNo=month.getMonth();const prefix=`${year}-${String(monthNo+1).padStart(2,'0')}`;
+  const monthRows=rows.filter((r)=>String(r.attendance_date).startsWith(prefix));
+  const byDate=new Map(monthRows.map((r)=>[r.attendance_date,r]));
+  const days=new Date(year,monthNo+1,0).getDate();const first=new Date(year,monthNo,1).getDay();
+  const cells=Array.from({length:Math.ceil((first+days)/7)*7},(_,i)=>{const d=i-first+1;if(d<1||d>days)return null;const date=`${year}-${String(monthNo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;return {date,day:d,row:byDate.get(date)};});
+  const counts={present:0,absent:0,wfh:0,leave:0};
+  monthRows.forEach((r)=>{if(['ON_TIME','LATE_ENTRY'].includes(r.status))counts.present++;else if(r.status==='ABSENT')counts.absent++;else if(r.status==='WFH'||r.check_in_method==='WFH')counts.wfh++;else if(r.status==='ON_LEAVE')counts.leave++;});
+  const selectedRow=byDate.get(selected);const selectedDate=new Date(selected+'T12:00:00');
+  const move=(delta)=>{setMonth(new Date(year,monthNo+delta,1));setSelected(new Date(year,monthNo+delta,1).toISOString().slice(0,10));};
+  const statusClass=(row)=>row?.status?String(row.status).toLowerCase().replaceAll('_','-'):'empty';
+  return <section className="attendance-history-explorer">
+    <div className="section-head attendance-section-head"><div><h2>Attendance history</h2><p>Choose a month, scan the pattern, and open a day for details.</p></div><div className="history-year"><CalendarDays size={15}/>{year}</div></div>
+    <Card className="attendance-history-card">
+      <div className="history-toolbar">
+        <div><span className="eyebrow">MONTHLY VIEW</span><h3>{new Intl.DateTimeFormat('en-IN',{month:'long',year:'numeric'}).format(month)}</h3></div>
+        <div className="history-month-nav"><button className="icon-button" onClick={()=>move(-1)} aria-label="Previous month"><ChevronLeft size={18}/></button><button className="button button-soft button-small" onClick={()=>{setMonth(new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1));setSelected(today)}}>This month</button><button className="icon-button" onClick={()=>move(1)} aria-label="Next month"><ChevronRight size={18}/></button></div>
+      </div>
+      <div className="history-summary"><div><span className="history-stat-dot dot-present"/><small>Present</small><b>{counts.present}</b></div><div><span className="history-stat-dot dot-absent"/><small>Absent</small><b>{counts.absent}</b></div><div><span className="history-stat-dot dot-wfh"/><small>Remote</small><b>{counts.wfh}</b></div><div><span className="history-stat-dot dot-leave"/><small>Leave</small><b>{counts.leave}</b></div></div>
+      <div className="history-workspace">
+        <div className="history-calendar">
+          <div className="history-weekdays">{['S','M','T','W','T','F','S'].map((d,i)=><span key={i}>{d}</span>)}</div>
+          <div className="history-days">{loading?<div className="history-loading"><Spinner/></div>:cells.map((cell,i)=>cell?<button key={cell.date} type="button" className={`history-day history-${statusClass(cell.row)}${cell.date===selected?' history-selected':''}${cell.date===today?' history-today':''}`} onClick={()=>setSelected(cell.date)} title={cell.row?.status?StatusPillLabel(cell.row.status):'No attendance record'}><span>{cell.day}</span><i/></button>:<span key={'empty-'+i} className="history-day history-blank"/>)}</div>
+          <div className="history-legend"><span><i className="dot-present"/><small>Present</small></span><span><i className="dot-absent"/><small>Absent</small></span><span><i className="dot-wfh"/><small>Remote</small></span><span><i className="dot-leave"/><small>Leave</small></span></div>
+        </div>
+        <div className="history-detail">
+          <div className="history-detail-top"><span className="eyebrow">SELECTED DAY</span>{selected===today&&<span className="today-chip">TODAY</span>}</div>
+          <h4>{new Intl.DateTimeFormat('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(selectedDate)}</h4>
+          {selectedRow?<><StatusPill value={selectedRow.status}/><div className="history-detail-list"><div><small>DAY TYPE</small><b>{selectedRow.check_in_method==='WFH'||selectedRow.status==='WFH'?'Remote':'Office'}</b></div><div><small>CHECK-IN</small><b>{selectedRow.check_in_at?formatTime(selectedRow.check_in_at):'—'}</b></div><div><small>CHECK-OUT</small><b>{selectedRow.check_out_at?formatTime(selectedRow.check_out_at):selectedRow.check_in_at?'In progress':'—'}</b></div></div></>:<div className="history-empty"><CalendarDays size={18}/><b>No attendance entry</b><small>This day has no recorded attendance.</small></div>}
+        </div>
+      </div>
+    </Card>
+  </section>;
+}
+function StatusPillLabel(value){const labels={ON_TIME:'On time',LATE_ENTRY:'Late entry',ABSENT:'Absent',WFH:'Working remotely',ON_LEAVE:'On leave'};return labels[value]||value||'No attendance record';}
 function CorrectionModal({close,onDone}){
   const [date,setDate]=useState(today);const [checkIn,setCheckIn]=useState('');const [checkOut,setCheckOut]=useState('');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/corrections',{date,requestedCheckIn:checkIn?new Date(checkIn).toISOString():undefined,requestedCheckOut:checkOut?new Date(checkOut).toISOString():undefined,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
