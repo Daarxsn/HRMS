@@ -1659,3 +1659,7 @@ html[data-theme="dark"] .settings-note{background:#17231e!important;border-color
 html[data-theme="dark"] .admin-attendance-summary>div{background:#151d1a;border-color:#29362f}html[data-theme="dark"] .admin-attendance-summary b{color:#e3ece6}html[data-theme="dark"] .admin-attendance-summary small{color:#99a7a0}html[data-theme="dark"] .admin-attendance-card tbody tr:hover{background:#17231e}html[data-theme="dark"] .attendance-review-state{background:#111815;border-color:#2a3731}
 @media(max-width:900px){.admin-attendance-summary{grid-template-columns:1fr 1fr}.admin-attendance-filters{width:100%;margin-left:0}.admin-attendance-filters .search-box{flex:1;width:auto}}
 @media(max-width:560px){.admin-attendance-summary{gap:7px}.admin-attendance-summary>div{padding:11px}.admin-attendance-summary-icon{width:34px;height:34px}.admin-attendance-summary b{font-size:19px}.admin-attendance-toolbar .filter-date{width:100%;justify-content:space-between}.admin-attendance-filters{flex-wrap:wrap}.admin-attendance-filters .search-box{flex-basis:100%}.admin-attendance-filters .select-wrap{flex:1}}
+
+/* Accessibility */
+.skip-link{position:fixed;left:18px;top:10px;z-index:200;padding:9px 12px;border-radius:9px;background:#111;color:#fff;border:2px solid #DAAF51;font-size:11px;font-weight:800;transform:translateY(-140%);transition:transform .18s ease;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.skip-link:focus{transform:translateY(0);outline:none}
