@@ -188,18 +188,20 @@ function Shell(){
 }
 
 function CommandPalette({close,theme,setTheme,isAdmin}){
-  const navigate=useNavigate();
-  const location=useLocation();
+  const navigate=useNavigate();const location=useLocation();const [queryText,setQueryText]=useState('');
   const nav=[...(isAdmin?adminNav:employeeNav),{to:'/profile',label:'My profile',icon:CircleUserRound}];
-  const [queryText,setQueryText]=useState('');
-  const filtered=nav.filter((item)=>item.label.toLowerCase().includes(queryText.toLowerCase()));
-  useEffect(()=>{const onKey=(e)=>{if(e.key==='Escape')close();};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey);},[close]);
+  const actions=isAdmin?[['/admin/attendance','Open live attendance',Clock3],['/admin/approvals','Review requests',ClipboardCheck],['/admin/team','Manage people',Users],['/admin/reports','Open reports',Activity]]:[['/attendance','Open today’s attendance',Fingerprint],['/leave','Request time off',CalendarDays],['/wfh','Request WFH',House],['/out','Mark temporary exit',ArrowUpRight]];
+  const q=queryText.trim().toLowerCase();const filtered=nav.filter((item)=>item.label.toLowerCase().includes(q));const filteredActions=actions.filter(([,label])=>label.toLowerCase().includes(q));
+  const go=(to)=>{navigate(to);close();};
+  useEffect(()=>{const onKey=(e)=>{if(e.key==='Escape')close();if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey);},[close]);
   return <div className="command-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="command-palette" role="dialog" aria-modal="true" aria-label="HRMS command menu">
     <div className="command-head"><Command size={18}/><input autoFocus value={queryText} onChange={e=>setQueryText(e.target.value)} placeholder="Search pages and actions…" aria-label="Search pages and actions"/><kbd>ESC</kbd></div>
-    <div className="command-section"><span>QUICK NAVIGATION</span>{filtered.map((item)=>{const Icon=item.icon;return <button className={`command-item${location.pathname===item.to?' active':''}`} key={item.to} onClick={()=>{navigate(item.to);close();}}><span className="command-item-icon"><Icon size={16}/></span><span>{item.label}</span><ArrowRight size={14}/></button>})}{!filtered.length&&<div className="command-empty"><Search size={18}/><span>No matching pages.</span></div>}</div>
+    <div className="command-section"><span>QUICK ACTIONS</span>{filteredActions.length?filteredActions.map(([to,label,Icon])=><button className="command-item" key={to} onClick={()=>go(to)}><span className="command-item-icon"><Icon size={16}/></span><span>{label}</span><ArrowRight size={14}/></button>):<div className="command-empty"><Search size={18}/><span>No matching actions.</span></div>}</div>
+    <div className="command-section"><span>NAVIGATE</span>{filtered.length?filtered.map((item)=>{const Icon=item.icon;return <button className={`command-item${location.pathname===item.to?' active':''}`} key={item.to} onClick={()=>go(item.to)}><span className="command-item-icon"><Icon size={16}/></span><span>{item.label}</span><ArrowRight size={14}/></button>}):<div className="command-empty"><Search size={18}/><span>No matching pages.</span></div>}</div>
     <div className="command-section"><span>PREFERENCES</span><button className="command-item" onClick={()=>setTheme(theme==='dark'?'light':'dark')}><span className="command-item-icon">{theme==='dark'?<Sun size={16}/>:<Moon size={16}/>}</span><span>{theme==='dark'?'Use light appearance':'Use dark appearance'}</span><kbd>{theme==='dark'?'LIGHT':'DARK'}</kbd></button></div>
   </div></div>;
 }
+
 function NotificationPopover({close,refresh}){
   const {notifications,notify}=useApp();const [items,setItems]=useState(notifications.notifications);const [busy,setBusy]=useState(false);const [busyId,setBusyId]=useState(null);
   useEffect(()=>setItems(notifications.notifications),[notifications]);
