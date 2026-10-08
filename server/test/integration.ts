@@ -12,7 +12,7 @@ const env = {
   JWT_SECRET: 'ci-integration-secret-0123456789-abcdefghijklmnopqrstuvwxyz'
 };
 
-const server = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
+const server = spawn(process.execPath, ['--experimental-strip-types', 'src/index.mts'], {
   cwd: process.cwd(),
   env,
   stdio: ['ignore', 'pipe', 'pipe']

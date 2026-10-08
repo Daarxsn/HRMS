@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "dev": "node --watch --experimental-strip-types src/index.mts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/src/index.js",
+    "start": "node dist/src/index.mjs",
     "migrate": "node --experimental-strip-types src/migrate.ts",
     "seed": "node --experimental-strip-types src/seed.ts",
     "db:verify": "node --experimental-strip-types test/database-smoke.ts",

@@ -20,4 +20,4 @@ ENV NODE_ENV=production PORT=8080
 EXPOSE 8080
 
 STOPSIGNAL SIGTERM
-CMD ["node","dist/src/index.js"]
+CMD ["node","dist/src/index.mjs"]
