@@ -1,91 +1,111 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import crypto from 'node:crypto';
 import multer from 'multer';
-import { Storage } from '@google-cloud/storage';
+import {
+  saveObject,
+  deleteObject,
+  readObject
+} from './object-storage.ts';
 
 export const profilePhotoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 4 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    cb(allowed.includes(file.mimetype) ? null : Object.assign(new Error('Profile photos must be JPG, PNG, or WebP images.'), { status: 400 }), allowed.includes(file.mimetype));
+    cb(
+      allowed.includes(file.mimetype)
+        ? null
+        : Object.assign(
+            new Error('Profile photos must be JPG, PNG, or WebP images.'),
+            { status: 400 }
+          ),
+      allowed.includes(file.mimetype)
+    );
   }
 });
 
-if (process.env.NODE_ENV === 'production' && !process.env.GCS_BUCKET) {
-  throw new Error('GCS_BUCKET is required in production so profile photos use durable private object storage.');
-}
+const suffixFor = (contentType: string) =>
+  contentType === 'image/jpeg'
+    ? '.jpg'
+    : contentType === 'image/png'
+      ? '.png'
+      : '.webp';
 
-const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
-let serviceAccountCredentials: Record<string, unknown> | undefined;
-if (serviceAccountJson) {
-  try {
-    serviceAccountCredentials = JSON.parse(serviceAccountJson);
-  } catch {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON must contain valid service-account JSON.');
-  }
-}
-if (process.env.VERCEL === '1' && process.env.GCS_BUCKET && !serviceAccountCredentials) {
-  throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is required on Vercel when GCS_BUCKET is configured.');
-}
+export type ProfilePhotoFile = {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+};
 
-const storage = process.env.GCS_BUCKET
-  ? new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT,
-      ...(serviceAccountCredentials ? { credentials: serviceAccountCredentials } : {})
-    })
-  : null;
-
-const suffixFor = (contentType: string) => contentType === 'image/jpeg' ? '.jpg' : contentType === 'image/png' ? '.png' : '.webp';
-
-export type ProfilePhotoFile = { buffer: Buffer; mimetype: string; originalname: string };
-
-export async function saveProfilePhoto(employeeId: string, file: ProfilePhotoFile) {
+export async function saveProfilePhoto(
+  employeeId: string,
+  file: ProfilePhotoFile
+) {
   const id = crypto.randomUUID();
   const key = `${employeeId}/profile/${id}${suffixFor(file.mimetype)}`;
-  const localPath = path.resolve(process.cwd(), 'private-uploads', key);
 
-  if (storage) {
-    await storage.bucket(process.env.GCS_BUCKET!).file(key).save(file.buffer, {
-      resumable: false,
-      metadata: { contentType: file.mimetype, cacheControl: 'private, no-store' },
-      validation: 'crc32c',
-      preconditionOpts: { ifGenerationMatch: 0 }
-    });
-  } else {
-    await fs.mkdir(path.dirname(localPath), { recursive: true, mode: 0o700 });
-    await fs.writeFile(localPath, file.buffer, { mode: 0o600, flag: 'wx' });
-  }
+  await saveObject(key, file.buffer, file.mimetype);
 
-  return { key, contentType: file.mimetype, filename: path.basename(file.originalname).slice(0, 255), localPath };
+  return {
+    key,
+    contentType: file.mimetype,
+    filename: file.originalname.slice(0, 255)
+  };
 }
 
-export async function deleteProfilePhoto(key: string | null | undefined) {
+export async function deleteProfilePhoto(
+  key: string | null | undefined
+) {
   if (!key) return;
+
   try {
-    if (storage) {
-      await storage.bucket(process.env.GCS_BUCKET!).file(key).delete({ ignoreNotFound: true });
-    } else {
-      await fs.unlink(path.resolve(process.cwd(), 'private-uploads', key)).catch(() => {});
-    }
+    await deleteObject(key);
   } catch (error) {
-    console.error(JSON.stringify({ type: 'profile_photo_cleanup_error', key, error: String((error as any)?.message || error) }));
+    console.error(
+      JSON.stringify({
+        type: 'profile_photo_cleanup_error',
+        key,
+        error: String((error as any)?.message || error)
+      })
+    );
   }
 }
 
 export async function readProfilePhoto(key: string) {
-  if (storage) return storage.bucket(process.env.GCS_BUCKET!).file(key).createReadStream();
-  return fs.readFile(path.resolve(process.cwd(), 'private-uploads', key));
+  return readObject(key);
 }
 
-export const verifyImageSignature = (buffer: Buffer, contentType: string) => {
+export const verifyImageSignature = (
+  buffer: Buffer,
+  contentType: string
+) => {
   const signatures: Record<string, Buffer> = {
     'image/jpeg': Buffer.from([0xff, 0xd8, 0xff]),
-    'image/png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    'image/png': Buffer.from([
+      0x89, 0x50, 0x4e, 0x47,
+      0x0d, 0x0a, 0x1a, 0x0a
+    ]),
     'image/webp': Buffer.from('RIFF')
   };
+
   const signature = signatures[contentType];
-  if (!signature || !buffer.subarray(0, signature.length).equals(signature)) throw Object.assign(new Error('The uploaded profile photo is not a valid image.'), { status: 400 });
-  if (contentType === 'image/webp' && !buffer.subarray(8, 12).equals(Buffer.from('WEBP'))) throw Object.assign(new Error('The uploaded profile photo is not a valid WebP image.'), { status: 400 });
+
+  if (
+    !signature ||
+    !buffer.subarray(0, signature.length).equals(signature)
+  ) {
+    throw Object.assign(
+      new Error('The uploaded profile photo is not a valid image.'),
+      { status: 400 }
+    );
+  }
+
+  if (
+    contentType === 'image/webp' &&
+    !buffer.subarray(8, 12).equals(Buffer.from('WEBP'))
+  ) {
+    throw Object.assign(
+      new Error('The uploaded profile photo is not a valid WebP image.'),
+      { status: 400 }
+    );
+  }
 };

@@ -1,27 +1,25 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
-import { Storage } from '@google-cloud/storage';
 import { z } from 'zod';
 import { query, transaction } from '../db.ts';
 import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.ts';
 import { asyncRoute, dateSchema, validate } from '../validate.ts';
 import { indiaDate, isScheduledWorkday } from '../policy.ts';
+import { saveObject, deleteObject, readObject } from '../object-storage.ts';
 
 const router = Router();
 router.use(requireAuth);
-const storage = process.env.GCS_BUCKET ? new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT }) : null;
 const uploadLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => {
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => {
   const allowed = ['application/pdf','image/jpeg','image/png'];
   cb(allowed.includes(file.mimetype) ? null : Object.assign(new Error('Only PDF, JPG, or PNG files are accepted.'), { status: 400 }), allowed.includes(file.mimetype));
 } });
 
 router.post('/files', requirePeople, uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
-  if (!req.file) throw Object.assign(new Error('Choose a PDF, JPG, or PNG file up to 10 MB.'), { status: 400 });
+  if (!req.file) throw Object.assign(new Error('Choose a PDF, JPG, or PNG file up to 4 MB.'), { status: 400 });
   const signatures={
     'application/pdf':Buffer.from('%PDF-'),
     'image/jpeg':Buffer.from([0xff,0xd8,0xff]),
@@ -31,25 +29,13 @@ router.post('/files', requirePeople, uploadLimiter, upload.single('file'), async
   const id = crypto.randomUUID();
   const suffix = req.file.mimetype === 'application/pdf' ? '.pdf' : req.file.mimetype === 'image/jpeg' ? '.jpg' : '.png';
   const key = `${req.user.id}/${id}${suffix}`;
-  const localPath = path.resolve(process.cwd(), 'private-uploads', key);
   try {
-    if (storage) {
-      await storage.bucket(process.env.GCS_BUCKET).file(key).save(req.file.buffer, {
-        resumable: false,
-        metadata: { contentType: req.file.mimetype, cacheControl: 'private, no-store' },
-        validation: 'crc32c',
-        preconditionOpts: { ifGenerationMatch: 0 }
-      });
-    } else {
-      await fs.mkdir(path.dirname(localPath), { recursive: true, mode: 0o700 });
-      await fs.writeFile(localPath, req.file.buffer, { mode: 0o600, flag: 'wx' });
-    }
+    await saveObject(key, req.file.buffer, req.file.mimetype);
     await query(`INSERT INTO attachments (id, uploaded_by, original_filename, object_key, content_type, size_bytes)
       VALUES (:id, :owner, :name, :key, :type, :size)`, { id, owner: req.user.id, name: path.basename(req.file.originalname).slice(0,255), key, type: req.file.mimetype, size: req.file.size });
   } catch (error) {
     try {
-      if (storage) await storage.bucket(process.env.GCS_BUCKET).file(key).delete({ ignoreNotFound: true });
-      else await fs.unlink(localPath);
+      await deleteObject(key);
     } catch (cleanupError) {
       console.error(JSON.stringify({type:'attachment_cleanup_error',request_id:req.requestId,attachment_id:id,error:String(cleanupError?.message||cleanupError)}));
     }
@@ -67,10 +53,16 @@ router.get('/files/:id', asyncRoute(async (req, res) => {
   res.setHeader('Content-Type', file.content_type);
   res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.original_filename)}`);
   res.setHeader('Cache-Control', 'private, no-store');
-  if (storage) return storage.bucket(process.env.GCS_BUCKET).file(file.object_key).createReadStream().on('error', (e) => { if (!res.headersSent) res.status(404).end(); }).pipe(res);
-  const localPath = path.resolve(process.cwd(), 'private-uploads', file.object_key);
-  const buffer = await fs.readFile(localPath);
-  res.send(buffer);
+  const object = await readObject(file.object_key);
+  if (object.kind === 'buffer') {
+    res.send(object.buffer);
+  } else {
+    object.stream
+      .on('error', () => {
+        if (!res.headersSent) res.status(404).end();
+      })
+      .pipe(res);
+  }
 }));
 
 router.get('/wfh', requirePeople, asyncRoute(async (req, res) => {
