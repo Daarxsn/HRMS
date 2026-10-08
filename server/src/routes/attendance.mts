@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { query, transaction } from '../db.ts';
-import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.ts';
-import { asyncRoute, dateSchema, validate } from '../validate.ts';
-import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.ts';
+import { query, transaction } from '../db.mts';
+import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
+import { asyncRoute, dateSchema, validate } from '../validate.mts';
+import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);

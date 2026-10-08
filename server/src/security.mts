@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { query } from './db.ts';
+import { query } from './db.mts';
 
 const secret = () => {
   const value=process.env.JWT_SECRET;

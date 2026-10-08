@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { query } from '../db.ts';
-import { audit, requireAuth, publicUser } from '../security.ts';
-import { asyncRoute, validate } from '../validate.ts';
-import { profilePhotoUpload, saveProfilePhoto, deleteProfilePhoto, readProfilePhoto, verifyImageSignature } from '../profile-photo.ts';
+import { query } from '../db.mts';
+import { audit, requireAuth, publicUser } from '../security.mts';
+import { asyncRoute, validate } from '../validate.mts';
+import { profilePhotoUpload, saveProfilePhoto, deleteProfilePhoto, readProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 
 const router = Router();
 router.use(requireAuth);

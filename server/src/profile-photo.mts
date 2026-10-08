@@ -4,7 +4,7 @@ import {
   saveObject,
   deleteObject,
   readObject
-} from './object-storage.ts';
+} from './object-storage.mts';
 
 export const profilePhotoUpload = multer({
   storage: multer.memoryStorage(),

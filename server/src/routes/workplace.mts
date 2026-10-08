@@ -4,11 +4,11 @@ import path from 'node:path';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
-import { query, transaction } from '../db.ts';
-import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.ts';
-import { asyncRoute, dateSchema, validate } from '../validate.ts';
-import { indiaDate, isScheduledWorkday } from '../policy.ts';
-import { saveObject, deleteObject, readObject } from '../object-storage.ts';
+import { query, transaction } from '../db.mts';
+import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.mts';
+import { asyncRoute, dateSchema, validate } from '../validate.mts';
+import { indiaDate, isScheduledWorkday } from '../policy.mts';
+import { saveObject, deleteObject, readObject } from '../object-storage.mts';
 
 const router = Router();
 router.use(requireAuth);

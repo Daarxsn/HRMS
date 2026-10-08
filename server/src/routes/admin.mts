@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { pool, query, transaction } from '../db.ts';
-import { audit, notify, requireAdmin, requireAuth } from '../security.ts';
-import { asyncRoute, dateSchema, validate } from '../validate.ts';
-import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.ts';
-import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.ts';
+import { pool, query, transaction } from '../db.mts';
+import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
+import { asyncRoute, dateSchema, validate } from '../validate.mts';
+import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
+import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);

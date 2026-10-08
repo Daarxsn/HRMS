@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { query, transaction } from '../db.ts';
-import { authCookieOptions, signToken, audit, publicUser } from '../security.ts';
-import { requireAuth } from '../security.ts';
-import { asyncRoute } from '../validate.ts';
+import { query, transaction } from '../db.mts';
+import { authCookieOptions, signToken, audit, publicUser } from '../security.mts';
+import { requireAuth } from '../security.mts';
+import { asyncRoute } from '../validate.mts';
 
 const router = Router();
 const googleClient = new OAuth2Client();
