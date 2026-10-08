@@ -50,6 +50,14 @@ async function effectiveAttendance(from, to) {
   return result.sort((a,b)=>String(b.attendance_date).localeCompare(String(a.attendance_date))||String(a.full_name).localeCompare(String(b.full_name)));
 }
 
+router.post('/announcements', adminMutationLimiter, asyncRoute(async (req,res)=>{
+  const input=validate(z.object({title:z.string().trim().min(3).max(120),body:z.string().trim().min(8).max(1000)}),req.body);
+  const people=await query("SELECT id FROM employees WHERE status='ACTIVE' AND role='EMPLOYEE'");
+  await Promise.all(people.map((person)=>query(`INSERT INTO notifications (id,employee_id,title,body,kind,entity_json,created_at) VALUES (:id,:employee,:title,:body,'ANNOUNCEMENT',NULL,UTC_TIMESTAMP())`,{id:crypto.randomUUID(),employee:person.id,title:input.title,body:input.body})));
+  await audit({actorId:req.user.id,action:'ANNOUNCEMENT_PUBLISHED',entityType:'announcement',details:{title:input.title,recipientCount:people.length},ipAddress:req.ip});
+  res.status(201).json({ok:true,recipientCount:people.length});
+}));
+
 router.get('/dashboard', asyncRoute(async (req, res) => {
   const today = indiaDate();
   const [people, attendance, pending, out, effectiveToday, peopleDetail] = await Promise.all([
