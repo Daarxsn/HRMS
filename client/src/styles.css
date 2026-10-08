@@ -1731,3 +1731,10 @@ html[data-theme="dark"] .status-dot{box-shadow:0 0 0 2px rgba(255,255,255,.03)}
 html[data-theme="dark"] .export-preview,html[data-theme="dark"] .export-field-grid>div{background:#111815;border-color:#2a3731}.html[data-theme="dark"] .export-preview>b{color:#edf3ee}
 html[data-theme="dark"] .export-preview>b{color:#edf3ee}html[data-theme="dark"] .export-preview small,html[data-theme="dark"] .export-field-grid span{color:#9aa7a0}html[data-theme="dark"] .export-field-grid b{color:#d5e1d8}
 @media(max-width:600px){.export-field-grid{grid-template-columns:1fr 1fr}.export-preview{align-items:flex-start}}
+
+/* Calm system states */
+.no-access{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:45px;border:1px solid #e4ebe6;border-radius:22px;background:radial-gradient(circle at 50% 0%,rgba(218,175,81,.1),transparent 11rem),linear-gradient(145deg,#fff,#f8faf7);box-shadow:var(--shadow-md);position:relative;overflow:hidden}
+.no-access:before,.no-access:after{content:"";position:absolute;border:1px solid rgba(93,145,111,.1);border-radius:50%;pointer-events:none}.no-access:before{width:300px;height:300px;top:-190px}.no-access:after{width:210px;height:210px;top:-145px}
+.no-access>svg{position:relative;z-index:1;width:54px;height:54px;padding:15px;border-radius:16px;background:#eff6ef;color:#5a8a69;box-shadow:0 9px 25px rgba(45,95,63,.09)}.no-access h2{position:relative;z-index:1;margin:18px 0 7px;font:700 24px 'Sansation',sans-serif;color:#294036;letter-spacing:-.04em}.no-access p{position:relative;z-index:1;max-width:390px;margin:0 0 17px;color:#8b9892;font-size:11px;line-height:1.6}.no-access .text-link{position:relative;z-index:1}
+html[data-theme="dark"] .no-access{background:radial-gradient(circle at 50% 0%,rgba(218,175,81,.08),transparent 11rem),linear-gradient(145deg,#151d1a,#111815);border-color:#29362f}.html[data-theme="dark"] .no-access h2{color:#edf3ee}
+html[data-theme="dark"] .no-access h2{color:#edf3ee}html[data-theme="dark"] .no-access p{color:#9ca9a2}
