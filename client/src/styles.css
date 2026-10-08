@@ -1724,3 +1724,10 @@ html[data-theme="dark"] .status-dot{box-shadow:0 0 0 2px rgba(255,255,255,.03)}
 
 .admin-hero-kicker small{margin-left:auto;color:#789487;font-size:7px;letter-spacing:.05em;font-weight:700}
 @media(max-width:700px){.admin-hero-kicker{flex-wrap:wrap}.admin-hero-kicker small{width:100%;margin-left:15px}}
+
+/* Export workflow */
+.export-preview{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px;border:1px solid #e8eee9;border-radius:12px;background:linear-gradient(105deg,#f7faf7,#fff);margin-bottom:13px}.export-preview>b,.export-preview small{display:block}.export-preview .eyebrow{font-size:8px}.export-preview>b{margin-top:4px;color:#344a41;font:700 14px 'Sansation',sans-serif}.export-preview small{margin-top:4px;color:#909d96;font-size:9px}.export-preview-icon{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:#edf5ef;color:#59836a;flex:0 0 auto}
+.export-field-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.export-field-grid>div{padding:11px;border:1px solid #edf1ee;border-radius:10px;background:#fbfcfa}.export-field-grid span,.export-field-grid b{display:block}.export-field-grid span{font-size:7px;letter-spacing:.12em;color:#9aa59f}.export-field-grid b{margin-top:5px;font-size:10px;color:#53655d;overflow-wrap:anywhere}
+html[data-theme="dark"] .export-preview,html[data-theme="dark"] .export-field-grid>div{background:#111815;border-color:#2a3731}.html[data-theme="dark"] .export-preview>b{color:#edf3ee}
+html[data-theme="dark"] .export-preview>b{color:#edf3ee}html[data-theme="dark"] .export-preview small,html[data-theme="dark"] .export-field-grid span{color:#9aa7a0}html[data-theme="dark"] .export-field-grid b{color:#d5e1d8}
+@media(max-width:600px){.export-field-grid{grid-template-columns:1fr 1fr}.export-preview{align-items:flex-start}}
