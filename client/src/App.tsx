@@ -304,7 +304,7 @@ function EmployeeHome(){
 function AdminHome(){
   const {user,notify}=useApp();const [data,setData]=useState(null);const [approvals,setApprovals]=useState([]);const [activity,setActivity]=useState([]);const [health,setHealth]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [announcementOpen,setAnnouncementOpen]=useState(false);const [announcementTitle,setAnnouncementTitle]=useState('');const [announcementBody,setAnnouncementBody]=useState('');const [announcementBusy,setAnnouncementBusy]=useState(false);
   const load=async()=>{setLoading(true);setError('');try{const [dashboard,queue,feed,system]=await Promise.all([get('/admin/dashboard'),get('/admin/approvals'),get('/admin/audit'),get('/admin/system-health')]);setData(dashboard);setApprovals(queue.approvals||[]);setActivity((feed.logs||[]).slice(0,6));setHealth(system);}catch(e){setError(e.message);}finally{setLoading(false);}};
-  useEffect(()=>{load();},[]);
+  useEffect(()=>{load();const timer=window.setInterval(load,30000);return()=>window.clearInterval(timer);},[]);
   const stats=data?.stats||{};
   const adminHour=Number(new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Kolkata'}).format(new Date()));
   const adminGreeting=adminHour<12?'Good morning':adminHour<17?'Good afternoon':'Good evening';
@@ -607,6 +607,7 @@ function ProfilePage(){
 
   const photoSrc=profile.profile_photo_available?assetUrl('/account/profile/photo')+`?v=${photoVersion}`:null;
   const displayRole=profile.role==='ADMIN'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee';
+  const profileCompletion=[Boolean(profile.full_name),Boolean(profile.email),Boolean(profile.profile_photo_available),Boolean(profile.phone),Boolean(profile.department),Boolean(profile.position)].filter(Boolean).length*100/6;
 
   return <>
     <PageTitle
@@ -617,7 +618,9 @@ function ProfilePage(){
 
     {error&&<InlineError>{error}</InlineError>}
 
-    <div className="profile-page">
+    {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><Sparkles size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress"><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
+
+    <div className="profile-page">    <div className="profile-page">
       <Card className="profile-identity-card">
         <div className="profile-identity">
           <div className="profile-identity-avatar">
@@ -659,7 +662,7 @@ function ProfilePage(){
         </div>
       </Card>
 
-      <Card className="profile-info-card profile-contact-card">
+      <Card id="contact-details" className="profile-info-card profile-contact-card">
         <div className="profile-info-heading">
           <div><span className="profile-info-icon"><CircleUserRound size={18}/></span><div><h2>Contact details</h2><p>Your name and work email are controlled by administrators. You can update your mobile number.</p></div></div>
         </div>
