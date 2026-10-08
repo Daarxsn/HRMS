@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root=path.resolve(process.cwd());
-const index=fs.readFileSync(path.join(root,'src/index.ts'),'utf8');
+const index=fs.readFileSync(path.join(root,'src/index.mts'),'utf8');
 const docker=fs.readFileSync(path.join(root,'Dockerfile'),'utf8');
 const db=fs.readFileSync(path.join(root,'src/db.ts'),'utf8');
 const migrate=fs.readFileSync(path.join(root,'src/migrate.ts'),'utf8');
