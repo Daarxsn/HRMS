@@ -620,7 +620,7 @@ function ProfilePage(){
 
     {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><Sparkles size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress"><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
 
-    <div className="profile-page">    <div className="profile-page">
+    <div className="profile-page">
       <Card className="profile-identity-card">
         <div className="profile-identity">
           <div className="profile-identity-avatar">
