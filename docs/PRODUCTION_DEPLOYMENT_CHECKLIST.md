@@ -2,10 +2,10 @@
 
 ## Before deployment
 
-- Create a production Cloud SQL MySQL 8 database.
+- Create a production Aiven MySQL MySQL 8 database.
 - Apply database migrations from server/migrations.
-- Create a private Cloud Storage bucket for leave attachments with public access prevention enabled.
-- Create a dedicated Cloud Run service account with only the required Cloud SQL and GCS permissions.
+- Create a private Vercel Blob store for leave attachments.
+- Create a dedicated Vercel service account with only the required Cloud SQL and Vercel Blob permissions.
 - Create the Google OAuth Web client and register the exact Vercel portal origin.
 - Create the Vercel frontend project with the client root directory.
 

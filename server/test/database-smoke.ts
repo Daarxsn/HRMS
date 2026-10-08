@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { pool } from '../src/db.ts';
+import { pool } from '../src/db.mts';
 
 try {
   const [tables] = await pool.query('SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()');

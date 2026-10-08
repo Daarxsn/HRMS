@@ -37,7 +37,7 @@ All health responses use `Cache-Control: no-store`. API responses include an `X-
 | GET | `/leave/balances` | Own yearly leave balances |
 | GET/POST | `/leave` | List or apply for leave |
 | DELETE | `/leave/:id` | Withdraw a pending own leave request |
-| POST | `/files` | Upload private PDF/JPG/PNG attachment (10 MB limit) |
+| POST | `/files` | Upload private PDF/JPG/PNG attachment (4 MB limit) |
 | GET | `/files/:id` | Download a private attachment after owner/admin check |
 | GET/POST | `/wfh` | List or request WFH |
 | GET | `/calendar?year=YYYY` | National and company holidays |

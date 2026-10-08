@@ -38,7 +38,7 @@ jobs:
         run: npm ci
       - name: Check TypeScript server syntax
         run: |
-          find server/src server/test -type f -name '*.ts' -print0 |
+          find server/src server/test -type f \( -name '*.ts' -o -name '*.mts' \) -print0 |
             xargs -0 -n1 node --experimental-strip-types --check
       - name: Typecheck frontend and backend
         run: npm run typecheck

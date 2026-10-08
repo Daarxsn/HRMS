@@ -9,7 +9,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.post('/profile/photo', profilePhotoUpload.single('photo'), asyncRoute(async (req,res)=>{
-  if (!req.file) throw Object.assign(new Error('Choose a JPG, PNG, or WebP profile photo up to 5 MB.'), { status:400 });
+  if (!req.file) throw Object.assign(new Error('Choose a JPG, PNG, or WebP profile photo up to 4 MB.'), { status:400 });
   verifyImageSignature(req.file.buffer, req.file.mimetype);
   const currentRows=await query('SELECT profile_photo_key FROM employees WHERE id=:id FOR UPDATE',{id:req.user.id});
   const current=currentRows[0];

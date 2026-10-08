@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, workingDaysInclusive } from '../src/policy.ts';
+import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, workingDaysInclusive } from '../src/policy.mts';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
