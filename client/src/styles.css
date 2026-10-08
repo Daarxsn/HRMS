@@ -1714,3 +1714,10 @@ html[data-theme="dark"] .notification-preferences{background:#151d1a;border-colo
 html[data-theme="dark"] .loading-screen{background:#0e1412!important}.html[data-theme="dark"] .boot-brand>div b{color:#eef4ef}
 html[data-theme="dark"] .boot-brand>div b{color:#eef4ef}html[data-theme="dark"] .boot-brand>div span{color:#95a49b}html[data-theme="dark"] .boot-line{background:#24302a}
 @media(prefers-reduced-motion:reduce){.boot-brand,.boot-loader{animation:none}.boot-line i{animation:none;transform:none;width:100%}}
+
+/* Global status language */
+.status-dot{width:5px;height:5px;border-radius:50%;display:inline-block;background:currentColor;opacity:.8;box-shadow:0 0 0 2px rgba(82,120,94,.08)}
+.status-on-time .status-dot,.status-approved .status-dot,.status-active .status-dot{background:#4e9867}.status-late-entry .status-dot,.status-rejected .status-dot,.status-inactive .status-dot,.status-absent .status-dot{background:#c9786f}.status-pending .status-dot{background:#c39a4f}.status-working-remotely .status-dot,.status-wfh .status-dot{background:#6b8ca6}
+.page-wrap{animation:pageIn .28s ease-out both}@keyframes pageIn{from{opacity:.0;transform:translateY(4px)}to{opacity:1;transform:none}}
+html[data-theme="dark"] .status-dot{box-shadow:0 0 0 2px rgba(255,255,255,.03)}
+@media(prefers-reduced-motion:reduce){.page-wrap{animation:none}}
