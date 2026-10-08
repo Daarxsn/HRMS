@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import {
@@ -403,12 +403,17 @@ function FlexModal({close,onDone}){
   return <Modal title="Request a flexible start" subtitle="The policy allows 9:00–10:30 AM with manager approval." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Requested start</span><input type="time" min="09:00" max="10:30" value={startTime} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Context for your manager</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Share any details that would be helpful." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Request approval</Button></div></form></Modal>;
 }
 function Modal({title,subtitle,close,children}){
+  const closeRef=useRef(null);
   useEffect(()=>{
-    const onKey=(event)=>{if(event.key==='Escape')close();};
+    const previous=document.activeElement;
+    const scrollY=window.scrollY;
+    document.body.style.overflow='hidden';
+    requestAnimationFrame(()=>closeRef.current?.focus());
+    const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();close();}};
     document.addEventListener('keydown',onKey);
-    return()=>document.removeEventListener('keydown',onKey);
+    return()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow='';if(previous instanceof HTMLElement)previous.focus();window.scrollTo(0,scrollY);};
   },[close]);
-  return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={close} aria-label="Close"><X size={19}/></button></div>{children}</div></div>;
+  return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button ref={closeRef} className="icon-button" onClick={close} aria-label="Close"><X size={19}/></button></div>{children}</div></div>;
 }
 function InlineError({children}){return <div className="inline-alert alert-error" role="alert"><CircleAlert size={16}/>{children}</div>;}
 
