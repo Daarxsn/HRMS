@@ -981,3 +981,204 @@ td{height:64px;padding:9px 20px;font-size:12px}
   .sidebar-brand{margin-bottom:10px}
   .brand-logo-wrap,.brand-logo-wrap .brand-logo-image{width:38px!important;height:38px!important}
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Final visual polish · calendar + hero                                       */
+/* -------------------------------------------------------------------------- */
+.calendar-main-stage{width:100%}
+.calendar-main-stage .calendar-card{
+  padding:26px 28px 20px;
+  border-radius:20px;
+  box-shadow:var(--shadow-md);
+  background:linear-gradient(180deg,#fff 0%,#fcfdfb 100%);
+}
+.calendar-toolbar{margin-bottom:23px}
+.calendar-toolbar h2{font-size:28px!important;color:#182a24!important}
+.calendar-eyebrow{font-size:10px!important;color:#8b9992!important;letter-spacing:.18em}
+.calendar-controls .icon-button{width:38px;height:38px;border-radius:11px}
+.calendar-controls .button{min-height:38px}
+.calendar-weekdays{padding:0 0 10px}
+.calendar-weekdays span{font-size:9px!important;color:#77877f!important}
+.calendar-grid{border-top:1px solid #edf1ed}
+.calendar-day{
+  min-height:94px;
+  height:auto;
+  padding:11px 10px;
+  gap:7px;
+  background:#fff;
+  border-bottom:1px solid #edf1ed;
+  border-right:1px solid #edf1ed;
+  transition:background .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+.calendar-day:hover{
+  background:#f8fbf8;
+  box-shadow:inset 0 0 0 1px rgba(74,135,104,.10);
+  transform:translateY(-1px);
+  z-index:1;
+}
+.calendar-day b{font-size:12px!important;color:#53645c!important}
+.calendar-sunday b{color:#a1aba6!important}
+.calendar-day small{
+  padding:6px 7px;
+  font-size:9px!important;
+  line-height:1.25;
+  border-radius:7px;
+  color:#5c594a!important;
+  background:#f8f3e8;
+}
+.calendar-holiday-fixed small{color:var(--saffron)!important;background:rgba(147,19,20,.08)}
+.calendar-holiday-floating small{color:#73550d!important;background:rgba(245,194,92,.22)}
+.calendar-holiday-fixed{background:rgba(147,19,20,.035)!important;border-color:rgba(147,19,20,.16)!important}
+.calendar-holiday-floating{background:rgba(245,194,92,.045)!important;border-color:rgba(218,175,81,.20)!important}
+.calendar-today{
+  background:linear-gradient(145deg,#f2f8f3,#fbfdfb)!important;
+  box-shadow:inset 0 0 0 2px rgba(103,175,122,.30);
+}
+.calendar-today:before{width:7px;height:7px;right:10px;top:10px;background:var(--green)}
+.calendar-today b{color:#2f6f55!important;font-weight:800}
+.calendar-legend{
+  padding-top:15px;
+  font-size:10px;
+  color:#7d8c84;
+  gap:20px;
+}
+.holiday-section{margin-top:34px}
+.holiday-section-head{margin:0 0 15px}
+.holiday-section-head h2{font-size:23px}
+.holiday-section-meta{
+  display:flex;align-items:center;gap:10px;color:#8b9891;font-size:11px
+}
+.holiday-section-meta .holiday-count{width:30px;height:30px;font-size:11px;background:var(--gold);color:#fff}
+.holidays-card-wide{
+  padding:0 24px;
+  border-radius:18px;
+  box-shadow:var(--shadow-md);
+}
+.holiday-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  column-gap:26px;
+}
+.holiday-grid .holiday-row{
+  min-height:80px;
+  padding:15px 0;
+  border-top:1px solid #edf1ed;
+}
+.holiday-grid .holiday-row:nth-child(-n+3){border-top:0}
+.holiday-date{
+  width:48px!important;
+  height:48px!important;
+  border-radius:12px!important;
+  background:#f4f6f3!important;
+  color:#586a61!important;
+}
+.holiday-date b{font-size:16px!important}
+.holiday-date small{font-size:8px!important;color:#8a9991!important}
+.holiday-row-copy b{font-size:13px!important;color:#253831!important}
+.holiday-row-copy small{font-size:10px!important;color:#7d8b84!important;line-height:1.45}
+.holiday-pin{
+  width:32px;height:32px;border-radius:10px;
+  display:grid;place-items:center;
+  flex:0 0 auto;
+}
+.holiday-row-fixed .holiday-pin{color:var(--saffron)!important;background:rgba(147,19,20,.08)!important}
+.holiday-row-floating .holiday-pin{color:#866518!important;background:rgba(245,194,92,.19)!important}
+.calendar-note-wide{
+  margin-top:14px;
+  border:1px solid #e1ebe1;
+  background:linear-gradient(110deg,#f1f7ef,#f8faf7);
+  border-radius:14px;
+  padding:15px 17px;
+}
+.calendar-note-wide b{font-size:11px}
+.calendar-note-wide p{font-size:10px}
+
+/* Employee overview: make the first viewport feel like a flagship dashboard */
+.employee-action-center{gap:18px}
+.day-hero{
+  min-height:330px!important;
+  border-radius:22px!important;
+  padding:35px 38px 58px!important;
+  box-shadow:0 24px 52px rgba(17,55,45,.19)!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 330px;
+  grid-template-rows:1fr auto;
+  column-gap:40px;
+  align-items:center;
+}
+.hero-text{max-width:640px!important;padding-bottom:0!important}
+.hero-text h2{font-size:41px!important;max-width:650px}
+.hero-text p{font-size:15px!important;max-width:570px;line-height:1.7}
+.hero-kicker{font-size:10px!important}
+.hero-actions .button{min-height:48px!important;font-size:14px!important;padding:0 17px!important;border-radius:12px}
+.hero-time{font-size:12px!important}
+.hero-art{right:auto!important;left:auto;top:24px!important;position:absolute!important;right:33px!important;opacity:.82}
+.hero-insight-card{
+  position:relative;
+  z-index:4;
+  align-self:center;
+  justify-self:end;
+  width:330px;
+  padding:18px;
+  border-radius:17px;
+  border:1px solid rgba(245,255,245,.15);
+  background:linear-gradient(155deg,rgba(255,255,255,.13),rgba(255,255,255,.055));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 20px 40px rgba(4,20,15,.16);
+  backdrop-filter:blur(10px);
+}
+.hero-insight-head,.hero-insight-main,.hero-insight-grid{display:flex;justify-content:space-between}
+.hero-insight-head{align-items:center;gap:8px}
+.hero-insight-head span,.hero-insight-head small{
+  color:#c5dbca;font-size:9px;font-weight:800;letter-spacing:.14em
+}
+.hero-insight-head span{display:flex;align-items:center;gap:7px}
+.hero-insight-head .pulse-dot{background:var(--yellow)}
+.hero-insight-head small{color:#9eb6a4}
+.hero-insight-main{flex-direction:column;gap:4px;margin:16px 0 17px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.12)}
+.hero-insight-main b{font-family:'Sansation',sans-serif;color:#fff;font-size:25px;letter-spacing:-.03em}
+.hero-insight-main span{font-size:11px;color:#b7c9bd}
+.hero-insight-grid{gap:8px}
+.hero-insight-grid>div{
+  flex:1;min-width:0;padding:10px 9px;border-radius:10px;background:rgba(255,255,255,.06)
+}
+.hero-insight-grid small{display:block;color:#91aa9a;font-size:7px;letter-spacing:.12em;font-weight:800}
+.hero-insight-grid b{display:block;color:#fff;font-family:'Sansation',sans-serif;font-size:18px;margin-top:5px}
+.hero-insight-grid em{font-style:normal;font-size:10px;color:#9fb5a5;font-family:'Open Sans',sans-serif}
+.hero-progress{height:4px;margin-top:15px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+.hero-progress span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold),var(--yellow));transition:width .7s ease}
+.hero-bottom{height:44px!important;left:38px!important;right:38px!important}
+.overview-attendance-card{
+  margin-top:18px!important;
+  border-color:rgba(218,175,81,.75)!important;
+  border-radius:16px!important;
+  box-shadow:var(--shadow-sm)!important;
+}
+.overview-attendance-copy h2{font-size:26px!important}
+.overview-attendance-copy p{font-size:14px!important}
+.overview-attendance-action .button{min-height:44px!important}
+@media(max-width:1050px){
+  .day-hero{grid-template-columns:1fr!important;min-height:340px!important}
+  .hero-insight-card{justify-self:start;width:min(100%,430px);margin-top:10px}
+  .hero-art{right:-15px!important;opacity:.32}
+  .holiday-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .holiday-grid .holiday-row:nth-child(-n+3){border-top:1px solid #edf1ed}
+  .holiday-grid .holiday-row:nth-child(-n+2){border-top:0}
+}
+@media(max-width:720px){
+  .calendar-main-stage .calendar-card{padding:18px 14px 15px}
+  .calendar-day{min-height:72px;padding:8px 6px}
+  .calendar-day small{font-size:8px!important}
+  .calendar-legend{gap:10px;font-size:9px;flex-wrap:wrap}
+  .holiday-grid{grid-template-columns:1fr}
+  .holidays-card-wide{padding:0 16px}
+  .holiday-grid .holiday-row,
+  .holiday-grid .holiday-row:nth-child(n){border-top:1px solid #edf1ed}
+  .holiday-grid .holiday-row:first-child{border-top:0}
+  .day-hero{min-height:390px!important;padding:25px 21px 50px!important;display:flex!important;flex-direction:column;align-items:flex-start!important}
+  .hero-text h2{font-size:30px!important}
+  .hero-text p{font-size:13px!important}
+  .hero-insight-card{width:100%;margin-top:20px}
+  .hero-art{right:-45px!important;top:8px!important;opacity:.18}
+  .hero-bottom{left:21px!important;right:21px!important}
+}
