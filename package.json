@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "falchion-xeniaa-employee-management",
   "private": true,
   "workspaces": [

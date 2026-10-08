@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.0",
-    "@vercel/blob": "^2.6.1",
+    "@vercel/blob": "^2.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
