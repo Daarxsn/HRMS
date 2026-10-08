@@ -511,7 +511,7 @@ function NotificationsPage(){
   </>;
 }
 function ProfilePage(){
-  const {user,setUser,notify}=useApp();
+  const {user,setUser,notify,theme,setTheme}=useApp();
   const [profile,setProfile]=useState(user);
   const [phone,setPhone]=useState(user.phone||'');
   const [busy,setBusy]=useState(false);
@@ -629,6 +629,8 @@ function ProfilePage(){
           <Button type="submit" loading={busy}>Save mobile number</Button>
         </form>
       </Card>
+
+      <Card className="profile-preferences-card"><div className="profile-preferences-heading"><span className="profile-info-icon"><Settings size={18}/></span><div><h2>Workspace preferences</h2><p>Personalize how the People Portal feels on your devices.</p></div></div><div className="preference-row"><div><b>Appearance</b><small>Choose the visual mode for this browser.</small></div><div className="preference-segment"><button className={theme==='light'?'active':''} onClick={()=>setTheme('light')} type="button"><Sun size={14}/> Light</button><button className={theme==='dark'?'active':''} onClick={()=>setTheme('dark')} type="button"><Moon size={14}/> Dark</button></div></div><div className="preference-row"><div><b>Motion</b><small>Interface animations respect your system accessibility settings.</small></div><span className="preference-note"><ShieldCheck size={14}/> Accessible by default</span></div></Card>
 
       <Card className="privacy-card">
         <div className="privacy-icon"><ShieldCheck size={18}/></div>
