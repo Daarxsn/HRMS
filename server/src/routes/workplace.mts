@@ -98,7 +98,33 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   });
   await audit({ actorId: req.user.id, action: 'WFH_REQUESTED', entityType: 'wfh_request', entityId: id, details: { date: input.date, kind: input.kind }, ipAddress: req.ip });
   await notifyAdmins('WFH request needs review', `${req.user.full_name} requested WFH on ${input.date}.`, 'REQUEST', { type:'wfh', id });
-  res.status(201).json({ ok: true, id });
+  const emailDelivery = await (async () => {
+    const approvalUrl = String(process.env.APP_ORIGIN || '').replace(/\/$/, '') + '/admin/approvals';
+    try {
+      const subject = 'WFH request · ' + req.user.full_name + ' · ' + input.date;
+      const text = ['Falchion Xeniaa HRMS', '', 'A new WFH request has been submitted.', 'Employee: ' + req.user.full_name + ' (' + req.user.employee_code + ')', 'Email: ' + req.user.email, 'Request: ' + input.kind, 'Date: ' + input.date, 'Reason: ' + input.reason, 'Review: ' + approvalUrl].join('\n');
+      const html = '<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111"><div style="max-width:640px;margin:0 auto;padding:24px">'
+        + '<p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#931314;font-weight:700">FALCHION XENIAA · HRMS</p>'
+        + '<h1 style="margin:0 0 8px;font-size:28px">New WFH request</h1>'
+        + '<p style="color:#555">A new work-from-home request has been submitted for administrator review.</p>'
+        + '<div style="border:1px solid #e5e5e5;border-radius:14px;padding:18px">'
+        + '<p><strong>Employee</strong><br>' + htmlEscape(req.user.full_name) + ' · ' + htmlEscape(req.user.employee_code) + '</p>'
+        + '<p><strong>Email</strong><br>' + htmlEscape(req.user.email) + '</p>'
+        + '<p><strong>Type</strong><br>' + htmlEscape(input.kind) + '</p>'
+        + '<p><strong>Date</strong><br>' + htmlEscape(input.date) + '</p>'
+        + '<p><strong>Reason</strong><br>' + htmlEscape(input.reason) + '</p>'
+        + '</div>'
+        + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
+        + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p>'
+        + '</div></body></html>';
+      const result = await sendHrNotificationEmail({ subject, text, html, replyTo:req.user.email });
+      return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
+    } catch (error) {
+      console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));
+      return { configured:false, sent:0, recipients:0 };
+    }
+  })();
+  res.status(201).json({ ok: true, id, emailDelivery });
 }));
 
 router.get('/calendar', asyncRoute(async (req, res) => {
