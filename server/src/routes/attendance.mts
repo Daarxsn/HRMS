@@ -8,7 +8,10 @@ import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
-router.use(requireAuth, requirePeople);
+router.use(requireAuth, (req, res, next) => {
+  if (req.user?.role === 'ADMIN' && req.user?.user_type === 'ADMIN') return next();
+  return requirePeople(req, res, next);
+});
 const attendanceMutationLimiter = rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 function officeNetworkConfig() {
@@ -128,7 +131,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
   res.json({ ok: true, method: result.method });
 }));
 
-router.post('/corrections', attendanceMutationLimiter, asyncRoute(async (req, res) => {
+router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, requestedCheckIn: z.string().datetime().optional(), requestedCheckOut: z.string().datetime().optional(), reason: z.string().trim().min(8).max(1000) }).refine((v) => v.requestedCheckIn || v.requestedCheckOut, 'Add the missing check-in or check-out time.'), req.body);
   if (input.date > indiaDate()) throw Object.assign(new Error('Choose today or an earlier date for an attendance correction.'), { status: 400 });
   const matching = await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', { employee: req.user.id, date: input.date });
@@ -149,7 +152,7 @@ router.post('/corrections', attendanceMutationLimiter, asyncRoute(async (req, re
   res.status(201).json({ ok: true, id });
 }));
 
-router.post('/flex-requests', attendanceMutationLimiter, asyncRoute(async (req, res) => {
+router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), reason: z.string().trim().min(8).max(1000) }), req.body);
   if (input.startTime < '09:00' || input.startTime > '10:30') throw Object.assign(new Error('A flex start must be between 9:00 AM and 10:30 AM.'), { status: 400 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
@@ -168,11 +171,11 @@ router.post('/flex-requests', attendanceMutationLimiter, asyncRoute(async (req, 
   res.status(201).json({ ok: true, id });
 }));
 
-router.get('/exits/current', asyncRoute(async (req, res) => {
+router.get('/exits/current', requirePeople, asyncRoute(async (req, res) => {
   const rows = await query(`SELECT x.id, x.left_at, x.reason FROM temporary_exits x JOIN attendance_records a ON a.id=x.attendance_id WHERE x.employee_id=:employee AND x.returned_at IS NULL AND a.attendance_date=:date ORDER BY x.left_at DESC LIMIT 1`, { employee: req.user.id, date: indiaDate() });
   res.json({ exit: rows[0] || null });
 }));
-router.post('/exits', asyncRoute(async (req, res) => {
+router.post('/exits', requirePeople, asyncRoute(async (req, res) => {
   const { reason } = validate(z.object({ reason: z.string().trim().max(500).optional() }), req.body || {});
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
@@ -185,7 +188,7 @@ router.post('/exits', asyncRoute(async (req, res) => {
   await audit({ actorId: req.user.id, action: 'TEMPORARY_EXIT_STARTED', entityType: 'temporary_exit', entityId: id, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
-router.patch('/exits/:id/return', asyncRoute(async (req, res) => {
+router.patch('/exits/:id/return', requirePeople, asyncRoute(async (req, res) => {
   const rows = await transaction(async (connection) => {
     const [locked] = await connection.execute('SELECT id, returned_at FROM temporary_exits WHERE id=:id AND employee_id=:employee FOR UPDATE', { id:req.params.id, employee:req.user.id });
     if (!locked[0] || locked[0].returned_at) throw Object.assign(new Error('This exit record is already closed or was not found.'), { status:404 });
