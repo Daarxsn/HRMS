@@ -1738,3 +1738,27 @@ html[data-theme="dark"] .export-preview>b{color:#edf3ee}html[data-theme="dark"] 
 .no-access>svg{position:relative;z-index:1;width:54px;height:54px;padding:15px;border-radius:16px;background:#eff6ef;color:#5a8a69;box-shadow:0 9px 25px rgba(45,95,63,.09)}.no-access h2{position:relative;z-index:1;margin:18px 0 7px;font:700 24px 'Sansation',sans-serif;color:#294036;letter-spacing:-.04em}.no-access p{position:relative;z-index:1;max-width:390px;margin:0 0 17px;color:#8b9892;font-size:11px;line-height:1.6}.no-access .text-link{position:relative;z-index:1}
 html[data-theme="dark"] .no-access{background:radial-gradient(circle at 50% 0%,rgba(218,175,81,.08),transparent 11rem),linear-gradient(145deg,#151d1a,#111815);border-color:#29362f}.html[data-theme="dark"] .no-access h2{color:#edf3ee}
 html[data-theme="dark"] .no-access h2{color:#edf3ee}html[data-theme="dark"] .no-access p{color:#9ca9a2}
+
+/* Admin self attendance */
+.admin-self-attendance-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px;align-items:stretch;padding:24px 26px;margin-bottom:22px;border:1px solid var(--line);background:var(--paper-2);box-shadow:var(--shadow-sm);}
+.admin-self-attendance-copy{min-width:0;}
+.admin-self-attendance-kicker{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--muted);}
+.admin-self-attendance-kicker small{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:0;color:var(--muted);}
+.admin-self-attendance-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-top:10px;}
+.admin-self-attendance-heading h2{margin:0;font-size:23px;line-height:1.15;}
+.admin-self-attendance-heading p{margin:7px 0 0;color:var(--muted);max-width:720px;}
+.admin-self-attendance-status{flex:0 0 auto;display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:999px;background:var(--paper);border:1px solid var(--line);font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;}
+.admin-self-attendance-status-ready{color:var(--muted);}
+.admin-self-attendance-status-in-progress{color:var(--green);}
+.admin-self-attendance-status-complete{color:var(--muted);}
+.admin-self-attendance-status-holiday{color:var(--gold);}
+.admin-self-attendance-actions{display:flex;gap:10px;margin-top:17px;}
+.admin-self-attendance-error{display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--red);background:var(--red-soft);color:var(--red);font-size:13px;}
+.admin-self-attendance-error .text-button{margin-left:auto;}
+.admin-self-attendance-holiday{display:flex;align-items:center;gap:8px;margin-top:16px;color:var(--muted);font-size:13px;}
+.admin-self-attendance-facts{min-width:230px;display:grid;grid-template-columns:1fr 1fr;align-content:center;gap:1px;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--line);}
+.admin-self-attendance-facts>div{min-height:78px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:14px;background:var(--paper);}
+.admin-self-attendance-facts span{font-size:9px;font-weight:800;letter-spacing:.12em;color:var(--muted);}
+.admin-self-attendance-facts b{font-size:14px;line-height:1.2;}
+@media (max-width:900px){.admin-self-attendance-card{grid-template-columns:1fr;}.admin-self-attendance-facts{min-width:0;}}
+@media (max-width:560px){.admin-self-attendance-card{padding:20px;}.admin-self-attendance-heading{flex-direction:column;}.admin-self-attendance-actions{flex-direction:column;}.admin-self-attendance-actions .button{width:100%;}.admin-self-attendance-kicker small{display:none;}}
