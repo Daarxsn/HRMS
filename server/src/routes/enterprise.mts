@@ -155,6 +155,11 @@ router.patch('/admin/policies/:id',adminLimiter,asyncRoute(async(req,res)=>{
   if(input.status==='PUBLISHED') sets.push('published_at=COALESCE(published_at,UTC_TIMESTAMP())');
   if(input.status==='DRAFT'||input.status==='ARCHIVED') sets.push('published_at=NULL');
   values.push(req.params.id); const result=await query('UPDATE company_policies SET '+sets.join(',')+' WHERE id=?',values); if(!result.affectedRows) throw Object.assign(new Error('Policy not found.'),{status:404});
+  if(input.status==='PUBLISHED') {
+    const policy=await query('SELECT title,version FROM company_policies WHERE id=:id LIMIT 1',{id:req.params.id});
+    const recipients=await query("SELECT id FROM employees WHERE status='ACTIVE' AND role='EMPLOYEE'");
+    await Promise.all(recipients.map((person)=>notify(person.id,'New HR policy published',policy[0]?.title+` · version ${policy[0]?.version}`,'ANNOUNCEMENT',{type:'policy',id:req.params.id})));
+  }
   await audit({actorId:req.user.id,action:'POLICY_UPDATED',entityType:'company_policy',entityId:req.params.id,details:{fields:Object.keys(input)},ipAddress:req.ip}); res.json({ok:true});
 }));
 
