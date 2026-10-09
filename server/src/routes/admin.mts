@@ -146,6 +146,19 @@ router.post('/users', adminMutationLimiter, asyncRoute(async (req, res) => {
     id, code: input.employeeCode, name: input.fullName, email: input.email.toLowerCase(), role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE', userType,
     title: input.title || input.position || 'Employee', position: input.position || input.title || 'Employee', branch: input.branch, department: input.department, phone: input.phone || null, joined, probation, wfh: input.wfhEnabled
   });
+  await transaction(async (connection) => {
+    await connection.execute(`INSERT INTO employment_history (id,employee_id,event_type,effective_date,title,department,branch,notes,created_by)
+      VALUES (?,?,?,?,?,?,?, ?,?)`, [
+      crypto.randomUUID(), id, 'JOINED', joined, input.title || input.position || 'Employee',
+      input.department, input.branch, 'Initial employee lifecycle record.', req.user.id
+    ]);
+    for (const [title, category] of [['Verify identity documents','DOCUMENTS'],['Complete HR profile','PROFILE'],['Confirm company policies','POLICIES']]) {
+      await connection.execute(`INSERT INTO onboarding_tasks (id,employee_id,title,category,due_date,status,created_by)
+        VALUES (?,?,?,?,DATE_ADD(?,INTERVAL 7 DAY),'PENDING',?)`, [
+        crypto.randomUUID(), id, title, category, joined, req.user.id
+      ]);
+    }
+  });
   await audit({ actorId: req.user.id, action: 'EMPLOYEE_CREATED', entityType: 'employee', entityId: id, details: { employee_code: input.employeeCode, role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE' }, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
