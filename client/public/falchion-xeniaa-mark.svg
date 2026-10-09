@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title"><title>Falchion Xeniaa</title>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#15221e"/>
+  <path d="M35 36h45v12H49v14h27v12H49v18H35z" fill="#DAAF51"/>
+  <path d="M78 36h15L79 63l15 29H78L70 75l-8 17H47l15-29-15-27h15l8 16z" fill="#F3C75E"/>
+  <circle cx="99" cy="28" r="5" fill="#A92F2D"/>
+</svg>
