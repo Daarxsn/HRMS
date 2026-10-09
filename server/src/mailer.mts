@@ -1,6 +1,16 @@
 import net from 'node:net';
 import tls from 'node:tls';
 
+type SmtpResponse = { code: number; lines: string[] };
+
+type PendingResponse = {
+  code: number;
+  lines: string[];
+  resolve: (response: SmtpResponse) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
 export type EmailMessage = {
   to: string[];
   subject: string;
@@ -43,7 +53,7 @@ function escapeHtml(value: unknown) {
 class SmtpClient {
   socket;
   buffer = '';
-  pending = [];
+  pending: PendingResponse[] = [];
   closed = false;
 
   constructor(socket, timeoutMs) {
@@ -59,7 +69,7 @@ class SmtpClient {
 
   timeoutMs;
 
-  consume(chunk) {
+  consume(chunk: string) {
     this.buffer += chunk;
     while (this.buffer.includes('\n')) {
       const index = this.buffer.indexOf('\n');
@@ -81,7 +91,7 @@ class SmtpClient {
     }
   }
 
-  fail(error) {
+  fail(error: Error) {
     while (this.pending.length) {
       const current = this.pending.shift();
       clearTimeout(current.timer);
@@ -89,8 +99,8 @@ class SmtpClient {
     }
   }
 
-  readResponse() {
-    return new Promise((resolve, reject) => {
+  readResponse(): Promise<SmtpResponse> {
+    return new Promise<SmtpResponse>((resolve, reject) => {
       const entry = {
         code: 0,
         lines: [],
@@ -106,11 +116,11 @@ class SmtpClient {
     });
   }
 
-  write(value) {
+  write(value: string | Buffer) {
     this.socket.write(value);
   }
 
-  async command(command, expected) {
+  async command(command: string, expected: number[]): Promise<SmtpResponse> {
     this.write(command + '\r\n');
     const response = await this.readResponse();
     if (!expected.includes(response.code)) {
@@ -119,29 +129,35 @@ class SmtpClient {
     return response;
   }
 
-  async close() {
+  detach() {
+    this.socket.removeAllListeners('data');
+    this.socket.removeAllListeners('error');
+    this.socket.removeAllListeners('close');
+  }
+
+  async close(): Promise<void> {
     this.closed = true;
     this.socket.end();
     await new Promise((resolve) => this.socket.once('close', resolve));
   }
 }
 
-const openSocket = async (config) => {
+const openSocket = async (config): Promise<SmtpClient> => {
   const socket = config.secure
     ? tls.connect({
         host: config.host,
         port: config.port,
-        serverName: config.host,
+        servername: config.host,
         minVersion: 'TLSv1.2',
         rejectUnauthorized: true
       })
     : net.createConnection({ host: config.host, port: config.port });
 
-  if (config.secure) await new Promise((resolve, reject) => {
+  if (config.secure) await new Promise<void>((resolve, reject) => {
     socket.once('secureConnect', resolve);
     socket.once('error', reject);
   });
-  else await new Promise((resolve, reject) => {
+  else await new Promise<void>((resolve, reject) => {
     socket.once('connect', resolve);
     socket.once('error', reject);
   });
@@ -149,15 +165,17 @@ const openSocket = async (config) => {
   return new SmtpClient(socket, config.timeoutMs);
 };
 
-const startTls = async (client, config) => {
+const startTls = async (client: SmtpClient, config): Promise<SmtpClient> => {
   await client.command('STARTTLS', [220]);
+  const rawSocket = client.socket as net.Socket;
+  client.detach();
   const upgraded = tls.connect({
-    socket: client.socket,
-    serverName: config.host,
+    socket: rawSocket,
+    servername: config.host,
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
   });
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     upgraded.once('secureConnect', resolve);
     upgraded.once('error', reject);
   });
@@ -169,7 +187,7 @@ const startTls = async (client, config) => {
 
 const dotStuff = (body) => body.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
 
-const buildMessage = (message) => {
+const buildMessage = (message: EmailMessage) => {
   const from = emailAddress(getConfig().from);
   const to = message.to.map(emailAddress).filter(Boolean);
   return [
@@ -197,7 +215,7 @@ const buildMessage = (message) => {
   ].join('\r\n');
 };
 
-export async function sendEmail(message) {
+export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean; skipped: boolean }> {
   if (!smtpConfigured()) return { sent: false, skipped: true };
 
   const config = getConfig();
@@ -210,11 +228,11 @@ export async function sendEmail(message) {
     if (greeting.code !== 220) throw new Error('SMTP greeting failed (' + greeting.code + ').');
 
     const ehlo = await client.command('EHLO falchionxeniaa-hrms', [250]);
-    if (!config.secure && ehlo.lines.some((line) => /^STARTTLS(?: |$)/i.test(line.trim()))) {
+    if (!config.secure) {
+      if (!ehlo.lines.some((line) => /^STARTTLS(?: |$)/i.test(line.trim()))) throw new Error('SMTP server does not advertise STARTTLS.');
       client = await startTls(client, config);
     }
 
-    if (!config.secure && !ehlo.lines.some((line) => /^STARTTLS(?: |$)/i.test(line.trim()))) {
       throw new Error('SMTP server does not advertise STARTTLS.');
     }
 
