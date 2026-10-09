@@ -7,7 +7,7 @@ import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
-import { htmlEscape, sendEmail, smtpConfigured } from '../email.mts';
+import { htmlEscape, sendEmail, smtpConfigured } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
