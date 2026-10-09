@@ -74,3 +74,14 @@ CREATE TABLE IF NOT EXISTS separation_cases (
   CONSTRAINT fk_separation_creator FOREIGN KEY (created_by) REFERENCES employees(id),
   INDEX idx_separation_status_date (status, last_working_date), INDEX idx_separation_employee (employee_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Backfill a durable joined event for employees that already existed before Phase 44.
+INSERT INTO employment_history (id,employee_id,event_type,effective_date,title,department,branch,notes,created_by)
+SELECT UUID(), e.id, 'JOINED', e.joined_on, e.title, e.department, e.branch,
+       'Backfilled from the existing employee record.',
+       (SELECT id FROM employees WHERE role='ADMIN' AND status='ACTIVE' ORDER BY created_at, id LIMIT 1)
+FROM employees e
+WHERE NOT EXISTS (
+  SELECT 1 FROM employment_history h
+  WHERE h.employee_id=e.id AND h.event_type='JOINED' AND h.effective_date=e.joined_on
+);
