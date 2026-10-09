@@ -1897,3 +1897,43 @@ img{max-width:100%}
   .person-drawer,.modal-card{animation:none!important}
   .mobile-bottom-item svg{transition:none}
 }
+
+/* Mobile thumb-zone attendance dock */
+.mobile-attendance-dock{display:none}
+@media(max-width:720px){
+  .mobile-attendance-dock{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    position:fixed;
+    left:max(12px,env(safe-area-inset-left));
+    right:max(12px,env(safe-area-inset-right));
+    bottom:calc(80px + env(safe-area-inset-bottom));
+    z-index:68;
+    min-height:58px;
+    padding:8px 9px 8px 12px;
+    border:1px solid rgba(219,227,221,.98);
+    border-radius:16px;
+    background:rgba(255,255,255,.96);
+    box-shadow:0 13px 35px rgba(12,31,23,.16);
+    backdrop-filter:blur(18px);
+  }
+  .mobile-attendance-dock-status{display:flex;align-items:center;gap:9px;min-width:0;flex:1}
+  .mobile-attendance-dock-status>span:last-child{min-width:0}
+  .mobile-attendance-dock-status b,.mobile-attendance-dock-status small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-attendance-dock-status b{font-size:10px;color:#354a41}
+  .mobile-attendance-dock-status small{margin-top:2px;font-size:8px;color:#89968f}
+  .mobile-attendance-dock .button{min-height:40px;padding:0 13px;border-radius:11px}
+  .mobile-attendance-dock-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border-radius:11px;background:#eef5ef;color:#2f6d54;font-size:10px;font-weight:800}
+  html[data-theme="dark"] .mobile-attendance-dock{background:rgba(18,25,22,.96);border-color:#2a3731;box-shadow:0 16px 42px rgba(0,0,0,.42)}
+  html[data-theme="dark"] .mobile-attendance-dock-status b{color:#e4ede7}
+  html[data-theme="dark"] .mobile-attendance-dock-status small{color:#9ca9a2}
+  html[data-theme="dark"] .mobile-attendance-dock-link{background:#203229;color:#d9e8de}
+}
+@media(max-width:420px){
+  .mobile-attendance-dock{bottom:calc(78px + env(safe-area-inset-bottom));border-radius:15px}
+  .mobile-attendance-dock .button,.mobile-attendance-dock-link{min-height:38px}
+}
+@media(prefers-reduced-motion:reduce){
+  .mobile-attendance-dock{transition:none}
+}
