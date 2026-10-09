@@ -111,6 +111,21 @@ class SmtpSession {
   }
 }
 
+async function waitForConnection(socket: net.Socket | tls.TLSSocket, event: 'connect' | 'secureConnect') {
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => {
+      socket.off(event, onConnect);
+      reject(error);
+    };
+    const onConnect = () => {
+      socket.off('error', onError);
+      resolve();
+    };
+    socket.once(event, onConnect);
+    socket.once('error', onError);
+  });
+}
+
 async function connectSession() {
   if (smtpSecure()) {
     const socket = tls.connect({
@@ -120,12 +135,12 @@ async function connectSession() {
       minVersion: 'TLSv1.2',
       rejectUnauthorized: true
     });
-    await once(socket, 'secureConnect');
+    await waitForConnection(socket, 'secureConnect');
     return new SmtpSession(socket);
   }
 
   const socket = net.createConnection({ host: smtpHost(), port: smtpPort() });
-  await once(socket, 'connect');
+  await waitForConnection(socket, 'connect');
   return new SmtpSession(socket);
 }
 
@@ -139,7 +154,7 @@ async function upgradeToStartTls(session: SmtpSession) {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
   });
-  await once(secureSocket, 'secureConnect');
+  await waitForConnection(secureSocket, 'secureConnect');
   return new SmtpSession(secureSocket);
 }
 
