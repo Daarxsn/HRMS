@@ -26,6 +26,7 @@ const getConfig = () => ({
   password: String(process.env.SMTP_PASSWORD || ''),
   from: String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim(),
   secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+  required: String(process.env.SMTP_REQUIRED || 'false').toLowerCase() === 'true',
   timeoutMs: Math.max(3000, Number(process.env.SMTP_TIMEOUT_MS || 15000))
 });
 
@@ -216,7 +217,10 @@ const buildMessage = (message: EmailMessage) => {
 };
 
 export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean; skipped: boolean }> {
-  if (!smtpConfigured()) return { sent: false, skipped: true };
+  if (!smtpConfigured()) {
+    if (getConfig().required) throw new Error('SMTP is required but not fully configured.');
+    return { sent: false, skipped: true };
+  }
 
   const config = getConfig();
   const recipients = (message.to || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
