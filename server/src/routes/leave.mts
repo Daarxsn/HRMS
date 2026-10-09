@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendEmail } from '../mailer.mts';
+import { htmlEscape, sendEmail, smtpConfigured } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
@@ -18,6 +18,7 @@ async function emailLeaveRequestToAdmins(request) {
   const origin = String(process.env.APP_ORIGIN || '').replace(/\/$/, '');
   const approvalUrl = origin ? origin + '/admin/approvals' : '';
   const attachmentNote = request.attachmentId ? 'Supporting document: attached in the HRMS request record.' : 'Supporting document: none.';
+  let sentCount = 0;
   await Promise.allSettled(admins.map(async (admin) => {
     try {
       const subject = 'Leave request · ' + request.employeeName + ' · ' + request.leaveType;
@@ -51,7 +52,8 @@ async function emailLeaveRequestToAdmins(request) {
         + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
         + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
         + '</div></body></html>';
-      await sendEmail({ to:[String(admin.email)], subject, text, html, replyTo:request.employeeEmail });
+      const result = await sendEmail({ to:[String(admin.email)], subject, text, html, replyTo:request.employeeEmail });
+      if (result.sent) sentCount += 1;
     } catch (error) {
       console.warn(JSON.stringify({ type:'leave_request_email_failed', request_id:request.id, recipient:String(admin.email), error:String(error?.message || error) }));
     }
