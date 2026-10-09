@@ -26,8 +26,8 @@ export function accessFor(user: any) {
     role: user.role,
     userType: user.user_type,
     capabilities: platform === 'ADMIN'
-      ? ['admin_dashboard','people_management','attendance_review','approvals','reports','office_settings','audit_trail','holiday_calendar','profile','notifications']
-      : ['employee_dashboard','attendance','leave','work_from_home','temporary_exit','notifications','holiday_calendar','profile']
+      ? ['admin_dashboard','people_management','employee_lifecycle','attendance_review','approvals','reports','office_settings','audit_trail','holiday_calendar','hr_operations','asset_register','policy_center','offboarding','security_controls','profile','notifications']
+      : ['employee_dashboard','attendance','leave','work_from_home','temporary_exit','notifications','holiday_calendar','policy_center','profile']
   };
 }
 
