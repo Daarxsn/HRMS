@@ -430,16 +430,61 @@ function TodayDrawer({row,holiday,close}){
   return <div className="drawer-backdrop" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><aside className="person-drawer today-drawer" role="dialog" aria-modal="true" aria-label="Today attendance details"><div className="drawer-cover"><button className="icon-button drawer-close" onClick={close} aria-label="Close"><X size={18}/></button><div className="drawer-attendance-mark"><CalendarDays size={23}/></div></div><div className="drawer-body"><div className="drawer-heading"><div><span className="eyebrow">TODAY</span><h2>{new Intl.DateTimeFormat('en-IN',{weekday:'long'}).format(new Date(today+'T12:00:00'))}</h2><p>{formatDate(today,{day:'numeric',month:'long',year:'numeric'})}</p></div><span className="today-status-badge">{status}</span></div><div className="today-drawer-status"><span className="pulse-dot"/><b>{status==='Complete'?'Your attendance is complete.':status==='In progress'?'Your workday is underway.':status==='Holiday'?'No attendance action is expected today.':'Your attendance has not started yet.'}</b></div><div className="drawer-section"><span className="eyebrow">DAY DETAIL</span><div className="drawer-facts"><div><small>Day type</small><b>{dayType}</b></div><div><small>Check-in</small><b>{row?.check_in_at?formatTime(row.check_in_at):'—'}</b></div><div><small>Check-out</small><b>{row?.check_out_at?formatTime(row.check_out_at):row?.check_in_at?'In progress':'—'}</b></div><div><small>Verification</small><b>{row?.check_in_method||'—'}</b></div><div><small>Office</small><b>Falchion Xeniaa · Pune HQ</b></div><div><small>Location record</small><b>{row?.check_in_distance_m!=null?Math.round(row.check_in_distance_m)+' m from HQ':row?.check_in_method==='WFH'?'Not required':'Not recorded'}</b></div></div></div><div className="today-drawer-note"><ShieldCheck size={16}/><span>Location is checked only when you choose an attendance action. This view does not run background tracking.</span></div></div></aside></div>;
 }
 function AttendancePage(){
-  const {notify,refresh}=useApp();
-  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);
-  const load=async()=>{setLoading(true);setError('');try{const [a,c]=await Promise.all([get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`)]);setRows(a.records||[]);setTodayHoliday((c.holidays||[]).find((h)=>h.date===today)||null);}catch(e){setError(e.message);}finally{setLoading(false);}};
-  useEffect(()=>{load();},[]);
-  const current=rows.find((r)=>r.attendance_date===today);const statusLabel=todayHoliday?'Holiday':current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';
+  const {user,notify,refresh}=useApp();
+  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [actionBusy,setActionBusy]=useState(false);const [actionError,setActionError]=useState('');const [wfhData,setWfhData]=useState({enabled:false,requests:[]});
+  const load=async()=>{
+    setLoading(true);setError('');
+    try{
+      const requests=[get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`)];
+      if(user?.role!=='ADMIN') requests.push(get('/wfh'));
+      const [a,cal,w]=await Promise.all(requests);
+      setRows(a.records||[]);
+      setTodayHoliday((cal.holidays||[]).find((h)=>h.date===today)||null);
+      if(user?.role!=='ADMIN') setWfhData({enabled:Boolean(w?.enabled),requests:w?.requests||[]});
+    }catch(e){setError(e.message);}finally{setLoading(false);}
+  };
+  useEffect(()=>{load();const interval=window.setInterval(load,30000);return()=>window.clearInterval(interval);},[user?.role]);
+  const current=rows.find((r)=>r.attendance_date===today);
+  const approvedWfhToday=user?.role!=='ADMIN'&&wfhData.enabled&&wfhData.requests.some((r)=>r.request_date===today&&r.status==='APPROVED');
+  const requestLocation=()=>new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
+    let best=null;let settled=false;let watchId=null;let timeoutId=null;
+    const finish=(error,value)=>{if(settled)return;settled=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(timeoutId!==null)window.clearTimeout(timeoutId);error?reject(error):resolve(value);};
+    const onPosition=({coords})=>{const candidate={latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy};if(!best||candidate.accuracy<best.accuracy)best=candidate;if(candidate.accuracy<=100)finish(null,candidate);};
+    const onError=(geoError)=>{if(geoError.code===1)finish(new Error('Location access is required for office attendance. Allow location access for this site and try again.'));else if(best&&best.accuracy<=100)finish(null,best);};
+    watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error('We could not get your current location. Allow location access and try again.')),10000);
+  });
+  const punch=async(type)=>{
+    setActionBusy(true);setActionError('');
+    try{
+      const method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
+      const geo=method==='GPS'?await requestLocation():{};
+      await post(`/attendance/${type}`,{method,...geo});
+      await load();
+      notify(type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.'));
+    }catch(e){setActionError(e.message);}
+    finally{setActionBusy(false);}
+  };const statusLabel=todayHoliday?'Holiday':current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';
   const presentRows=rows.filter((r)=>['ON_TIME','LATE_ENTRY'].includes(r.status)||r.check_in_at);const lateRows=rows.filter((r)=>r.status==='LATE_ENTRY');const absentRows=rows.filter((r)=>r.status==='ABSENT');const leaveRows=rows.filter((r)=>r.status==='ON_LEAVE');const considered=Math.max(1,presentRows.length+absentRows.length);const healthPercent=Math.round((presentRows.length/considered)*100);
   return <>
     <PageTitle eyebrow="YOUR TIME, YOUR RECORD" title="Attendance" description="A clear history of your attendance without exposing worked-hour details." action={<button className="button button-soft" onClick={load}><RefreshCw size={16}/> Refresh</button>}/>
     {error&&<InlineError>{error}</InlineError>}
-    <Card className="attendance-overview-card attendance-redesign"><div className="attendance-overview-main"><div className="eyebrow">TODAY · {today}</div><h2>{todayHoliday?todayHoliday.name:statusLabel==='Complete'?'Attendance recorded.':statusLabel==='In progress'?`You checked in at ${formatTime(current.check_in_at)}.`:'Your attendance starts from Overview.'}</h2><p>{todayHoliday?'No attendance action is expected today.':statusLabel==='Complete'?'Today’s attendance record is complete.':statusLabel==='In progress'?'Your attendance is in progress. Check out later from the Overview.':'Use the Overview page for the check-in and check-out action.'}</p><div className="attendance-overview-meta"><span><Clock3 size={15}/> Report time · 9:00–9:30 AM</span><span><ShieldCheck size={15}/> One-time verification</span><span><MapPin size={15}/> Pune HQ</span></div></div><div className="attendance-overview-state"><div className="attendance-state-ring"><Clock3 size={28}/></div><b>{statusLabel}</b>{!todayHoliday&&<Link className="button button-primary button-small" to="/">Go to Overview</Link>}</div></Card>
+    <Card className="attendance-overview-card attendance-redesign">
+      <div className="attendance-overview-main">
+        <div className="attendance-overview-kicker"><span className="eyebrow">TODAY · {today}</span><span className="attendance-live-badge"><i className="pulse-dot"/> LIVE</span></div>
+        <h2>{todayHoliday?todayHoliday.name:statusLabel==='Complete'?'Attendance recorded.':statusLabel==='In progress'?'You checked in at '+formatTime(current.check_in_at)+'.':'Ready when you are.'}</h2>
+        <p>{todayHoliday?'No attendance action is expected today.':statusLabel==='Complete'?'Your attendance entry is complete for today.':statusLabel==='In progress'?'Your workday is underway. Check out when you finish.':approvedWfhToday?'You have an approved WFH day. Check in remotely when you start.':'Check in when you arrive. Your office location is verified only when you press the attendance action.'}</p>
+        {actionError&&<div className="attendance-action-error" role="alert"><CircleAlert size={15}/><span>{actionError}</span><button type="button" onClick={()=>setActionError('')} aria-label="Dismiss"><X size={14}/></button></div>}
+        <div className="attendance-overview-meta"><span><Clock3 size={15}/> 9:00–9:30 AM report window</span><span><ShieldCheck size={15}/> One-time verification</span><span>{approvedWfhToday?<House size={15}/>:<MapPin size={15}/>} {approvedWfhToday?'Approved WFH':'Pune HQ'}</span></div>
+      </div>
+      <div className="attendance-overview-state">
+        <div className={'attendance-state-ring attendance-state-'+statusLabel.toLowerCase().replaceAll(' ','-')}>{statusLabel==='Complete'?<Check size={28}/>:statusLabel==='In progress'?<Clock3 size={28}/>:todayHoliday?<CalendarDays size={28}/>:<Fingerprint size={28}/>}</div>
+        <b>{statusLabel}</b>
+        {todayHoliday?<Link className="button button-soft button-small" to="/calendar">View calendar</Link>:statusLabel==='In progress'?<Button size="small" loading={actionBusy} icon={LogOut} onClick={()=>punch('check-out')}>Check out</Button>:statusLabel==='Complete'?<Link className="button button-soft button-small" to="/">Overview</Link>:<Button size="small" loading={actionBusy} icon={LogIn} onClick={()=>punch('check-in')}>{approvedWfhToday?'Check in remotely':'Check in'}</Button>}
+        <small className="attendance-last-updated">Auto-refreshes every 30 sec</small>
+      </div>
+    </Card>
     <Card className="attendance-health-card"><div className="attendance-health-head"><div><span className="eyebrow">ATTENDANCE PATTERN</span><h2>Your year at a glance</h2><p>A calm summary of the days recorded so far.</p></div><div className="attendance-health-score"><b>{loading?"—":healthPercent}%</b><small>present pattern</small></div></div><div className="attendance-health-metrics"><div><span className="health-bar green"/><b>{loading?"—":presentRows.length}</b><small>Present</small></div><div><span className="health-bar red"/><b>{loading?"—":lateRows.length}</b><small>Late</small></div><div><span className="health-bar gold"/><b>{loading?"—":leaveRows.length}</b><small>Leave</small></div><div><span className="health-bar gray"/><b>{loading?"—":absentRows.length}</b><small>Absent</small></div></div></Card>
     <AttendanceHistoryExplorer rows={rows} loading={loading} />
     <div className="attendance-support-grid"><Card className="help-card"><div className="help-top"><span><CircleHelp size={17}/></span><h3>Need to correct a day?</h3></div><p>Forgot to check in, check out, or had a location issue? Ask an administrator to review the day.</p><button className="text-link" onClick={()=>setCorrectionOpen(true)}>Request correction <ArrowRight size={14}/></button></Card><Card className="help-card flex-help"><div className="help-top"><span><Timer size={17}/></span><h3>Need a flex start?</h3></div><p>Request an adjusted start between 9:00 and 10:30 AM for administrator approval.</p><button className="text-link" onClick={()=>setFlexOpen(true)}>Request flex start <ArrowRight size={14}/></button></Card></div>
