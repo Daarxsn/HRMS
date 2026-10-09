@@ -90,7 +90,14 @@ function App() {
     });
     return()=>{live=false;};
   },[]);
-  useEffect(()=>{ if(!user)return; refreshNotifications(); const timer=window.setInterval(refreshNotifications,60000); return()=>window.clearInterval(timer); },[user,refresh]);
+  useEffect(()=>{
+    if(!user)return;
+    const refreshWhenVisible=()=>{if(document.visibilityState==='visible')refreshNotifications();};
+    refreshWhenVisible();
+    const timer=window.setInterval(refreshWhenVisible,60000);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refreshWhenVisible);};
+  },[user,refresh]);
   useEffect(()=>{
     const onSessionExpired=()=>{
       setUser(null);
@@ -174,7 +181,7 @@ function Shell(){
       <nav className="main-nav">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
       <div className="nav-bottom"><div className="nav-caption">ACCOUNT</div><NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><CircleUserRound size={18} strokeWidth={1.8}/><span>My profile</span></NavLink><button className="nav-link nav-logout" onClick={logout}><LogOut size={18} strokeWidth={1.8}/><span>Sign out</span></button></div>
       <div className="sidebar-note"><div className="note-spark"><Sparkles size={15}/></div><p><b>Work with trust.</b><br/>Presence is shared when you choose to check in. No background tracking.</p></div>
-      <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{user.role==='ADMIN'?'Administrator':user.user_type==='INTERN'?'Intern':'Employee'}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
+      <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt="" loading="lazy" decoding="async"/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{user.role==='ADMIN'?'Administrator':user.user_type==='INTERN'?'Intern':'Employee'}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
     <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Open command menu"><Command size={15}/><span>Search</span><kbd>⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</Link></div></header>
       <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
@@ -333,10 +340,12 @@ function AdminSelfAttendanceCard(){
     }catch(e){setError(e.message);}finally{setLoading(false);}
   };
   useEffect(()=>{
-    load();
-    const timer=window.setInterval(load,30000);
-    const clock=window.setInterval(()=>setTime(new Date()),30000);
-    return()=>{window.clearInterval(timer);window.clearInterval(clock);};
+    const refreshWhenVisible=()=>{if(document.visibilityState==='visible')load();};
+    refreshWhenVisible();
+    const timer=window.setInterval(refreshWhenVisible,30000);
+    const clock=window.setInterval(()=>{if(document.visibilityState==='visible')setTime(new Date());},30000);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+    return()=>{window.clearInterval(timer);window.clearInterval(clock);document.removeEventListener('visibilitychange',refreshWhenVisible);};
   },[]);
   const getLocation=()=>new Promise((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
@@ -443,7 +452,13 @@ function AttendancePage(){
       if(user?.role!=='ADMIN') setWfhData({enabled:Boolean(w?.enabled),requests:w?.requests||[]});
     }catch(e){setError(e.message);}finally{setLoading(false);}
   };
-  useEffect(()=>{load();const interval=window.setInterval(load,30000);return()=>window.clearInterval(interval);},[user?.role]);
+  useEffect(()=>{
+    const refreshWhenVisible=()=>{if(document.visibilityState==='visible')load();};
+    refreshWhenVisible();
+    const interval=window.setInterval(refreshWhenVisible,30000);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+    return()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',refreshWhenVisible);};
+  },[user?.role]);
   const current=rows.find((r)=>r.attendance_date===today);
   const approvedWfhToday=user?.role!=='ADMIN'&&wfhData.enabled&&wfhData.requests.some((r)=>r.request_date===today&&r.status==='APPROVED');
   const requestLocation=()=>new Promise((resolve,reject)=>{
@@ -785,7 +800,7 @@ function ProfilePage(){
       <Card className="profile-identity-card">
         <div className="profile-identity">
           <div className="profile-identity-avatar">
-            {photoSrc?<img src={photoSrc} alt={profile.full_name}/>:initials(profile.full_name)}
+            {photoSrc?<img src={photoSrc} alt={profile.full_name} loading="lazy" decoding="async"/>:initials(profile.full_name)}
           </div>
           <div className="profile-identity-copy">
             <h2>{profile.full_name}</h2>
