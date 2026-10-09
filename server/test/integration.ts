@@ -133,10 +133,18 @@ try {
   assert.equal(adminHealth.data.databaseLatencyMs >= 0, true);
   assert.ok(adminHealth.data.mysqlVersion);
 
-  const adminAttendanceAttempt = await request('/attendance', {
+  const adminAttendanceAccess = await request('/attendance', {
     headers: { Cookie: adminSession.cookie }
   });
-  assert.equal(adminAttendanceAttempt.response.status, 403);
+  assert.equal(adminAttendanceAccess.response.status, 200);
+  assert.ok(Array.isArray(adminAttendanceAccess.data.records));
+
+  const adminAttendanceValidation = await request('/attendance/check-in', {
+    method: 'POST',
+    headers: { Cookie: adminSession.cookie },
+    body: JSON.stringify({})
+  });
+  assert.equal(adminAttendanceValidation.response.status, 400);
 
   const adminLeaveAttempt = await request('/leave', {
     headers: { Cookie: adminSession.cookie }
