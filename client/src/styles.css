@@ -2027,3 +2027,25 @@ html[data-theme="dark"] .employee-mobile-quick-actions i,html[data-theme="dark"]
   html[data-theme="dark"] .mobile-request-action{background:#1f3028;border-color:#32483c;color:#cfe2d5}
 }
 @media(min-width:721px){.mobile-request-list{display:none!important}}
+
+/* Mobile admin attendance review cards */
+.mobile-admin-attendance-list{display:none}
+@media(max-width:720px){
+  .mobile-admin-attendance-list{display:grid;gap:8px;margin-top:10px}
+  .mobile-admin-attendance-card{width:100%;padding:14px;text-align:left;border:1px solid #e5ebe7;border-radius:15px;background:linear-gradient(145deg,#fff,#fafcf9);box-shadow:var(--shadow-xs);color:inherit}
+  .mobile-admin-attendance-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .mobile-admin-attendance-top .person-cell{min-width:0}
+  .mobile-admin-attendance-top .status{flex:0 0 auto}
+  .mobile-admin-attendance-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid #edf1ed}
+  .mobile-admin-attendance-grid span{display:block;min-width:0}
+  .mobile-admin-attendance-grid small{display:block;font-size:7px;letter-spacing:.1em;color:#9aa69f;font-weight:800}
+  .mobile-admin-attendance-grid b{display:block;margin-top:3px;font-size:10px;color:#485b52;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-admin-attendance-foot{display:flex;align-items:center;gap:7px;margin-top:11px;padding-top:9px;border-top:1px solid #edf1ed;color:#89968f;font-size:8px}
+  .mobile-admin-attendance-foot span{display:inline-flex;align-items:center;gap:4px}
+  .mobile-admin-attendance-foot span:last-of-type{margin-left:auto}
+  html[data-theme="dark"] .mobile-admin-attendance-card{background:#151d1a;border-color:#29362f}
+  html[data-theme="dark"] .mobile-admin-attendance-grid,html[data-theme="dark"] .mobile-admin-attendance-foot{border-color:#29362f}
+  html[data-theme="dark"] .mobile-admin-attendance-grid b{color:#dbe6df}
+  html[data-theme="dark"] .mobile-admin-attendance-grid small,html[data-theme="dark"] .mobile-admin-attendance-foot{color:#9ba8a1}
+}
+@media(min-width:721px){.mobile-admin-attendance-list{display:none!important}}
