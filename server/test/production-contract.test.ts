@@ -71,6 +71,8 @@ assert.match(email,/SMTP_REQUIRED/);
 assert.match(email,/HR_NOTIFICATION_EMAIL/);
 assert.match(email,/sendHrNotificationEmail/);
 assert.match(email,/socket\.destroyed/);
+assert.match(email,/responsePromise = this\.readResponse\(\)/);
+assert.match(email,/greetingPromise = client\.readResponse\(\)/);
 assert.match(admin,/adminMutationLimiter/);
 assert.match(admin,/emailTestLimiter/);
 assert.match(admin,/sendHrNotificationEmail/);

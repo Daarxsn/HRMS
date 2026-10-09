@@ -122,8 +122,11 @@ class SmtpClient {
   }
 
   async command(command: string, expected: number[]): Promise<SmtpResponse> {
+    // Register the response waiter before writing so very fast SMTP servers cannot
+    // answer before the client starts listening.
+    const responsePromise = this.readResponse();
     this.write(command + '\r\n');
-    const response = await this.readResponse();
+    const response = await responsePromise;
     if (!expected.includes(response.code)) {
       throw new Error('SMTP command failed (' + response.code + ').');
     }
@@ -172,9 +175,11 @@ const openSocket = async (config): Promise<SmtpClient> => {
       })
     : net.createConnection({ host: config.host, port: config.port });
 
-  // Attach the SMTP protocol reader before waiting for TCP/TLS connection
-  // so the server greeting cannot arrive between connect and listener setup.
   const client = new SmtpClient(socket, config.timeoutMs);
+
+  // Register the greeting waiter before waiting for connection establishment.
+  // SMTP servers are allowed to send the 220 banner immediately.
+  const greetingPromise = client.readResponse();
 
   if (config.secure) {
     await new Promise<void>((resolve, reject) => {
@@ -188,6 +193,8 @@ const openSocket = async (config): Promise<SmtpClient> => {
     });
   }
 
+  const greeting = await greetingPromise;
+  if (greeting.code !== 220) throw new Error('SMTP greeting failed (' + greeting.code + ').');
   return client;
 };
 
@@ -253,9 +260,6 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
 
   let client = await openSocket(config);
   try {
-    const greeting = await client.readResponse();
-    if (greeting.code !== 220) throw new Error('SMTP greeting failed (' + greeting.code + ').');
-
     const ehlo = await client.command('EHLO falchionxeniaa-hrms', [250]);
     if (!config.secure) {
       if (!ehlo.lines.some((line) => /^STARTTLS(?: |$)/i.test(line.trim()))) throw new Error('SMTP server does not advertise STARTTLS.');
