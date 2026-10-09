@@ -233,8 +233,6 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
       client = await startTls(client, config);
     }
 
-      throw new Error('SMTP server does not advertise STARTTLS.');
-    }
 
     const authPlain = Buffer.from('\0' + config.user + '\0' + config.password).toString('base64');
     await client.command('AUTH PLAIN ' + authPlain, [235]);
