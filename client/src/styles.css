@@ -2215,3 +2215,27 @@ html[data-theme="dark"] .notification-page-item{background:#151d1a!important;bor
     box-shadow:inherit;
   }
 }
+
+/* Attendance daily action system */
+.attendance-overview-kicker{display:flex;align-items:center;gap:8px}
+.attendance-live-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border:1px solid rgba(218,175,81,.28);border-radius:999px;background:rgba(218,175,81,.09);color:#a17e30;font-size:7px;font-weight:800;letter-spacing:.08em}
+.attendance-live-badge .pulse-dot{width:5px;height:5px;background:#67AF7A}
+.attendance-action-error{display:flex;align-items:flex-start;gap:7px;margin-top:14px;padding:10px 11px;border:1px solid #efd2cf;border-radius:10px;background:#fff7f6;color:#a45f59;font-size:9px;line-height:1.45}
+.attendance-action-error svg{flex:0 0 auto;margin-top:1px}.attendance-action-error span{flex:1}
+.attendance-action-error button{border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:2px;cursor:pointer}
+.attendance-state-complete{background:#edf6ef;color:#5b8d68}.attendance-state-in-progress{background:#f5f0df;color:#9b7b37}.attendance-state-holiday{background:#f3f0e8;color:#8c8268}.attendance-state-not-checked-in{background:#eef4f0;color:#4f8067}
+.attendance-last-updated{font-size:7px;color:#9aa69f}
+html[data-theme="dark"] .attendance-live-badge{background:rgba(218,175,81,.08);border-color:#51482f;color:#cbb06c}
+html[data-theme="dark"] .attendance-action-error{background:#241818;border-color:#553332;color:#d29a94}
+@media(max-width:720px){
+  .attendance-overview-card{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;padding:18px!important}
+  .attendance-overview-main h2{font-size:21px!important}.attendance-overview-main p{font-size:10px!important;line-height:1.55!important}
+  .attendance-overview-meta{gap:7px!important;flex-direction:column!important}
+  .attendance-overview-state{min-width:0!important;display:grid!important;grid-template-columns:auto 1fr auto;grid-template-areas:"ring status action" "updated updated updated";align-items:center!important;text-align:left!important;gap:9px!important;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)}
+  .attendance-state-ring{grid-area:ring;width:58px!important;height:58px!important}.attendance-overview-state>b{grid-area:status;font-size:11px}
+  .attendance-overview-state>.button{grid-area:action;min-height:42px!important}.attendance-last-updated{grid-area:updated;margin-top:1px;text-align:right}
+}
+@media(max-width:420px){
+  .attendance-overview-state{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ring status" "action action" "updated updated"}
+  .attendance-overview-state>.button{width:100%}.attendance-last-updated{text-align:left}
+}
