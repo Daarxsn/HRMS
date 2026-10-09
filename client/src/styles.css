@@ -2270,3 +2270,37 @@ html[data-theme="dark"] .leave-request-preview-main small{color:#9eaaa3}
   .leave-upcoming-item{flex-basis:88vw}
   .leave-request-form>.button{bottom:calc(74px + env(safe-area-inset-bottom))}
 }
+
+/* WFH mobile request confidence layer */
+.wfh-request-preview{padding:11px 12px;border:1px solid #dfe9e1;border-radius:11px;background:linear-gradient(145deg,#f7fbf8,#fff);margin-top:1px}
+.wfh-request-preview-head{display:flex;align-items:center;justify-content:space-between;color:#6e8b79}
+.wfh-request-preview-head .eyebrow{font-size:7px}
+.wfh-request-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.wfh-request-preview-grid span{display:flex;align-items:flex-start;gap:7px;min-width:0}
+.wfh-request-preview-grid svg{flex:0 0 auto;color:#71977e;margin-top:1px}
+.wfh-request-preview-grid b,.wfh-request-preview-grid small{display:block}
+.wfh-request-preview-grid b{font-size:10px;color:#42574d;line-height:1.35}
+.wfh-request-preview-grid small{font-size:7px;color:#97a39c;margin-top:3px}
+html[data-theme="dark"] .wfh-request-preview{background:#18221e;border-color:#2d3d34}
+html[data-theme="dark"] .wfh-request-preview-grid b{color:#dce7e0}
+html[data-theme="dark"] .wfh-request-preview-grid small{color:#9eaaa3}
+@media(max-width:720px){
+  .wfh-usage-grid{display:grid!important;grid-template-columns:1.2fr .8fr!important;gap:7px!important}
+  .wfh-usage-main{grid-column:1/-1!important}
+  .wfh-banner{min-height:142px!important;padding:17px!important;border-radius:17px!important}
+  .wfh-banner h2{font-size:17px!important;max-width:72%!important}
+  .wfh-banner p{font-size:9px!important;line-height:1.5!important;max-width:72%!important}
+  .wfh-request-card{padding:17px!important;border-radius:17px!important}
+  .wfh-request-card .request-kind-toggle button{min-height:58px!important;padding:10px!important}
+  .wfh-request-card .form-field input,.wfh-request-card .form-field textarea{min-height:46px}
+  .wfh-request-card>.form-stack>.button{min-height:48px!important}
+  .wfh-request-preview-grid{grid-template-columns:1fr}
+  .wfh-request-preview-grid span+span{padding-top:7px;border-top:1px solid #e8eee9}
+  html[data-theme="dark"] .wfh-request-preview-grid span+span{border-top-color:#2d3d34}
+}
+@media(max-width:420px){
+  .wfh-usage-grid{grid-template-columns:1fr 1fr!important}
+  .wfh-usage-main{grid-column:1/-1!important}
+  .wfh-banner h2{font-size:15px!important}
+  .wfh-banner p{max-width:75%!important}
+}
