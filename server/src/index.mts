@@ -13,6 +13,7 @@ import leaveRoutes from './routes/leave.mts';
 import workplaceRoutes from './routes/workplace.mts';
 import adminRoutes from './routes/admin.mts';
 import accountRoutes from './routes/account.mts';
+import enterpriseRoutes from './routes/enterprise.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -84,6 +85,7 @@ app.use('/api/leave',leaveRoutes);
 app.use('/api',workplaceRoutes);
 app.use('/api/admin',adminRoutes);
 app.use('/api/account',accountRoutes);
+app.use('/api/enterprise',enterpriseRoutes);
 app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
 app.use(errorHandler);
 
