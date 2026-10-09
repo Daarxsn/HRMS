@@ -156,7 +156,7 @@ function ContactModal({save,close}) {
 }
 function DocumentModal({save,close}) {
   const [file,setFile]=useState(null),[type,setType]=useState('ID_PROOF'),[title,setTitle]=useState(''),[issued,setIssued]=useState(''),[expires,setExpires]=useState('');
-  const submit=()=>{const form=new FormData();form.append('document',file);form.append('documentType',type);form.append('title',title);form.append('issuedOn',issued||'');form.append('expiresOn',expires||'');save(form);};
+  const submit=()=>{const form=new FormData();form.append('document',file);form.append('documentType',type);form.append('title',title);if(issued)form.append('issuedOn',issued);if(expires)form.append('expiresOn',expires);save(form);};
   return <Modal title="Upload HR document" close={close}><div className="form-stack"><input className="input" placeholder="Document title" value={title} onChange={e=>setTitle(e.target.value)}/><input className="input" placeholder="Document type" value={type} onChange={e=>setType(e.target.value)}/><input className="input" type="date" value={issued} onChange={e=>setIssued(e.target.value)}/><input className="input" type="date" value={expires} onChange={e=>setExpires(e.target.value)}/><input className="input" type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/><button className="button button-primary" disabled={!file||!title} onClick={submit}>Upload securely</button></div></Modal>;
 }
 
