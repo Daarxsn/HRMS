@@ -252,4 +252,4 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
   }
 }
 
-export { escapeHtml };
+export { escapeHtml, escapeHtml as htmlEscape };
