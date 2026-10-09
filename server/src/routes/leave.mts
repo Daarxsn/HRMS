@@ -51,7 +51,7 @@ async function emailLeaveRequestToAdmins(request) {
         + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
         + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
         + '</div></body></html>';
-      await sendEmail({ to:String(admin.email), subject, text, html, replyTo:request.employeeEmail });
+      await sendEmail({ to:[String(admin.email)], subject, text, html, replyTo:request.employeeEmail });
     } catch (error) {
       console.warn(JSON.stringify({ type:'leave_request_email_failed', request_id:request.id, recipient:String(admin.email), error:String(error?.message || error) }));
     }
