@@ -176,7 +176,9 @@ router.post('/admin/separations',adminLimiter,asyncRoute(async(req,res)=>{
 }));
 router.patch('/admin/separations/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({status:z.enum(['OPEN','IN_PROGRESS','COMPLETED','CANCELLED']),notes:z.string().trim().max(2000).nullable().optional()}),req.body);
-  const result=await query('UPDATE separation_cases SET status=:status,notes=COALESCE(:notes,notes),completed_at=CASE WHEN :status=\'COMPLETED\' THEN UTC_TIMESTAMP() ELSE NULL END WHERE id=:id',{status:input.status,notes:input.notes===undefined?null:input.notes,id:req.params.id}); if(!result.affectedRows) throw Object.assign(new Error('Separation case not found.'),{status:404});
+  const rows=await query('SELECT id,employee_id FROM separation_cases WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]) throw Object.assign(new Error('Separation case not found.'),{status:404});
+  await query("UPDATE separation_cases SET status=:status,notes=COALESCE(:notes,notes),completed_at=CASE WHEN :status='COMPLETED' THEN UTC_TIMESTAMP() ELSE NULL END WHERE id=:id",{status:input.status,notes:input.notes===undefined?null:input.notes,id:req.params.id});
+  if(input.status==='COMPLETED') await query("UPDATE employees SET status='INACTIVE',session_version=session_version+1 WHERE id=:employee",{employee:rows[0].employee_id});
   await audit({actorId:req.user.id,action:'SEPARATION_UPDATED',entityType:'separation_case',entityId:req.params.id,details:{status:input.status},ipAddress:req.ip}); res.json({ok:true});
 }));
 
