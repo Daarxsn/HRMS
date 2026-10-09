@@ -14,7 +14,7 @@ const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHea
 
 async function emailLeaveRequestToAdmins(request) {
   const admins = await query("SELECT email FROM employees WHERE role='ADMIN' AND user_type='ADMIN' AND status='ACTIVE' AND email IS NOT NULL");
-  if (!admins.length) return;
+  if (!admins.length) return { configured:smtpConfigured(), sent:0, recipients:0 };
   const origin = String(process.env.APP_ORIGIN || '').replace(/\/$/, '');
   const approvalUrl = origin ? origin + '/admin/approvals' : '';
   const attachmentNote = request.attachmentId ? 'Supporting document: attached in the HRMS request record.' : 'Supporting document: none.';
@@ -56,6 +56,7 @@ async function emailLeaveRequestToAdmins(request) {
       console.warn(JSON.stringify({ type:'leave_request_email_failed', request_id:request.id, recipient:String(admin.email), error:String(error?.message || error) }));
     }
   }));
+  return { configured:smtpConfigured(), sent:sentCount, recipients:admins.length };
 }
 
 
