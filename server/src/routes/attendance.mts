@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
+import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
 import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
@@ -18,6 +19,39 @@ function officeNetworkConfig() {
   const configured = String(process.env.OFFICE_NETWORK_IPS || (process.env.NODE_ENV === 'development' ? '127.0.0.1;::1' : '')).trim();
   return { configured, allowed: parseOfficeNetworkIps(configured) };
 }
+
+async function emailAdminRequest({ id, title, description, type, details, employee }) {
+  const approvalUrl = String(process.env.APP_ORIGIN || '').replace(/\/$/, '') + '/admin/approvals';
+  try {
+    const text = ['Falchion Xeniaa HRMS','',description,
+      'Employee: ' + employee.name + ' (' + employee.code + ')',
+      'Email: ' + employee.email,
+      ...details,
+      'Review: ' + approvalUrl
+    ].join('\\n');
+    const detailHtml = details.map((item) => {
+      const parts = String(item).split(': ');
+      return '<p><strong>' + htmlEscape(parts.shift()) + '</strong><br>' + htmlEscape(parts.join(': ')) + '</p>';
+    }).join('');
+    const html = '<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111"><div style="max-width:640px;margin:0 auto;padding:24px">'
+      + '<p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#931314;font-weight:700">FALCHION XENIAA · HRMS</p>'
+      + '<h1 style="margin:0 0 8px;font-size:28px">' + htmlEscape(title) + '</h1>'
+      + '<p style="color:#555">' + htmlEscape(description) + '</p>'
+      + '<div style="border:1px solid #e5e5e5;border-radius:14px;padding:18px">'
+      + '<p><strong>Employee</strong><br>' + htmlEscape(employee.name) + ' · ' + htmlEscape(employee.code) + '</p>'
+      + '<p><strong>Email</strong><br>' + htmlEscape(employee.email) + '</p>'
+      + detailHtml
+      + '</div>'
+      + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
+      + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p></div></body></html>';
+    const result = await sendHrNotificationEmail({ subject:title + ' · ' + employee.name, text, html, replyTo:employee.email });
+    return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0, type };
+  } catch (error) {
+    console.warn(JSON.stringify({type:'admin_request_email_failed',request_id:id,request_type:type,error:String(error?.message || error)}));
+    return { configured:false, sent:0, recipients:0, type };
+  }
+}
+
 function verifyOfficeNetwork(req) {
   const { configured, allowed } = officeNetworkConfig();
   if (!configured || allowed.length === 0) throw Object.assign(new Error('Office network verification is not configured. Ask an administrator to complete the office network setup.'), { status: 503 });
@@ -149,7 +183,15 @@ router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute
   });
   await audit({ actorId: req.user.id, action: 'ATTENDANCE_CORRECTION_REQUESTED', entityType: 'attendance_correction', entityId: id, details: { date: input.date }, ipAddress: req.ip });
   await notifyAdmins('Attendance correction needs review', `${req.user.full_name} requested an attendance correction for ${input.date}.`, 'REQUEST', { type:'correction', id });
-  res.status(201).json({ ok: true, id });
+  const emailDelivery = await emailAdminRequest({
+    id,
+    title:'Attendance correction request',
+    description:'A new attendance correction request has been submitted for administrator review.',
+    type:'correction',
+    details:['Date: ' + input.date, 'Requested check-in: ' + (input.requestedCheckIn || 'Not provided'), 'Requested check-out: ' + (input.requestedCheckOut || 'Not provided'), 'Reason: ' + input.reason],
+    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email}
+  });
+  res.status(201).json({ ok: true, id, emailDelivery });
 }));
 
 router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
@@ -168,7 +210,15 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
   });
   await audit({ actorId: req.user.id, action: 'FLEX_START_REQUESTED', entityType: 'flex_start_request', entityId: id, details: { date: input.date, start_time: input.startTime }, ipAddress: req.ip });
   await notifyAdmins('Flexible start needs review', `${req.user.full_name} requested a ${input.startTime} start on ${input.date}.`, 'REQUEST', { type:'flex', id });
-  res.status(201).json({ ok: true, id });
+  const emailDelivery = await emailAdminRequest({
+    id,
+    title:'Flexible start request',
+    description:'A new flexible-start request has been submitted for administrator review.',
+    type:'flex',
+    details:['Date: ' + input.date, 'Requested start: ' + input.startTime, 'Reason: ' + input.reason],
+    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email}
+  });
+  res.status(201).json({ ok: true, id, emailDelivery });
 }));
 
 router.get('/exits/current', requirePeople, asyncRoute(async (req, res) => {
