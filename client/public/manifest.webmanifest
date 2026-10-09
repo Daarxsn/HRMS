@@ -4,7 +4,9 @@
   "description": "Attendance, leave and workplace portal",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait-primary",
   "background_color": "#F4F4F5",
-  "theme_color": "#111111",
+  "theme_color": "#17342f",
   "icons": [{ "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
