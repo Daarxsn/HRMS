@@ -1085,14 +1085,14 @@ function SettingsPage(){
         </Card>
 
         <Card className="settings-card">
-          <CardHeading title="Email notifications" subtitle="Leave requests are emailed to every active administrator for a durable record." action={<span className={`live-tag ${emailStatus?.configured?'':'settings-email-off'}`}><i/> {emailStatus?.configured?'SMTP READY':'SMTP NOT CONFIGURED'}</span>}/>
+          <CardHeading title="Email notifications" subtitle="All HR request emails are sent to one designated HR mailbox for a durable record." action={<span className={`live-tag ${emailStatus?.configured?'':'settings-email-off'}`}><i/> {emailStatus?.configured?'SMTP READY':'SMTP NOT CONFIGURED'}</span>}/>
           {emailStatus?.configured?<div className="settings-health-grid">
             <div><small>SMTP host</small><b>{emailStatus.host||'Configured'}</b></div>
             <div><small>Port</small><b>{emailStatus.port}</b></div>
             <div><small>Transport</small><b>{emailStatus.secure?'Direct TLS':'STARTTLS'}</b></div>
-            <div><small>Sender</small><b>{emailStatus.from||'—'}</b></div>
-          </div>:<div className="privacy-promise"><ShieldCheck size={16}/><span>Configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in the production environment, then redeploy.</span></div>}
-          <div className="settings-email-actions"><button type="button" className="button button-soft" disabled={!emailStatus?.configured||emailBusy} onClick={async()=>{setEmailBusy(true);try{await post('/admin/email-test');notify('SMTP test email sent to your administrator email.');}catch(e){setError(e.message||'SMTP test failed.')}finally{setEmailBusy(false)}}}>{emailBusy?'Sending…':'Send test email to me'}</button></div>
+            <div><small>Sender</small><b>{emailStatus.from||'—'}</b></div><div><small>HR mailbox</small><b>{emailStatus.hrNotificationEmail||'Not configured'}</b></div>
+          </div>:<div className="privacy-promise"><ShieldCheck size={16}/><span>Configure the SMTP settings and HR_NOTIFICATION_EMAIL in the production environment, then redeploy.</span></div>}
+          <div className="settings-email-actions"><button type="button" className="button button-soft" disabled={!emailStatus?.configured||!emailStatus?.hrNotificationEmail||emailBusy} onClick={async()=>{setEmailBusy(true);try{await post('/admin/email-test');notify('SMTP test email sent to the configured HR mailbox.');}catch(e){setError(e.message||'SMTP test failed.')}finally{setEmailBusy(false)}}}>{emailBusy?'Sending…':'Send test email to HR mailbox'}</button></div>
         </Card>
 
         <Card className="settings-card">

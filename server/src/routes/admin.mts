@@ -7,11 +7,12 @@ import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
-import { htmlEscape, sendEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
 const adminMutationLimiter = rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`admin:${req.user.id}`});
+const emailTestLimiter = rateLimit({windowMs:15*60*1000,limit:2,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`admin-email-test:${req.user.id}`});
 
 async function effectiveAttendance(from, to) {
   const fromDate = new Date(`${from}T12:00:00Z`);
@@ -114,16 +115,23 @@ router.get('/email-status', asyncRoute(async (req,res)=>{
     hrNotificationEmail:getHrNotificationEmail()
   });
 }));
-router.post('/email-test', adminMutationLimiter, asyncRoute(async (req,res)=>{
-  const result=await sendEmail({
-    to:[req.user.email],
-    subject:'Falchion Xeniaa HRMS · SMTP test',
-    text:'SMTP is configured correctly for Falchion Xeniaa HRMS administrator notifications.',
-    html:'<p style="font-family:Arial,sans-serif"><strong>Falchion Xeniaa HRMS</strong><br>SMTP is configured correctly for administrator notifications.</p>'
-  });
-  if(result.skipped) throw Object.assign(new Error('SMTP email is not configured.'),{status:503});
-  await audit({actorId:req.user.id,action:'SMTP_TEST_EMAIL_SENT',entityType:'system',details:{recipient:req.user.email},ipAddress:req.ip});
-  res.json({ok:true,recipient:req.user.email});
+router.post('/email-test', emailTestLimiter, asyncRoute(async (req,res)=>{
+  const recipient=getHrNotificationEmail();
+  if(!recipient) throw Object.assign(new Error('HR notification mailbox is not configured.'),{status:503});
+  try {
+    const result=await sendHrNotificationEmail({
+      subject:'Falchion Xeniaa HRMS · SMTP test',
+      text:'SMTP is configured correctly for Falchion Xeniaa HRMS administrator notifications.',
+      html:'<p style="font-family:Arial,sans-serif"><strong>Falchion Xeniaa HRMS</strong><br>SMTP is configured correctly for the configured HR notification mailbox.</p>'
+    });
+    if(result.skipped) throw Object.assign(new Error('SMTP email is not configured.'),{status:503});
+    await audit({actorId:req.user.id,action:'SMTP_TEST_EMAIL_SENT',entityType:'system',details:{recipient},ipAddress:req.ip});
+    res.json({ok:true,recipient});
+  } catch (error) {
+    console.warn(JSON.stringify({type:'smtp_test_failed',request_id:req.requestId,recipient,error:String(error?.message || error)}));
+    if (error?.status) throw error;
+    throw Object.assign(new Error('SMTP delivery failed. Check the production SMTP host, port, sender, username, and provider app password.'),{status:502});
+  }
 }));
 router.get('/system-health', asyncRoute(async (req, res) => {
   const started = process.hrtime.bigint();

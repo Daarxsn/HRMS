@@ -70,7 +70,11 @@ assert.match(email,/AUTH PLAIN/);
 assert.match(email,/SMTP_REQUIRED/);
 assert.match(email,/HR_NOTIFICATION_EMAIL/);
 assert.match(email,/sendHrNotificationEmail/);
+assert.match(email,/socket\.destroyed/);
 assert.match(admin,/adminMutationLimiter/);
+assert.match(admin,/emailTestLimiter/);
+assert.match(admin,/sendHrNotificationEmail/);
+assert.match(admin,/getHrNotificationEmail/);
 assert.match(admin,/system-health/);
 assert.match(index,/enterpriseRoutes/);
 assert.match(enterprise,/router\.get\('\/policies'/);
@@ -118,6 +122,8 @@ assert.match(app,/Secure Google sign-in/);
 assert.doesNotMatch(app,/Choose an account|Continue to preview|demoEmail|demo\.enabled/);
 assert.match(e2e,/signInDev/);
 assert.doesNotMatch(e2e,/Choose an account|Continue to preview/);
+assert.match(app,/Send test email to HR mailbox/);
+assert.match(app,/All HR request emails are sent to one designated HR mailbox/);
 
 
 assert.match(admin,/router\.get\('\/reports\.csv'/);

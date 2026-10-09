@@ -138,8 +138,26 @@ class SmtpClient {
 
   async close(): Promise<void> {
     this.closed = true;
-    this.socket.end();
-    await new Promise((resolve) => this.socket.once('close', resolve));
+    const socket = this.socket as any;
+    if (socket.destroyed) return;
+    await new Promise<void>((resolve) => {
+      let doneCalled = false;
+      const done = () => {
+        if (doneCalled) return;
+        doneCalled = true;
+        socket.removeListener('close', done);
+        socket.removeListener('error', done);
+        resolve();
+      };
+      socket.once('close', done);
+      socket.once('error', done);
+      try {
+        socket.end(() => done());
+      } catch {
+        done();
+      }
+      if (socket.destroyed) done();
+    });
   }
 }
 
@@ -154,16 +172,23 @@ const openSocket = async (config): Promise<SmtpClient> => {
       })
     : net.createConnection({ host: config.host, port: config.port });
 
-  if (config.secure) await new Promise<void>((resolve, reject) => {
-    socket.once('secureConnect', resolve);
-    socket.once('error', reject);
-  });
-  else await new Promise<void>((resolve, reject) => {
-    socket.once('connect', resolve);
-    socket.once('error', reject);
-  });
+  // Attach the SMTP protocol reader before waiting for TCP/TLS connection
+  // so the server greeting cannot arrive between connect and listener setup.
+  const client = new SmtpClient(socket, config.timeoutMs);
 
-  return new SmtpClient(socket, config.timeoutMs);
+  if (config.secure) {
+    await new Promise<void>((resolve, reject) => {
+      socket.once('secureConnect', resolve);
+      socket.once('error', reject);
+    });
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('error', reject);
+    });
+  }
+
+  return client;
 };
 
 const startTls = async (client: SmtpClient, config): Promise<SmtpClient> => {
