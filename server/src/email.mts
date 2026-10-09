@@ -75,6 +75,12 @@ class SmtpSession {
     this.pending.length = 0;
   }
 
+  detach() {
+    this.socket.removeAllListeners('data');
+    this.socket.removeAllListeners('error');
+    this.socket.removeAllListeners('close');
+  }
+
   async read(): Promise<{ code: number; lines: string[] }> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('SMTP response timed out.')), 15000);
@@ -125,8 +131,10 @@ async function connectSession() {
 
 async function upgradeToStartTls(session: SmtpSession) {
   await session.command('STARTTLS', [220]);
+  const rawSocket = (session as any).socket as net.Socket;
+  session.detach();
   const secureSocket = tls.connect({
-    socket: (session as any).socket,
+    socket: rawSocket,
     servername: smtpHost(),
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
