@@ -2327,3 +2327,16 @@ html[data-theme="dark"] .wfh-request-preview-grid small{color:#9eaaa3}
   html[data-theme="dark"] .mobile-report-grid b,html[data-theme="dark"] .mobile-report-leave-main b{color:#dbe6df}html[data-theme="dark"] .mobile-report-grid small,html[data-theme="dark"] .mobile-report-leave-main span{color:#9ba8a1}
 }
 @media(min-width:721px){.mobile-report-list{display:none!important}}
+
+/* Performance: defer off-screen mobile surfaces */
+@media(max-width:720px){
+  .profile-info-card,.profile-preferences-card,.privacy-card,
+  .notification-page-card,.approval-workspace,.report-leave-card,
+  .attendance-history-card,.attendance-support-grid,.wfh-side{
+    content-visibility:auto;
+    contain-intrinsic-size:320px;
+  }
+  .mobile-report-card,.mobile-request-card,.mobile-admin-attendance-card{
+    contain:layout paint;
+  }
+}
