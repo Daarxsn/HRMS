@@ -45,7 +45,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 function IconLogo({ small=false }) {
-  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/pwa-icon.svg" alt="" /></span>;
+  return <span className={`brand-logo-image${small?' brand-logo-image-small':''}`} aria-hidden="true"><img src="/falchion-xeniaa-horizontal.svg" alt="" /></span>;
 }
 function Toast({ toast, onClose }) {
   useEffect(() => { if (toast) { const timer=setTimeout(onClose,4300); return ()=>clearTimeout(timer); } },[toast,onClose]);
@@ -171,8 +171,7 @@ function Shell(){
     <aside className={`sidebar${mobileOpen?' sidebar-open':''}`}>
       <div className="sidebar-brand">
         <Link to={isAdmin?'/admin':'/'} className="sidebar-brand-link" aria-label="Falchion Xeniaa People Portal">
-          <span className="brand-logo-wrap"><IconLogo/><span className="brand-logo-glow"/></span>
-          <span className="brand-wordmark"><strong>FALCHION</strong> <b>XENIAA</b><small>PEOPLE PORTAL</small></span>
+          <span className="brand-logo-wrap"><IconLogo/></span>
         </Link>
         <button className="sidebar-collapse" aria-label="Close menu" onClick={()=>setMobileOpen(false)}><PanelLeftClose size={17}/></button>
       </div>
