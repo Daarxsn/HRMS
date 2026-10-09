@@ -1,6 +1,6 @@
 const worker = globalThis as any;
-const CACHE = 'falchion-shell-v2';
-const APP_SHELL = ['/', '/manifest.webmanifest'];
+const CACHE = 'falchion-shell-v3';
+const APP_SHELL = ['/', '/manifest.webmanifest', '/pwa-icon.svg'];
 
 worker.addEventListener('install', (event: any) => {
   event.waitUntil(
