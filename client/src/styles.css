@@ -1937,3 +1937,27 @@ img{max-width:100%}
 @media(prefers-reduced-motion:reduce){
   .mobile-attendance-dock{transition:none}
 }
+
+/* Mobile interaction quality */
+@media(max-width:720px){
+  button,.button,a.button,input,select,textarea{
+    touch-action:manipulation;
+  }
+  .button,.icon-button,.mobile-menu,.theme-toggle,.notification-button,.command-trigger,.mobile-bottom-item{
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  .button:not(.button-small){min-height:44px}
+  .mobile-bottom-item{min-height:50px}
+  .select-wrap select,.form-field input,.form-field select,.form-field textarea{
+    min-height:44px;
+  }
+  .search-box{min-height:44px}
+  .search-box input{font-size:12px}
+  .filter-date input,.report-filter-controls input{min-height:40px}
+  .table-scroll{padding-bottom:2px}
+}
+@media(max-width:420px){
+  .button:not(.button-small){min-height:43px}
+  .topbar-right .icon-button,.mobile-menu,.command-trigger{width:40px;height:40px}
+}
