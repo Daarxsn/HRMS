@@ -1961,3 +1961,38 @@ img{max-width:100%}
   .button:not(.button-small){min-height:43px}
   .topbar-right .icon-button,.mobile-menu,.command-trigger{width:40px;height:40px}
 }
+
+/* Mobile command surfaces */
+.employee-mobile-quick-actions,.admin-mobile-command-strip{display:none}
+@media(max-width:720px){
+  .employee-mobile-quick-actions,.admin-mobile-command-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:-3px 0 12px}
+  .employee-mobile-quick-actions a,.admin-mobile-command-strip a{min-width:0;min-height:62px;padding:9px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;border:1px solid #e6ece7;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fbf8);color:#61746b;font-size:8px;font-weight:800;text-align:center;box-shadow:var(--shadow-xs)}
+  .employee-mobile-quick-actions a:first-child,.admin-mobile-command-strip a:first-child{background:#eef6ef;border-color:#d6e8d9;color:#2f6d54}
+  .employee-mobile-quick-actions svg,.admin-mobile-command-strip svg{width:18px;height:18px}
+  .employee-mobile-quick-actions span,.admin-mobile-command-strip span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .employee-mobile-quick-actions i,.admin-mobile-command-strip i{position:absolute;top:6px;right:7px;min-width:15px;height:15px;display:grid;place-items:center;padding:0 3px;border-radius:999px;background:#931314;color:#fff;font:700 7px/1 'Open Sans',sans-serif;border:2px solid #fff}
+  .day-hero{margin-top:2px}
+  .overview-attendance-card{padding:18px!important;border-radius:17px!important}
+  .overview-attendance-action{width:100%}
+  .overview-attendance-action .button{width:100%}
+  .employee-action-center{margin-top:12px}
+  .employee-action-grid{grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .employee-action-item{min-height:104px!important;padding:12px!important}
+  .next-holiday-card{padding:14px!important}
+  .overview-grid{grid-template-columns:1fr!important}
+  .admin-mobile-command-strip{margin:-3px 0 12px}
+  .admin-self-attendance-card .admin-self-attendance-actions{display:grid;grid-template-columns:1fr 1fr}
+  .admin-self-attendance-card .admin-self-attendance-actions .button{width:100%}
+  .admin-self-attendance-facts{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:420px){
+  .employee-mobile-quick-actions,.admin-mobile-command-strip{gap:5px}
+  .employee-mobile-quick-actions a,.admin-mobile-command-strip a{min-height:58px;padding-left:4px;padding-right:4px;border-radius:12px}
+  .employee-mobile-quick-actions span,.admin-mobile-command-strip span{font-size:7px}
+  .employee-action-grid{grid-template-columns:1fr!important}
+  .employee-action-item{min-height:88px!important}
+  .admin-self-attendance-card .admin-self-attendance-actions{grid-template-columns:1fr}
+}
+html[data-theme="dark"] .employee-mobile-quick-actions a,html[data-theme="dark"] .admin-mobile-command-strip a{background:linear-gradient(180deg,#151d1a,#111815);border-color:#2a3731;color:#9aa8a0}
+html[data-theme="dark"] .employee-mobile-quick-actions a:first-child,html[data-theme="dark"] .admin-mobile-command-strip a:first-child{background:#203229;border-color:#355043;color:#d9e9df}
+html[data-theme="dark"] .employee-mobile-quick-actions i,html[data-theme="dark"] .admin-mobile-command-strip i{border-color:#151d1a}
