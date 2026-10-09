@@ -6,10 +6,58 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
+import { htmlEscape, sendEmail } from '../email.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
 const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
+
+async function emailLeaveRequestToAdmins(request) {
+  const admins = await query("SELECT email FROM employees WHERE role='ADMIN' AND user_type='ADMIN' AND status='ACTIVE' AND email IS NOT NULL");
+  if (!admins.length) return;
+  const origin = String(process.env.APP_ORIGIN || '').replace(/\/$/, '');
+  const approvalUrl = origin ? origin + '/admin/approvals' : '';
+  const attachmentNote = request.attachmentId ? 'Supporting document: attached in the HRMS request record.' : 'Supporting document: none.';
+  await Promise.allSettled(admins.map(async (admin) => {
+    try {
+      const subject = 'Leave request · ' + request.employeeName + ' · ' + request.leaveType;
+      const text = [
+        'Falchion Xeniaa HRMS',
+        '',
+        'A new leave request has been submitted.',
+        'Employee: ' + request.employeeName + ' (' + request.employeeCode + ')',
+        'Email: ' + request.employeeEmail,
+        'Leave type: ' + request.leaveType,
+        'From: ' + request.startDate,
+        'To: ' + request.endDate,
+        'Working days: ' + request.days,
+        'Reason: ' + request.reason,
+        attachmentNote,
+        approvalUrl ? 'Review: ' + approvalUrl : ''
+      ].filter(Boolean).join('\n');
+      const html = '<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111"><div style="max-width:640px;margin:0 auto;padding:24px">'
+        + '<p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#931314;font-weight:700">FALCHION XENIAA · HRMS</p>'
+        + '<h1 style="margin:0 0 8px;font-size:28px">New leave request</h1>'
+        + '<p style="color:#555">A new leave request has been submitted for administrator review.</p>'
+        + '<div style="border:1px solid #e5e5e5;border-radius:14px;padding:18px;margin-top:18px">'
+        + '<p><strong>Employee</strong><br>' + htmlEscape(request.employeeName) + ' · ' + htmlEscape(request.employeeCode) + '</p>'
+        + '<p><strong>Email</strong><br>' + htmlEscape(request.employeeEmail) + '</p>'
+        + '<p><strong>Leave</strong><br>' + htmlEscape(request.leaveType) + '</p>'
+        + '<p><strong>Dates</strong><br>' + htmlEscape(request.startDate) + ' → ' + htmlEscape(request.endDate) + '</p>'
+        + '<p><strong>Working days</strong><br>' + request.days + '</p>'
+        + '<p><strong>Reason</strong><br>' + htmlEscape(request.reason) + '</p>'
+        + '<p><strong>Record</strong><br>' + htmlEscape(attachmentNote) + '</p>'
+        + '</div>'
+        + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
+        + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
+        + '</div></body></html>';
+      await sendEmail({ to:String(admin.email), subject, text, html, replyTo:request.employeeEmail });
+    } catch (error) {
+      console.warn(JSON.stringify({ type:'leave_request_email_failed', request_id:request.id, recipient:String(admin.email), error:String(error?.message || error) }));
+    }
+  }));
+}
+
 
 async function getLeaveBalances(employee, connection = null) {
   const execute = async (sql: string, values: any = {}): Promise<any> => connection ? (await connection.execute(sql, values))[0] : query(sql, values);
@@ -100,6 +148,18 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
   });
   await audit({ actorId: req.user.id, action: 'LEAVE_REQUESTED', entityType: 'leave_request', entityId: id, details: { type: input.type, from: input.startDate, to: input.endDate, days }, ipAddress: req.ip });
   await notifyAdmins('Leave request needs review', `${req.user.full_name} requested ${days} day(s) of ${input.type.toLowerCase()} leave.`, 'REQUEST', { type:'leave', id });
+  await emailLeaveRequestToAdmins({
+    id,
+    employeeName:req.user.full_name,
+    employeeCode:req.user.employee_code,
+    employeeEmail:req.user.email,
+    leaveType:input.type,
+    startDate:input.startDate,
+    endDate:input.endDate,
+    days,
+    reason:input.reason,
+    attachmentId:input.attachmentId || null
+  });
   res.status(201).json({ ok: true, id, days });
 }));
 
