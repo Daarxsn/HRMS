@@ -7,6 +7,7 @@ import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
+import { htmlEscape, sendEmail, smtpConfigured } from '../email.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -100,6 +101,28 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
     };
   });
   res.json({ date: today, officeHoliday, holidayName, stats: { employees: Number(people[0].active || 0), present: Number(attendance[0].total || 0), onTime: Number(attendance[0].on_time || 0), late: Number(attendance[0].late || 0), stillIn: Number(attendance[0].still_in || 0), pending: Number(pending[0].total || 0), outNow: out.length, absent:absenceCount, onLeave:leaveCount, approvedWfh:approvedWfhCount }, temporaryExits:out, recent });
+}));
+router.get('/email-status', asyncRoute(async (req,res)=>{
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({
+    configured:smtpConfigured(),
+    host:process.env.SMTP_HOST ? String(process.env.SMTP_HOST).trim() : null,
+    port:Number(process.env.SMTP_PORT || 587),
+    secure:String(process.env.SMTP_SECURE || 'false').toLowerCase()==='true',
+    from:process.env.SMTP_FROM ? String(process.env.SMTP_FROM).trim() : (process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : null),
+    required:String(process.env.SMTP_REQUIRED || 'false').toLowerCase()==='true'
+  });
+}));
+router.post('/email-test', adminMutationLimiter, asyncRoute(async (req,res)=>{
+  const result=await sendEmail({
+    to:req.user.email,
+    subject:'Falchion Xeniaa HRMS · SMTP test',
+    text:'SMTP is configured correctly for Falchion Xeniaa HRMS administrator notifications.',
+    html:'<p style="font-family:Arial,sans-serif"><strong>Falchion Xeniaa HRMS</strong><br>SMTP is configured correctly for administrator notifications.</p>'
+  });
+  if(result.skipped) throw Object.assign(new Error('SMTP email is not configured.'),{status:503});
+  await audit({actorId:req.user.id,action:'SMTP_TEST_EMAIL_SENT',entityType:'system',details:{recipient:req.user.email},ipAddress:req.ip});
+  res.json({ok:true,recipient:req.user.email});
 }));
 router.get('/system-health', asyncRoute(async (req, res) => {
   const started = process.hrtime.bigint();
