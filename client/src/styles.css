@@ -2304,3 +2304,26 @@ html[data-theme="dark"] .wfh-request-preview-grid small{color:#9eaaa3}
   .wfh-banner h2{font-size:15px!important}
   .wfh-banner p{max-width:75%!important}
 }
+
+/* Reports: mobile executive workspace */
+.mobile-report-list{display:none}
+@media(max-width:720px){
+  .report-filter-card{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:40}
+  .report-filter-copy b{font-size:11px!important}.report-filter-copy small{font-size:7px!important}
+  .report-filter-controls{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}.report-filter-controls>svg{display:none}.report-filter-controls label{min-width:0!important}
+  .report-filter-controls input{width:100%;min-height:42px!important}.report-filter-controls .button{grid-column:1/-1;width:100%;min-height:42px!important}
+  .report-executive-strip{grid-template-columns:1fr 1fr!important;gap:7px!important}.report-executive-strip>div{min-height:82px;padding:12px!important}.report-executive-strip b{font-size:20px!important}
+  .report-trend-card{padding:16px!important;border-radius:16px!important}.report-trend-bars{overflow-x:auto!important;justify-content:flex-start!important;gap:9px!important;scrollbar-width:none}.report-trend-bars::-webkit-scrollbar{display:none}.report-trend-col{flex:0 0 26px!important}.report-trend-bar{height:125px!important}
+  .report-trend-value{font-size:7px!important}.report-trend-col small{font-size:6px!important;white-space:nowrap}
+  .report-metrics{grid-template-columns:1fr 1fr!important;gap:7px!important}.report-metrics>.card{min-height:86px;padding:12px!important}.report-metrics b{font-size:21px!important}
+  .report-status-summary{grid-template-columns:1fr 1fr!important;gap:6px!important}.report-status-summary span{display:flex;justify-content:space-between;align-items:center;padding:9px 10px!important;border:1px solid #e7ede8;border-radius:10px;background:#fafcf9}.report-status-summary span b{font-size:13px!important}
+  .report-attendance-table{display:none!important}.report-leave-card .table-scroll{display:none!important}.report-leave-card{background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible!important;padding:0!important}
+  .report-leave-summary{display:grid!important;grid-template-columns:1fr 1fr!important;gap:6px!important;margin-bottom:9px}.report-leave-summary .summary-box{padding:11px!important;border-radius:11px!important}
+  .mobile-report-list{display:grid;gap:8px;margin-top:10px}.mobile-report-card{padding:14px!important;border-radius:15px!important}.mobile-report-card-top{display:flex;align-items:center;justify-content:space-between;gap:9px}.mobile-report-card-top .person-cell{min-width:0}.mobile-report-card-top .status{flex:0 0 auto}
+  .mobile-report-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid #edf1ed}.mobile-report-grid span{min-width:0}.mobile-report-grid small{display:block;font-size:6px;letter-spacing:.1em;color:#9aa69f;font-weight:800}.mobile-report-grid b{display:block;margin-top:3px;font-size:9px;color:#4b5f56;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-report-leave-main{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #edf1ed}.mobile-report-leave-main b{font-size:10px;color:#43584d}.mobile-report-leave-main span{font-size:8px;color:#8f9b95;white-space:nowrap}
+  html[data-theme="dark"] .report-status-summary span{background:#151d1a;border-color:#29362f}html[data-theme="dark"] .mobile-report-card{background:#151d1a!important;border-color:#29362f!important}
+  html[data-theme="dark"] .mobile-report-grid,html[data-theme="dark"] .mobile-report-leave-main{border-color:#29362f}
+  html[data-theme="dark"] .mobile-report-grid b,html[data-theme="dark"] .mobile-report-leave-main b{color:#dbe6df}html[data-theme="dark"] .mobile-report-grid small,html[data-theme="dark"] .mobile-report-leave-main span{color:#9ba8a1}
+}
+@media(min-width:721px){.mobile-report-list{display:none!important}}
