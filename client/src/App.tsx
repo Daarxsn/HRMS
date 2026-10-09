@@ -11,6 +11,7 @@ import {
   PanelLeftClose, UserRound, XCircle
 } from 'lucide-react';
 import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
+import EnterpriseHRPage, { EmployeePoliciesPage } from './EnterpriseHRPage';
 
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
@@ -141,11 +142,13 @@ const employeeNav=[
   {to:'/wfh',label:'Work from home',icon:House},
   {to:'/out',label:'Out of office',icon:ArrowUpRight},
   {to:'/notifications',label:'Notifications',icon:Bell},
-  {to:'/calendar',label:'Holiday calendar',icon:Calendar}
+  {to:'/calendar',label:'Holiday calendar',icon:Calendar},
+  {to:'/policies',label:'Policy center',icon:FileText}
 ];
 const adminNav=[
   {to:'/admin',label:'Overview',icon:Gauge},
   {to:'/admin/team',label:'People',icon:Users},
+  {to:'/admin/hr',label:'HR operations',icon:BriefcaseBusiness},
   {to:'/admin/attendance',label:'Attendance',icon:Clock3},
   {to:'/admin/approvals',label:'Requests',icon:ClipboardCheck},
   {to:'/admin/reports',label:'Reports',icon:Activity},
@@ -184,8 +187,8 @@ function Shell(){
     </aside>
     <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Open command menu"><Command size={15}/><span>Search</span><kbd>⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</Link></div></header>
       <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
-        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/>
-        <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/>
+        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/>
+        <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/>
         <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div>
       <footer className="app-footer"><span>Falchion Xeniaa · People portal</span><span>Built on trust <span className="footer-dot">·</span> {new Date().getFullYear()}</span></footer>
       <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{(isAdmin?[['/admin','Overview',Gauge],['/admin/attendance','Attendance',Clock3],['/admin/approvals','Requests',ClipboardCheck],['/admin/team','People',Users],['/profile','Profile',CircleUserRound]]:[['/','Home',House],['/attendance','Attendance',Fingerprint],['/leave','Leave',CalendarDays],['/notifications','Alerts',Bell],['/profile','Profile',CircleUserRound]]).map(([to,label,Icon])=><NavLink key={to} to={to} end={to==='/'||to==='/admin'} className={({isActive})=>`mobile-bottom-item${isActive?' active':''}`}><Icon size={18}/><span>{label}</span>{((to==='/notifications'||to==='/admin/approvals')&&notifications.unread>0)&&<i>{notifications.unread>9?'9+':notifications.unread}</i>}</NavLink>)}</nav>
