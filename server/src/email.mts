@@ -1,6 +1,5 @@
 import net from 'node:net';
 import tls from 'node:tls';
-import { once } from 'node:events';
 
 type SocketLike = net.Socket | tls.TLSSocket;
 
