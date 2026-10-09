@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendEmail } from '../email.mts';
+import { htmlEscape, sendEmail } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
