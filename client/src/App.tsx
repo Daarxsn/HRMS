@@ -302,6 +302,72 @@ function EmployeeHome(){
   </>;
 }
 
+function AdminSelfAttendanceCard(){
+  const {notify}=useApp();
+  const [row,setRow]=useState(null);
+  const [holiday,setHoliday]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [time,setTime]=useState(new Date());
+  const load=async()=>{
+    setLoading(true);setError('');
+    try{
+      const [attendance,calendar]=await Promise.all([get(`/attendance?from=${today}&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`)]);
+      setRow(attendance.records?.[0]||null);
+      setHoliday((calendar.holidays||[]).find((item)=>item.date===today)||null);
+    }catch(e){setError(e.message);}finally{setLoading(false);}
+  };
+  useEffect(()=>{
+    load();
+    const timer=window.setInterval(load,30000);
+    const clock=window.setInterval(()=>setTime(new Date()),30000);
+    return()=>{window.clearInterval(timer);window.clearInterval(clock);};
+  },[]);
+  const getLocation=()=>new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
+    navigator.geolocation.getCurrentPosition(
+      ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
+      (geoError)=>reject(new Error(geoError.code===1?'Location access is required for office attendance. Allow location access for this site and try again.':'We could not get your current location. Keep location services enabled and try again.')),
+      {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+    );
+  });
+  const punch=async(type)=>{
+    setBusy(true);setError('');
+    try{
+      const geo=await getLocation();
+      await post(`/attendance/${type}`,{method:'GPS',...geo});
+      await load();
+      notify(type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.');
+    }catch(e){setError(e.message);}finally{setBusy(false);}
+  };
+  const state=holiday
+    ? {label:'Holiday',title:holiday.name||'Office holiday',body:'Attendance is not expected today.'}
+    : row?.check_in_at
+      ? row.check_out_at
+        ? {label:'Complete',title:'Your workday is complete.',body:`Checked in at ${formatTime(row.check_in_at)} · checked out at ${formatTime(row.check_out_at)}.`}
+        : {label:'In progress',title:`Checked in at ${formatTime(row.check_in_at)}.`,body:'Your workday is underway. Check out when you leave the office.'}
+      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. Location is verified once for the attendance action.'};
+  return <Card className="admin-self-attendance-card">
+    <div className="admin-self-attendance-copy">
+      <div className="admin-self-attendance-kicker"><span className="pulse-dot"/><span>YOUR ATTENDANCE</span><small>{new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(time)} IST</small></div>
+      <div className="admin-self-attendance-heading"><div><h2>{state.title}</h2><p>{state.body}</p></div><span className={`admin-self-attendance-status admin-self-attendance-status-${state.label.toLowerCase().replaceAll(' ','-')}`}>{state.label}</span></div>
+      {error&&<div className="admin-self-attendance-error"><CircleAlert size={15}/>{error}<button type="button" className="text-button" onClick={load}>Retry</button></div>}
+      {!holiday&&<div className="admin-self-attendance-actions">
+        <Button variant={row?.check_in_at?'soft':'primary'} onClick={()=>punch('check-in')} loading={busy} disabled={loading||Boolean(row?.check_in_at)} icon={LogIn}>Check in</Button>
+        <Button variant={row?.check_in_at&&!row?.check_out_at?'primary':'soft'} onClick={()=>punch('check-out')} loading={busy} disabled={loading||!row?.check_in_at||Boolean(row?.check_out_at)} icon={LogOut}>Check out</Button>
+      </div>}
+      {holiday&&<div className="admin-self-attendance-holiday"><CalendarDays size={15}/><span>Today is a scheduled company holiday.</span></div>}
+    </div>
+    <div className="admin-self-attendance-facts">
+      <div><span>CHECK-IN</span><b>{row?.check_in_at?formatTime(row.check_in_at):'—'}</b></div>
+      <div><span>CHECK-OUT</span><b>{row?.check_out_at?formatTime(row.check_out_at):'—'}</b></div>
+      <div><span>VERIFY</span><b>{row?.check_in_method||'Not recorded'}</b></div>
+      <div><span>WORKDAY</span><b>9:00 AM — 6:00 PM</b></div>
+    </div>
+  </Card>;
+}
+
 function AdminHome(){
   const {user,notify}=useApp();const [data,setData]=useState(null);const [approvals,setApprovals]=useState([]);const [activity,setActivity]=useState([]);const [health,setHealth]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [announcementOpen,setAnnouncementOpen]=useState(false);const [announcementTitle,setAnnouncementTitle]=useState('');const [announcementBody,setAnnouncementBody]=useState('');const [announcementBusy,setAnnouncementBusy]=useState(false);const [lastUpdated,setLastUpdated]=useState(null);
   const load=async()=>{setLoading(true);setError('');try{const [dashboard,queue,feed,system]=await Promise.all([get('/admin/dashboard'),get('/admin/approvals'),get('/admin/audit'),get('/admin/system-health')]);setData(dashboard);setApprovals(queue.approvals||[]);setActivity((feed.logs||[]).slice(0,6));setHealth(system);setLastUpdated(new Date());}catch(e){setError(e.message);}finally{setLoading(false);}};
@@ -311,7 +377,7 @@ function AdminHome(){
   const adminGreeting=adminHour<12?'Good morning':adminHour<17?'Good afternoon':'Good evening';
   return <>
     {error&&<InlineError>{error}<button className="text-button" onClick={load}>Try again</button></InlineError>}
-    <PageTitle eyebrow={formatDate(today,{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase()} title={`${adminGreeting}, ${user.full_name.split(' ')[0]}.`} description="Your people, today’s pulse, and the decisions that need you." action={<Link to="/admin/team" className="button button-primary"><Plus size={17}/> Add a person</Link>}/><section className="admin-hero"><div className="admin-hero-copy"><span className="admin-hero-kicker"><i className="pulse-dot"/> LIVE WORKFORCE BRIEF <small>{lastUpdated?'Updated '+new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}).format(lastUpdated)+' IST':'Updating…'}</small></span><h2>{data?.officeHoliday?String(data.holidayName||"Office holiday")+" today.":"Your workplace, in one calm view."}</h2><p>{data?.officeHoliday?"Attendance is not expected today. Use the day to keep your team aligned and requests moving.":String(stats.present||0)+" of "+String(stats.employees||0)+" active people are checked in. "+String(stats.pending||0)+" request"+(stats.pending===1?"":"s")+" are waiting for review."}</p><div className="admin-hero-actions"><Link className="button button-light" to="/admin/attendance">Open live attendance <ArrowRight size={16}/></Link><Link className="admin-hero-secondary" to="/admin/approvals">Review queue <span>{stats.pending||0}</span></Link></div></div><div className="admin-hero-score"><span>ATTENDANCE TODAY</span><b>{stats.employees?Math.round((stats.present/stats.employees)*100):0}%</b><small>{stats.present||0} checked in · {stats.absent||0} not checked in</small><div><i style={{width:(stats.employees?Math.round((stats.present/stats.employees)*100):0)+"%"}}/></div></div></section>
+    <PageTitle eyebrow={formatDate(today,{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase()} title={`${adminGreeting}, ${user.full_name.split(' ')[0]}.`} description="Your people, today’s pulse, and the decisions that need you." action={<Link to="/admin/team" className="button button-primary"><Plus size={17}/> Add a person</Link>}/><AdminSelfAttendanceCard/><section className="admin-hero"><div className="admin-hero-copy"><span className="admin-hero-kicker"><i className="pulse-dot"/> LIVE WORKFORCE BRIEF <small>{lastUpdated?'Updated '+new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}).format(lastUpdated)+' IST':'Updating…'}</small></span><h2>{data?.officeHoliday?String(data.holidayName||"Office holiday")+" today.":"Your workplace, in one calm view."}</h2><p>{data?.officeHoliday?"Attendance is not expected today. Use the day to keep your team aligned and requests moving.":String(stats.present||0)+" of "+String(stats.employees||0)+" active people are checked in. "+String(stats.pending||0)+" request"+(stats.pending===1?"":"s")+" are waiting for review."}</p><div className="admin-hero-actions"><Link className="button button-light" to="/admin/attendance">Open live attendance <ArrowRight size={16}/></Link><Link className="admin-hero-secondary" to="/admin/approvals">Review queue <span>{stats.pending||0}</span></Link></div></div><div className="admin-hero-score"><span>ATTENDANCE TODAY</span><b>{stats.employees?Math.round((stats.present/stats.employees)*100):0}%</b><small>{stats.present||0} checked in · {stats.absent||0} not checked in</small><div><i style={{width:(stats.employees?Math.round((stats.present/stats.employees)*100):0)+"%"}}/></div></div></section>
     <div className="admin-intro"><div className="intro-icon"><Activity size={18}/></div><div><b>{data?.officeHoliday?`${data.holidayName||'Office holiday'} · attendance not expected`:'People, not just presence.'}</b><span>{data?.officeHoliday?'Today is a scheduled non-working day for Falchion Xeniaa.':'Attendance is a record of the workday—not a measure of someone’s value.'}</span></div><span className="intro-date"><span className="pulse-dot"/> {data?.officeHoliday?'SCHEDULED HOLIDAY':'LIVE TODAY'}</span></div>
     <div className="stat-grid">{[
       {label:'Team members',value:stats.employees,meta:'Across employees & interns',icon:Users,tone:'blue'},
