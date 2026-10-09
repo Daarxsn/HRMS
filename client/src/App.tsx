@@ -299,6 +299,14 @@ function EmployeeHome(){
     </div>
     <div className="section-head"><div><h2>Your recent days</h2><p>A simple view of your attendance history.</p></div><Link className="text-link" to="/attendance">Full attendance history <ArrowRight size={15}/></Link></div>
     <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>DAY TYPE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:history.length?history.map((row)=><tr key={row.id}><td><b>{formatDate(row.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td><span className="table-type"><span className="type-dot"/>{row.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={row.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">No attendance records yet. Your recent workdays will appear here.</div></td></tr>}</tbody></table></div></Card>
+    {!holiday&&<div className="mobile-attendance-dock" aria-label="Quick attendance action">
+      <div className="mobile-attendance-dock-status"><span className="pulse-dot"/><span><b>{todayRow?.check_in_at?(todayRow.check_out_at?'Attendance complete':'Currently checked in'):'Not checked in'}</b><small>{todayRow?.check_in_at?formatTime(todayRow.check_in_at):'Ready when you arrive'}</small></span></div>
+      {todayRow?.check_in_at&&!todayRow?.check_out_at
+        ?<Button size="small" onClick={()=>quickPunch('check-out')} loading={punchBusy} icon={LogOut}>Check out</Button>
+        :todayRow?.check_out_at
+          ?<Link className="mobile-attendance-dock-link" to="/attendance">Review</Link>
+          :<Button size="small" onClick={()=>quickPunch('check-in')} loading={punchBusy} icon={LogIn}>Check in</Button>}
+    </div>}
   </>;
 }
 
