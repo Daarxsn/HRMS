@@ -57,7 +57,7 @@ assert.match(attendance,/OFFICE_NETWORK_IPS/);
 assert.doesNotMatch(attendance,/verifyQr|qrToken|'QR'/);
 assert.match(leave,/leaveMutationLimiter/);
 assert.match(leave,/emailLeaveRequestToAdmin/);
-assert.match(leave,/sendEmail/);
+assert.match(leave,/sendHrNotificationEmail/);
 assert.match(leave,/HR_NOTIFICATION_EMAIL/);
 assert.match(attendance,/sendHrNotificationEmail/);
 assert.match(attendance,/Attendance correction request/);
