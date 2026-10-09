@@ -6,6 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.mts';
+import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, isScheduledWorkday } from '../policy.mts';
 import { saveObject, deleteObject, readObject } from '../object-storage.mts';
