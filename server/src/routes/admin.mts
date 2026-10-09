@@ -7,7 +7,7 @@ import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
-import { htmlEscape, sendEmail, smtpConfigured } from '../mailer.mts';
+import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -110,7 +110,8 @@ router.get('/email-status', asyncRoute(async (req,res)=>{
     port:Number(process.env.SMTP_PORT || 587),
     secure:String(process.env.SMTP_SECURE || 'false').toLowerCase()==='true',
     from:process.env.SMTP_FROM ? String(process.env.SMTP_FROM).trim() : (process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : null),
-    required:String(process.env.SMTP_REQUIRED || 'false').toLowerCase()==='true'
+    required:String(process.env.SMTP_REQUIRED || 'false').toLowerCase()==='true',
+    hrNotificationEmail:getHrNotificationEmail()
   });
 }));
 router.post('/email-test', adminMutationLimiter, asyncRoute(async (req,res)=>{
