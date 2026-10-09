@@ -2049,3 +2049,108 @@ html[data-theme="dark"] .employee-mobile-quick-actions i,html[data-theme="dark"]
   html[data-theme="dark"] .mobile-admin-attendance-grid small,html[data-theme="dark"] .mobile-admin-attendance-foot{color:#9ba8a1}
 }
 @media(min-width:721px){.mobile-admin-attendance-list{display:none!important}}
+
+/* Profile · Notifications · Requests responsive product pass */
+@media(min-width:721px) and (max-width:1024px){
+  .profile-page{max-width:none}
+  .profile-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .notification-page-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .notification-page-toolbar{flex-wrap:wrap}
+  .approval-request{grid-template-columns:40px minmax(0,1fr) auto}
+}
+
+@media(max-width:720px){
+  /* Profile becomes a compact mobile identity workspace */
+  .profile-page{width:100%;gap:11px}
+  .profile-identity-card{padding:18px;border-radius:18px!important}
+  .profile-identity{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:13px}
+  .profile-identity-avatar{width:76px;height:76px;flex-basis:76px;border-width:3px}
+  .profile-identity-copy h2{font-size:22px;line-height:1.08}
+  .profile-identity-copy p{margin:5px 0 8px;font-size:10px;line-height:1.35}
+  .profile-identity-meta{gap:5px}
+  .profile-identity-meta span{padding:5px 7px;font-size:8px}
+  .profile-identity>.status{grid-column:1/-1;margin:0;justify-self:start}
+  .profile-photo-actions-clean{margin-top:15px;padding-top:13px;gap:7px}
+  .profile-photo-actions-clean .photo-button,.profile-photo-actions-clean .photo-remove-button{min-height:42px;flex:1;justify-content:center}
+  .profile-info-card{padding:18px}
+  .profile-info-heading>div{align-items:flex-start}
+  .profile-info-heading h2{font-size:17px}
+  .profile-info-heading p{font-size:9px}
+  .profile-info-grid{grid-template-columns:1fr 1fr;margin-top:17px;border-radius:11px;overflow:hidden}
+  .profile-info-grid>div{padding:11px 10px!important;min-height:68px}
+  .profile-info-grid>div:nth-child(odd){border-left:0}
+  .profile-info-grid span{font-size:7px!important}
+  .profile-info-grid b{font-size:10px!important}
+  .profile-contact-form{gap:11px}
+  .profile-security{font-size:8px!important;line-height:1.45}
+  .profile-preferences-card{padding:18px}
+  .profile-preferences-heading h2{font-size:17px}
+  .profile-preferences-heading p{font-size:9px}
+  .preference-row{margin-top:13px;padding-top:13px}
+  .preference-segment{width:100%}
+  .preference-segment button{min-height:42px}
+  .privacy-card{padding:16px!important}
+  
+  /* Notifications becomes a scan-first feed */
+  .notification-page-summary{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .notification-page-summary>.card{min-height:76px;padding:11px!important;border-radius:13px!important}
+  .notification-page-summary>.card>span{width:28px!important;height:28px!important}
+  .notification-page-summary b{font-size:15px!important}
+  .notification-page-summary small{font-size:7px!important}
+  .notification-page-toolbar{display:flex!important;flex-direction:column;gap:9px!important}
+  .notification-filter-stack{width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+  .notification-filter-stack::-webkit-scrollbar{display:none}
+  .notification-filter-stack .approval-tabs{flex:0 0 auto}
+  .notification-kind-tabs{padding-left:9px}
+  .notification-toolbar-actions{width:100%;justify-content:space-between}
+  .notification-toolbar-actions .icon-button{width:44px;height:44px}
+  .notification-toolbar-actions .text-button{min-height:40px;padding:0 12px}
+  .notification-page-card{border-radius:16px!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible}
+  .notification-page-list{gap:7px}
+  .notification-page-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:14px!important;border:1px solid #e5ebe7!important;border-radius:14px!important;background:#fff!important;box-shadow:var(--shadow-xs);min-height:72px}
+  .notification-page-item-unread{box-shadow:inset 3px 0 0 #67AF7A,var(--shadow-xs)}
+  .notification-page-icon{width:34px;height:34px}
+  .notification-page-copy b{font-size:10px!important;line-height:1.35}
+  .notification-page-copy small{font-size:9px!important;line-height:1.45;margin-top:4px}
+  .notification-page-copy em{font-size:7px!important;margin-top:6px}
+  .notification-page-state{font-size:7px;padding-top:3px;white-space:nowrap}
+  
+  /* Requests review cards get app-like thumb actions */
+  .approval-command-bar{margin-bottom:10px;padding:13px!important;border-radius:15px!important}
+  .approval-command-intro b{font-size:14px}
+  .approval-command-intro small{font-size:8px;line-height:1.4}
+  .approval-command-metrics{width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+  .approval-command-metrics::-webkit-scrollbar{display:none}
+  .approval-command-metrics button{flex:0 0 78px;min-height:58px}
+  .approval-workspace{border-radius:16px!important;box-shadow:none!important;background:transparent!important;overflow:visible}
+  .approval-workspace-toolbar{padding:0 0 10px!important;background:transparent!important;border:0!important}
+  .approval-list{padding:0;gap:8px}
+  .approval-request{grid-template-columns:34px minmax(0,1fr);gap:10px;padding:14px!important;border-radius:15px!important}
+  .approval-request-main{min-width:0}
+  .approval-request-top{display:flex;gap:7px;justify-content:space-between;align-items:center}
+  .approval-category{font-size:7px!important}
+  .approval-request-date{font-size:7px!important;white-space:nowrap}
+  .approval-request h3{font-size:12px!important;margin:7px 0 5px}
+  .approval-request-meta{gap:8px!important;flex-wrap:wrap}
+  .approval-request-meta span{font-size:8px!important}
+  .approval-reason{font-size:9px!important;margin-top:7px!important;line-height:1.45!important;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .approval-actions{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 1fr;gap:7px;margin-top:4px}
+  .approval-actions .button{min-height:44px!important}
+  
+  /* Review modal on phones needs maximum decision clarity */
+  .decision-toggle{width:100%;display:grid!important;grid-template-columns:1fr 1fr}
+  .decision-toggle button{min-height:44px!important}
+}
+
+@media(max-width:420px){
+  .profile-identity-card{padding:16px}
+  .profile-identity-avatar{width:68px;height:68px;flex-basis:68px}
+  .profile-identity-copy h2{font-size:20px}
+  .profile-info-grid{grid-template-columns:1fr}
+  .profile-info-grid>div{min-height:60px}
+  .notification-page-summary>.card{min-height:70px;padding:9px!important}
+  .notification-page-summary>.card>span{width:25px!important;height:25px!important}
+  .notification-page-summary b{font-size:13px!important}
+  .notification-page-summary small{font-size:6px!important}
+}
+html[data-theme="dark"] .notification-page-item{background:#151d1a!important;border-color:#29362f!important}
