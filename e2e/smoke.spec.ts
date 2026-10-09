@@ -17,7 +17,7 @@ test('employee can sign in and reach the action center', async ({ page }) => {
 test('administrator can sign in and reach workplace pulse', async ({ page }) => {
   await signInDev(page, 'admin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
-  await expect(page.getByRole('link', { name: /Reports/i })).toBeVisible();
+  await expect(page.getByRole('complementary').getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
 });
 
 test('mobile navigation opens and remains usable', async ({ page }, testInfo) => {
