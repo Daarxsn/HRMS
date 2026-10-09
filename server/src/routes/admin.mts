@@ -115,7 +115,7 @@ router.get('/email-status', asyncRoute(async (req,res)=>{
 }));
 router.post('/email-test', adminMutationLimiter, asyncRoute(async (req,res)=>{
   const result=await sendEmail({
-    to:req.user.email,
+    to:[req.user.email],
     subject:'Falchion Xeniaa HRMS · SMTP test',
     text:'SMTP is configured correctly for Falchion Xeniaa HRMS administrator notifications.',
     html:'<p style="font-family:Arial,sans-serif"><strong>Falchion Xeniaa HRMS</strong><br>SMTP is configured correctly for administrator notifications.</p>'
