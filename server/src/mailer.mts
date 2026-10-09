@@ -257,3 +257,16 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
 }
 
 export { escapeHtml, escapeHtml as htmlEscape };
+
+export const getHrNotificationEmail = () => {
+  const value = String(process.env.HR_NOTIFICATION_EMAIL || '').trim().toLowerCase();
+  if (!value) return null;
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value) ? value : null;
+};
+
+export async function sendHrNotificationEmail(message: Omit<EmailMessage, 'to'>): Promise<{ sent: boolean; skipped: boolean; recipient: string | null }> {
+  const recipient = getHrNotificationEmail();
+  if (!recipient) return { sent:false, skipped:true, recipient:null };
+  const result = await sendEmail({ ...message, to:[recipient] });
+  return { sent:result.sent, skipped:result.skipped, recipient };
+}
