@@ -162,7 +162,9 @@ Vercel Functions have ephemeral local storage. Production profile photos use the
 Vite environment values are embedded at build time. Redeploy the portal after changing either `VITE_API_URL` or `VITE_GOOGLE_CLIENT_ID`.
 ## SMTP email notifications
 
-The HRMS sends a record email to every active administrator when a new leave request is submitted. In-app notifications remain unchanged. Email delivery is configured only through environment variables; SMTP failures are logged and do not cancel or roll back an already-created leave request.
+The HRMS sends each new leave-request record email to **one designated mailbox only**. In-app notifications still reach the appropriate administrators inside HRMS. The application does not send leave-request emails to all three administrator accounts.
+
+Set `HR_NOTIFICATION_EMAIL` to the single administrator/HR mailbox that should receive these email records. Leave emails are never fanned out to multiple administrator addresses.
 
 Configure these server variables in the deployment environment:
 
@@ -173,10 +175,11 @@ Configure these server variables in the deployment environment:
 - `SMTP_PASSWORD`: SMTP password or provider app password
 - `SMTP_FROM`: sender mailbox used for HRMS notifications
 - `SMTP_REQUIRED`: set `true` in production when email delivery must be configured
+- `HR_NOTIFICATION_EMAIL`: the single mailbox that receives leave-request records
 
 The implementation sends a plain-text and HTML email containing the employee, employee code, leave type, dates, working days, reason, and a link to the administrator approval queue. It does not place private attachment files directly into email.
 
-For the current Vercel deployment, add the SMTP variables under **Project Settings → Environment Variables → Production**, then redeploy the application. Never commit SMTP credentials to Git.
+For the current Vercel deployment, add the SMTP variables and `HR_NOTIFICATION_EMAIL` under **Project Settings → Environment Variables → Production**, then redeploy the application. Never commit SMTP credentials to Git.
 
 ## Locked policy defaults
 
