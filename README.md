@@ -160,6 +160,24 @@ This repository deploys as one Vercel **Services** project: the Vite portal hand
 Vercel Functions have ephemeral local storage. Production profile photos use the configured private Google Cloud Storage bucket; the `server/private-uploads/` fallback is for development only. The database must accept encrypted remote connections from Vercel and should have a connection limit sized for function concurrency.
 
 Vite environment values are embedded at build time. Redeploy the portal after changing either `VITE_API_URL` or `VITE_GOOGLE_CLIENT_ID`.
+## SMTP email notifications
+
+The HRMS sends a record email to every active administrator when a new leave request is submitted. In-app notifications remain unchanged. Email delivery is configured only through environment variables; SMTP failures are logged and do not cancel or roll back an already-created leave request.
+
+Configure these server variables in the deployment environment:
+
+- `SMTP_HOST`: SMTP server hostname
+- `SMTP_PORT`: normally `587` for STARTTLS or `465` for direct TLS
+- `SMTP_SECURE`: `false` for port 587/STARTTLS, `true` for port 465/direct TLS
+- `SMTP_USER`: authenticated SMTP username
+- `SMTP_PASSWORD`: SMTP password or provider app password
+- `SMTP_FROM`: sender mailbox used for HRMS notifications
+- `SMTP_REQUIRED`: set `true` in production when email delivery must be configured
+
+The implementation sends a plain-text and HTML email containing the employee, employee code, leave type, dates, working days, reason, and a link to the administrator approval queue. It does not place private attachment files directly into email.
+
+For the current Vercel deployment, add the SMTP variables under **Project Settings → Environment Variables → Production**, then redeploy the application. Never commit SMTP credentials to Git.
+
 ## Locked policy defaults
 
 | Setting | Default |
