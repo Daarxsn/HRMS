@@ -6,29 +6,13 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendEmail, smtpConfigured } from '../mailer.mts';
+import { htmlEscape, sendHrNotificationEmail, smtpConfigured } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
 const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
-function getHrNotificationEmail() {
-  const value = String(process.env.HR_NOTIFICATION_EMAIL || '').trim().toLowerCase();
-  if (!value) return null;
-  return z.string().email().safeParse(value).success ? value : null;
-}
-
 async function emailLeaveRequestToAdmin(request) {
-  const recipient = getHrNotificationEmail();
-  if (!recipient) {
-    console.warn(JSON.stringify({
-      type:'leave_request_email_skipped',
-      request_id:request.id,
-      reason:'HR_NOTIFICATION_EMAIL is not configured or is invalid'
-    }));
-    return { configured:false, sent:0, recipients:0 };
-  }
-
   const origin = String(process.env.APP_ORIGIN || '').replace(/\/$/, '');
   const approvalUrl = origin ? origin + '/admin/approvals' : '';
   const attachmentNote = request.attachmentId ? 'Supporting document: attached in the HRMS request record.' : 'Supporting document: none.';
@@ -64,20 +48,17 @@ async function emailLeaveRequestToAdmin(request) {
       + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
       + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
       + '</div></body></html>';
-
-    const result = await sendEmail({ to:[recipient], subject, text, html, replyTo:request.employeeEmail });
-    return { configured:true, sent:result.sent ? 1 : 0, recipients:1 };
+    const result = await sendHrNotificationEmail({ subject, text, html, replyTo:request.employeeEmail });
+    return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
   } catch (error) {
     console.warn(JSON.stringify({
       type:'leave_request_email_failed',
       request_id:request.id,
-      recipient,
       error:String(error?.message || error)
     }));
-    return { configured:true, sent:0, recipients:1 };
+    return { configured:smtpConfigured(), sent:0, recipients:0 };
   }
 }
-
 
 async function getLeaveBalances(employee, connection = null) {
   const execute = async (sql: string, values: any = {}): Promise<any> => connection ? (await connection.execute(sql, values))[0] : query(sql, values);
