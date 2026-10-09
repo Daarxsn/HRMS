@@ -41,11 +41,12 @@ router.post('/policies/:id/acknowledge', asyncRoute(async(req,res)=>{
 
 router.get('/admin/overview',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req);
-  const [headcount,departments,attendance,leave,onboarding,assets,policies,separations,upcoming,missingDocs]=await Promise.all([
+  const [headcount,departments,attendance,attendanceTrendRows,leave,onboarding,assets,policies,separations,upcoming,missingDocs]=await Promise.all([
     query(`SELECT COUNT(*) total,SUM(status='ACTIVE') active,SUM(role='ADMIN' AND status='ACTIVE') admins FROM employees`),
     query(`SELECT COALESCE(NULLIF(department,''),'Unassigned') department,COUNT(*) total FROM employees WHERE status='ACTIVE' GROUP BY COALESCE(NULLIF(department,''),'Unassigned') ORDER BY total DESC,department LIMIT 12`),
     query(`SELECT COUNT(DISTINCT employee_id) present,SUM(status='LATE_ENTRY') late,SUM(status='ABSENT') absent FROM attendance_records WHERE attendance_date BETWEEN DATE_SUB(CURDATE(),INTERVAL 29 DAY) AND CURDATE()`),
-    query(`SELECT leave_type,SUM(CASE WHEN status='APPROVED' THEN days ELSE 0 END) approved,SUM(CASE WHEN status='PENDING' THEN days ELSE 0 END) pending FROM leave_requests WHERE start_date>=DATE_FORMAT(CURDATE(),'%Y-01-01') GROUP BY leave_type ORDER BY leave_type`),
+    query(`SELECT DATE_FORMAT(attendance_date,'%Y-%m') month,COUNT(DISTINCT employee_id) present,SUM(status='LATE_ENTRY') late,SUM(status='ABSENT') absent FROM attendance_records WHERE attendance_date>=DATE_SUB(CURDATE(),INTERVAL 5 MONTH) GROUP BY month ORDER BY month`),
+    query(`SELECT leave_type,SUM(CASE WHEN status='APPROVED' THEN days ELSE 0 END) approved,SUM(CASE WHEN status='PENDING' THEN days ELSE 0 END) pending,SUM(CASE WHEN status IN ('APPROVED','PENDING') THEN days ELSE 0 END) committed FROM leave_requests WHERE start_date>=DATE_FORMAT(CURDATE(),'%Y-01-01') GROUP BY leave_type ORDER BY leave_type`),
     query(`SELECT status,COUNT(*) total FROM onboarding_tasks GROUP BY status`),
     query(`SELECT status,COUNT(*) total FROM company_assets GROUP BY status`),
     query(`SELECT p.id,p.title,p.category,p.version,p.status,p.published_at,(SELECT COUNT(*) FROM employees e WHERE e.status='ACTIVE' AND e.role='EMPLOYEE') active_people,(SELECT COUNT(*) FROM policy_acknowledgements a WHERE a.policy_id=p.id) acknowledgements FROM company_policies p ORDER BY p.updated_at DESC LIMIT 12`),
@@ -55,8 +56,10 @@ router.get('/admin/overview',adminLimiter,asyncRoute(async(req,res)=>{
   ]);
   const onboardingSummary=onboarding.reduce((a,r)=>{a[r.status]=Number(r.total);return a;},{});
   const assetSummary=assets.reduce((a,r)=>{a[r.status]=Number(r.total);return a;},{});
+  const attendanceTrend=attendanceTrendRows.map((x)=>({...x,present:Number(x.present||0),late:Number(x.late||0),absent:Number(x.absent||0)}));
+  const leaveSummary=leave.map((x)=>({...x,approved:Number(x.approved||0),pending:Number(x.pending||0),committed:Number(x.committed||0)}));
   const policySummary=policies.map((p)=>({...p,active_people:Number(p.active_people),acknowledgements:Number(p.acknowledgements),acknowledgement_percent:p.active_people?Math.round(Number(p.acknowledgements)*100/Number(p.active_people)):0}));
-  res.json({headcount:{total:Number(headcount[0]?.total||0),active:Number(headcount[0]?.active||0),admins:Number(headcount[0]?.admins||0)},departments:departments.map((x)=>({...x,total:Number(x.total)})),attendance30d:{present:Number(attendance[0]?.present||0),late:Number(attendance[0]?.late||0),absent:Number(attendance[0]?.absent||0)},leave:leave.map((x)=>({...x,approved:Number(x.approved||0),pending:Number(x.pending||0)})),onboarding:{summary:onboardingSummary,progressPercent:progress(onboarding).percent},assets:assetSummary,policies:policySummary,separations,upcomingProbation:upcoming,missingDocuments:missingDocs});
+  res.json({headcount:{total:Number(headcount[0]?.total||0),active:Number(headcount[0]?.active||0),admins:Number(headcount[0]?.admins||0)},departments:departments.map((x)=>({...x,total:Number(x.total)})),attendance30d:{present:Number(attendance[0]?.present||0),late:Number(attendance[0]?.late||0),absent:Number(attendance[0]?.absent||0)},attendanceTrend,leave:leaveSummary,onboarding:{summary:onboardingSummary,progressPercent:progress(onboarding).percent},assets:assetSummary,policies:policySummary,separations,upcomingProbation:upcoming,missingDocuments:missingDocs});
 }));
 
 router.get('/admin/employees/:id/lifecycle',adminLimiter,asyncRoute(async(req,res)=>{
