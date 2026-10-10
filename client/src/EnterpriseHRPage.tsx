@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, FileText, Laptop, LockKeyhole, Plus, ShieldCheck, UserPlus, Users, X } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
 
@@ -34,9 +34,20 @@ export default function EnterpriseHRPage() {
       setSelectedId((current)=>current||peopleRows.users?.[0]?.id||'');
     } catch(e) { setError(e.message||'Could not load HR operations.'); } finally { setLoading(false); }
   };
+  const lifecycleRequest = useRef(0);
   const loadLifecycle=async(id)=>{
-    if(!id)return;
-    try { setLifecycle(await get('/enterprise/admin/employees/'+id+'/lifecycle')); } catch(e) { setNotice(e.message||'Could not load employee lifecycle.'); }
+    const requestId = ++lifecycleRequest.current;
+    if(!id){setLifecycle(null);return;}
+    setLifecycle(null);
+    try {
+      const result = await get('/enterprise/admin/employees/'+id+'/lifecycle');
+      if(requestId === lifecycleRequest.current) setLifecycle(result);
+    } catch(e) {
+      if(requestId === lifecycleRequest.current) {
+        setLifecycle(null);
+        setNotice(e.message||'Could not load employee lifecycle.');
+      }
+    }
   };
   useEffect(()=>{load();},[]);
   useEffect(()=>{if(selectedId)loadLifecycle(selectedId);},[selectedId]);
