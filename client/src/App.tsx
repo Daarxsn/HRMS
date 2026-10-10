@@ -77,8 +77,8 @@ function App({ requestGmailAccess = null }) {
   const [bootError,setBootError]=useState('');
   const [notifications,setNotifications]=useState({unread:0,notifications:[]});
   const [refresh,setRefresh]=useState(0);
-  const [theme,setTheme]=useState(()=>localStorage.getItem('hrms-theme')||'light');
-  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('hrms-theme',theme);},[theme]);
+  const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('hrms-theme')||'light';}catch{return 'light';}});
+  useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('hrms-theme',theme);}catch{/* Theme remains active for this session when storage is unavailable. */}},[theme]);
   const notify=(message,type='success')=>setToast({message,type});
   const refreshNotifications=async()=>{if(!user)return;try{setNotifications(await get('/account/notifications'));}catch{}}
   useEffect(()=>{
@@ -108,7 +108,6 @@ function App({ requestGmailAccess = null }) {
     window.addEventListener('hrms:session-expired',onSessionExpired);
     return ()=>window.removeEventListener('hrms:session-expired',onSessionExpired);
   },[]);
-  useEffect(()=>{ if(import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
   const gmailRequest = requestGmailAccess || (async () => { throw new Error('Google Gmail access is not configured for this deployment.'); });
   const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme,requestGmailAccess:gmailRequest}),[user,notifications,theme,requestGmailAccess]);
   const retryBoot=()=>{setBootError('');setLoading(true);window.location.reload();};
@@ -581,7 +580,7 @@ function LeavePage(){
   useEffect(()=>{load();},[]);
   const sickDays=type==='SICK'&&startDate&&endDate?Math.round((new Date(`${endDate}T12:00:00`)-new Date(`${startDate}T12:00:00`))/86400000)+1:0;
   const requiresDoctorNote=type==='SICK'&&sickDays>=3;
-  const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{let attachmentId;if(file){const form=new FormData();form.append('file',file);const upload=await post('/files',form);attachmentId=upload.id;}const gmailAccessToken=await requestGmailAccess();const result=await post('/leave',{type,startDate,endDate,reason,attachmentId,gmailAccessToken});notify(result?.emailDelivery?.sent?`Leave request sent. ${result.emailDelivery.sent} admin email(s) recorded.`:'Leave request sent for review.');setStart('');setEnd('');setReason('');setFile(null);await load();refresh();}catch(e){setError(e.message);}finally{setBusy(false);}};
+  const submit=async(e)=>{e.preventDefault();setError('');if(!startDate||!endDate){setError('Choose both the first and last day of your leave.');return;}if(endDate<startDate){setError('The last day cannot be before the first day.');return;}if(requiresDoctorNote&&!file){setError('Attach a doctor’s note for sick leave of 3 or more consecutive calendar days.');return;}setBusy(true);try{const gmailAccessToken=await requestGmailAccess();let attachmentId;if(file){const form=new FormData();form.append('file',file);const upload=await post('/files',form);attachmentId=upload.id;}const result=await post('/leave',{type,startDate,endDate,reason,attachmentId,gmailAccessToken});notify(result?.emailDelivery?.sent?`Leave request sent. ${result.emailDelivery.sent} admin email(s) recorded.`:'Leave request sent for review.');setStart('');setEnd('');setReason('');setFile(null);await load();refresh();}catch(e){setError(e.message);}finally{setBusy(false);}};
   const withdraw=async(id)=>{if(!window.confirm('Withdraw this pending leave request?'))return;setWithdrawBusy(id);setError('');try{await del(`/leave/${id}`);notify('The pending request was withdrawn.');await load();refresh();}catch(e){setError(e.message);}finally{setWithdrawBusy(null);}};
   const balanceCards=[balances.find((b)=>b.type==='CASUAL'),balances.find((b)=>b.type==='EARNED'),balances.find((b)=>b.type==='FLOATING')].filter(Boolean);
   const upcomingLeave=requests.filter((r)=>r.status==='APPROVED'&&String(r.end_date||r.start_date)>=today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date))).slice(0,3);

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const app = fs.readFileSync(path.join(root, 'src/App.tsx'), 'utf8');
+const enterprise = fs.readFileSync(path.join(root, 'src/EnterpriseHRPage.tsx'), 'utf8');
 const api = fs.readFileSync(path.join(root, 'src/api.ts'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const manifest = fs.readFileSync(path.join(root, 'public/manifest.webmanifest'), 'utf8');
@@ -38,14 +39,18 @@ assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contrac
 assert.ok(app.includes('What needs your attention'), 'Employee action-center contract missing');
 assert.ok(app.includes('approved this month') || app.includes('approvedWfhThisMonth'), 'Employee WFH usage visibility contract missing');
 assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract missing');
+assert.ok(app.includes('Attach a doctor’s note for sick leave of 3 or more consecutive calendar days.'), 'Sick leave doctor-note validation contract missing');
+assert.ok(app.includes('The last day cannot be before the first day.'), 'Leave date range validation contract missing');
 assert.ok(app.includes('path="/notifications"'), 'Employee notifications route contract missing');
 assert.ok(app.includes('get(\'/account/notifications\')'), 'Employee notifications API integration contract missing');
 assert.ok(app.includes('Workplace pulse'), 'Administrator workplace pulse contract missing');
 assert.ok(app.includes('Next to review'), 'Administrator review preview contract missing');
 assert.ok(app.includes("get('/admin/approvals')"), 'Administrator approval queue integration contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
+assert.ok(api.includes('Z|[+-]'), 'Timezone-aware timestamp parsing contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
 assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the production UI');
+assert.ok(!/\balert\s*\(/.test(enterprise), 'Enterprise HR actions must not use blocking browser alerts');
 assert.ok(sw.includes("url.pathname.startsWith('/api/')"), 'Service worker must exclude API responses');
 assert.ok(manifest.includes('"display": "standalone"'), 'PWA standalone display contract missing');
 assert.ok(index.includes('Permissions-Policy'), 'Browser Permissions-Policy contract missing');
