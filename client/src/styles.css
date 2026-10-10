@@ -2737,6 +2737,62 @@ html[data-theme] .calendar-holiday-floating small {
   color: var(--ui-text);
 }
 
+/* High-specificity overrides for legacy calendar rules that used !important. */
+html[data-theme] .calendar-toolbar h2 {
+  color: var(--ui-text)!important;
+}
+html[data-theme] .calendar-eyebrow,
+html[data-theme] .calendar-weekdays span,
+html[data-theme] .calendar-day b,
+html[data-theme] .calendar-sunday b {
+  color: var(--ui-text-muted)!important;
+}
+html[data-theme] .calendar-day small {
+  color: var(--ui-text)!important;
+  background-color: var(--ui-surface-muted)!important;
+  border: 1px solid var(--ui-border);
+}
+html[data-theme] .calendar-holiday-fixed {
+  background-color: var(--ui-danger-bg)!important;
+  border-color: rgba(147,19,20,.30)!important;
+}
+html[data-theme] .calendar-holiday-floating {
+  background-color: var(--ui-selected)!important;
+  border-color: rgba(218,175,81,.50)!important;
+}
+html[data-theme] .calendar-holiday-fixed small {
+  color: var(--ui-danger-text)!important;
+  background-color: var(--ui-danger-bg)!important;
+}
+html[data-theme] .calendar-holiday-floating small {
+  color: var(--ui-text)!important;
+  background-color: var(--ui-selected)!important;
+}
+html[data-theme] .calendar-today {
+  background: var(--ui-selected)!important;
+  box-shadow: inset 0 0 0 2px rgba(218,175,81,.55);
+}
+html[data-theme] .calendar-today:before { background-color: var(--fx-gold)!important; }
+html[data-theme] .calendar-today b {
+  color: var(--fx-saffron-red)!important;
+  font-weight: 800;
+}
+html[data-theme="dark"] .calendar-today b { color: var(--fx-gold)!important; }
+html[data-theme] :is(.holiday-date,.holiday-count,.holiday-section-meta .holiday-count) {
+  background-color: var(--ui-surface-muted)!important;
+  color: var(--ui-text)!important;
+  border-color: var(--ui-border);
+}
+html[data-theme] .holiday-row-copy b { color: var(--ui-text)!important; }
+html[data-theme] .holiday-row-copy small { color: var(--ui-text-muted)!important; }
+html[data-theme] :is(.calendar-note,.calendar-note-wide) {
+  background-color: var(--ui-surface-muted)!important;
+  color: var(--ui-text)!important;
+  border-color: var(--ui-border);
+}
+html[data-theme] :is(.calendar-note b,.calendar-note-wide b) { color: var(--ui-text)!important; }
+html[data-theme] :is(.calendar-note p,.calendar-note-wide p) { color: var(--ui-text-muted)!important; }
+
 /* Buttons, navigation, selection and status pills follow brand semantics. */
 html[data-theme] .button-soft {
   background-color: var(--ui-surface-muted)!important;
