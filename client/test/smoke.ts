@@ -75,4 +75,13 @@ assert.ok(enterprise.includes('setLifecycle(null)'), 'Employee lifecycle panel m
 assert.ok(enterprise.includes('Could not load onboarding tasks.'), 'Onboarding load failures must be surfaced');
 assert.ok(enterprise.includes('Retrying…'), 'Onboarding task loading must provide retry feedback');
 
+assert.ok(enterprise.includes('We couldn’t load your policies'), 'Employee policy errors must offer a clear recovery state');
+assert.ok(enterprise.includes('Try again'), 'Employee policy loading must provide retry feedback');
+assert.ok(app.includes("localStorage.getItem('hrms-theme')"), 'Appearance preference must persist across reloads');
+assert.ok(app.includes("document.documentElement.dataset.theme=theme"), 'Appearance preference must update the document theme');
+assert.ok(css.includes('--ui-surface:#171a17'), 'Dark mode must define a semantic dark surface');
+assert.ok(css.includes('--ui-text:#f1f3ef'), 'Dark mode must define readable foreground text');
+assert.ok(css.includes('profile-details-grid'), 'Theme regression coverage must include profile data grids');
+
+
 console.log('Frontend smoke contracts: PASS');
