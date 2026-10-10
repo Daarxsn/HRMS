@@ -8,7 +8,7 @@ try {
     'employees','system_settings','attendance_records','leave_requests','wfh_requests',
     'attendance_correction_requests','flex_start_requests','notifications','audit_logs',
     'company_holidays','attachments','qr_challenges','qr_challenge_uses','temporary_exits',
-    'employee_schedule_exceptions','schema_migrations'
+    'employee_schedule_exceptions','employee_emergency_contacts','employment_history','onboarding_tasks',\n    'employee_documents','company_assets','company_policies','policy_acknowledgements','separation_cases','schema_migrations'
   ];
   for (const table of required) assert.ok(names.has(table), `Missing required table: ${table}`);
 
@@ -16,6 +16,9 @@ try {
   assert.ok(migrationRows.some((row) => row.version === '001_initial_schema.sql'), 'Initial schema migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '002_session_revocation.sql'), 'Session revocation migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '003_retire_qr_setting.sql'), 'QR retirement migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '004_employee_profile_organization.sql'), 'Employee profile organization migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '005_holiday_types.sql'), 'Holiday type migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '006_enterprise_hr.sql'), 'Enterprise HR/policy center migration is not recorded');
   assert.ok(migrationRows.every((row) => /^[a-f0-9]{64}$/.test(String(row.checksum || ''))), 'Every applied migration must have a SHA-256 checksum');
 
   const [employeeRows] = await pool.query("SELECT COUNT(*) AS total FROM employees WHERE status='ACTIVE'");

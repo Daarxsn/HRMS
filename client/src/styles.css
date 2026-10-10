@@ -3268,3 +3268,244 @@ table tbody tr { transition: background-color .14s ease; }
 html[data-theme] .calendar-day {
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease!important;
 }
+
+
+/* ==========================================================================
+   PHASE 2 · EMPLOYEE PROFILE, HOLIDAY CALENDAR AND POLICY CENTER
+   Shared semantic tokens keep both themes correct without page-specific palettes.
+   ========================================================================== */
+
+/* Profile: stronger identity hierarchy, refined data cells and resilient states. */
+.profile-page{display:grid;gap:18px;max-width:1240px}
+.profile-loading-strip{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:11px 14px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface);color:var(--ui-text-muted);font-size:12px}
+.profile-load-error{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px;padding:16px;border:1px solid rgba(147,19,20,.3);border-radius:14px;background:var(--ui-danger-bg);color:var(--ui-text)}
+.profile-load-error>span{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border-radius:10px;background:var(--ui-surface);color:var(--ui-danger-text)}
+.profile-load-error>div{min-width:0;flex:1}
+.profile-load-error b{display:block;font-size:13px}
+.profile-load-error p{margin:4px 0 12px;color:var(--ui-text-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.profile-identity-card{position:relative;overflow:hidden;padding:clamp(20px,3vw,32px);border-radius:22px;background:radial-gradient(ellipse at 100% 0,rgba(218,175,81,.10),transparent 42%),var(--ui-surface);border-color:var(--ui-border)}
+.profile-identity{position:relative;display:flex;align-items:center;gap:20px;min-width:0}
+.profile-identity-avatar{display:grid;place-items:center;flex:0 0 auto;width:88px;height:88px;border:2px solid var(--fx-gold);border-radius:50%;overflow:hidden;background:var(--ui-surface-muted);color:var(--ui-text);font-size:25px;font-weight:750;box-shadow:0 0 0 5px var(--ui-selected)}
+.profile-identity-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-identity-copy{min-width:0;flex:1}
+.profile-identity-copy h2{margin:0;color:var(--ui-text);font-size:clamp(22px,2.4vw,30px);line-height:1.18;letter-spacing:-.045em}
+.profile-identity-copy>p{margin:7px 0 13px;color:var(--ui-text-muted);font-size:13px;line-height:1.5}
+.profile-identity-copy>p span{color:var(--fx-gold);padding:0 3px}
+.profile-identity-meta{display:flex;flex-wrap:wrap;gap:7px}
+.profile-identity-meta span{display:inline-flex;align-items:center;min-height:27px;padding:5px 10px;border:1px solid var(--ui-border);border-radius:999px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:11px;font-weight:650}
+.profile-identity>.status{align-self:flex-start;flex:0 0 auto}
+.profile-photo-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:23px;padding-top:18px;border-top:1px solid var(--ui-border)}
+.profile-photo-actions .photo-button,.profile-photo-actions .photo-remove-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface-muted);color:var(--ui-text);font-size:12px;font-weight:700;cursor:pointer;transition:background-color .16s ease,border-color .16s ease}
+.profile-photo-actions .photo-button:hover,.profile-photo-actions .photo-remove-button:hover:not(:disabled){border-color:var(--fx-gold);background:var(--ui-hover)}
+.profile-photo-actions .photo-button input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.profile-photo-actions .photo-remove-button{color:var(--ui-danger-text);border-color:rgba(147,19,20,.28)}
+.profile-photo-actions .photo-remove-button:disabled{opacity:.6;cursor:not-allowed}
+.profile-photo-hint{margin-left:auto;color:var(--ui-text-muted);font-size:11px}
+.profile-info-card,.profile-preferences-card{padding:clamp(18px,2.4vw,28px);border-radius:20px}
+.profile-info-heading{margin-bottom:0}
+.profile-info-heading>div,.profile-preferences-heading{display:flex;align-items:center;gap:12px}
+.profile-info-heading h2,.profile-preferences-heading h2{margin:0;color:var(--ui-text);font-size:17px;letter-spacing:-.025em}
+.profile-info-heading p,.profile-preferences-heading p{margin:4px 0 0;color:var(--ui-text-muted);font-size:12px;line-height:1.6}
+.profile-info-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 auto;border:1px solid var(--ui-border);border-radius:13px;background:var(--ui-selected);color:var(--fx-saffron-red)}
+html[data-theme="dark"] .profile-info-icon{color:var(--fx-gold)}
+.profile-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:22px;border:1px solid var(--ui-border);border-radius:15px;overflow:hidden;background:var(--ui-surface)}
+.profile-info-grid>div{display:flex;flex-direction:column;justify-content:center;min-width:0;min-height:82px;padding:16px 17px;background:var(--ui-surface);border:0;border-right:1px solid var(--ui-border);border-bottom:1px solid var(--ui-border);transition:background-color .16s ease}
+.profile-info-grid>div:nth-child(3n){border-right:0}
+.profile-info-grid>div:nth-last-child(-n+3){border-bottom:0}
+.profile-info-grid span{margin:0 0 8px;color:var(--ui-text-muted);font-size:10px;line-height:1.4;font-weight:700;letter-spacing:.045em;text-transform:uppercase}
+.profile-info-grid b{display:block;min-width:0;margin:0;color:var(--ui-text);font-size:13px;line-height:1.5;overflow-wrap:anywhere;font-weight:700}
+.profile-info-grid .profile-value-wrap{font-size:12px}
+.profile-contact-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:22px}
+.profile-contact-form .form-field{display:grid;align-content:start;gap:7px;min-width:0}
+.profile-contact-form .form-field>span{color:var(--ui-text-muted);font-size:11px;font-weight:700}
+.profile-contact-form .form-field input{width:100%;min-width:0;min-height:43px;padding:0 12px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-field);color:var(--ui-field-text);font-size:13px}
+.profile-contact-form .form-field input:disabled{opacity:1;background:var(--ui-surface-muted);color:var(--ui-text-muted)}
+.profile-contact-form .profile-security{grid-column:1/-1;align-items:center;padding:12px 13px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:11px;line-height:1.6}
+.profile-contact-form .profile-security svg{color:var(--fx-gold)}
+.profile-contact-form>.button{justify-self:start;min-width:180px}
+.profile-preferences-card{display:grid;gap:0}
+.profile-preferences-heading{padding-bottom:8px}
+.preference-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 0;border-top:1px solid var(--ui-border)}
+.preference-row>div:first-child{display:grid;gap:5px}
+.preference-row b{color:var(--ui-text);font-size:13px}
+.preference-row small{color:var(--ui-text-muted);font-size:11px;line-height:1.5}
+.preference-segment{display:inline-flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-muted)}
+.preference-segment button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:0 12px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--ui-text-muted);font-size:12px;font-weight:700;cursor:pointer}
+.preference-segment button.active{background:var(--ui-selected);color:var(--ui-text);border-color:rgba(218,175,81,.45);box-shadow:0 1px 2px rgba(17,17,17,.04)}
+.preference-note{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:11px}
+.privacy-card{display:flex;align-items:flex-start;gap:13px;padding:19px 22px;border:1px solid var(--ui-border);border-radius:17px;background:var(--ui-surface-muted);color:var(--ui-text)}
+.privacy-card .privacy-icon{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-selected);color:var(--fx-saffron-red)}
+html[data-theme="dark"] .privacy-card .privacy-icon{color:var(--fx-gold)}
+.privacy-card b{display:block;color:var(--ui-text);font-size:13px}
+.privacy-card p{margin:5px 0 0;color:var(--ui-text-muted);font-size:12px;line-height:1.7}
+
+/* Calendar: stable theme-aware event surfaces, loading feedback and retry states. */
+.calendar-card{padding:clamp(16px,2.3vw,28px);border-radius:20px}
+.calendar-toolbar{gap:16px}
+.calendar-toolbar h2{color:var(--ui-text)!important;font-size:clamp(20px,2.2vw,28px)!important;letter-spacing:-.045em}
+.calendar-eyebrow{color:var(--ui-text-muted)!important;font-size:10px;letter-spacing:.13em}
+.calendar-controls{flex:0 0 auto}
+.calendar-controls .icon-button{display:grid;place-items:center;border:1px solid var(--ui-border);background:var(--ui-surface-muted);color:var(--ui-text)}
+.calendar-controls .icon-button:hover{border-color:var(--fx-gold);background:var(--ui-hover)}
+.calendar-weekdays{border-bottom-color:var(--ui-border)}
+.calendar-grid{border-color:var(--ui-border)}
+.calendar-day{min-width:0;min-height:82px;padding:10px;border-color:var(--ui-border);background:var(--ui-surface);transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease!important}
+.calendar-day b{font-size:12px!important;color:var(--ui-text-muted)!important}
+.calendar-sunday b{color:var(--ui-text-muted)!important;opacity:.76}
+.calendar-day-empty{background:var(--ui-surface-muted)!important}
+.calendar-day small{font-size:9px!important;line-height:1.35;padding:5px 6px;color:var(--ui-text)!important;background:var(--ui-surface-muted)!important;border:1px solid var(--ui-border)}
+.calendar-holiday-fixed{background:var(--ui-danger-bg)!important;border-color:rgba(147,19,20,.24)!important}
+.calendar-holiday-floating{background:var(--ui-selected)!important;border-color:rgba(218,175,81,.48)!important}
+.calendar-holiday-fixed small{color:var(--ui-danger-text)!important;background:var(--ui-danger-bg)!important;border-color:rgba(147,19,20,.28)}
+.calendar-holiday-floating small{color:var(--ui-text)!important;background:var(--ui-selected)!important;border-color:rgba(218,175,81,.42)}
+.calendar-today{background:var(--ui-selected)!important;box-shadow:inset 0 0 0 2px rgba(218,175,81,.6)!important}
+.calendar-today b{color:var(--fx-saffron-red)!important;font-weight:800}
+html[data-theme="dark"] .calendar-today b{color:var(--fx-gold)!important}
+.calendar-today:before{background:var(--fx-gold)!important}
+.calendar-legend{align-items:center;flex-wrap:wrap;gap:12px 19px;color:var(--ui-text-muted)}
+.calendar-legend i{width:7px;height:7px;flex:0 0 auto;border-radius:50%}
+.calendar-legend .legend-fixed{background:var(--fx-saffron-red)}
+.calendar-legend .legend-floating{background:var(--fx-gold)}
+.calendar-legend .legend-done{background:var(--fx-gold)}
+.holiday-section{margin-top:28px}
+.holiday-section-head{gap:14px}
+.holiday-section-head h2{color:var(--ui-text);font-size:22px;letter-spacing:-.035em}
+.holiday-section-head p{color:var(--ui-text-muted)}
+.holiday-section-meta{color:var(--ui-text-muted)}
+.holiday-count,.holiday-section-meta .holiday-count{background:var(--ui-selected)!important;color:var(--ui-text)!important;border:1px solid rgba(218,175,81,.4)}
+.holidays-card-wide{padding:0 clamp(16px,2vw,26px);border-radius:19px}
+.holiday-grid{column-gap:25px}
+.holiday-grid .holiday-row{border-top-color:var(--ui-border)}
+.holiday-date{background:var(--ui-surface-muted)!important;color:var(--ui-text)!important;border:1px solid var(--ui-border)}
+.holiday-row-copy b{color:var(--ui-text)!important;font-size:12px!important}
+.holiday-row-copy small{color:var(--ui-text-muted)!important;font-size:11px!important}
+.holiday-pin{color:var(--fx-gold)}
+.calendar-note-wide,.calendar-note{border:1px solid var(--ui-border);background:var(--ui-surface-muted)!important;color:var(--ui-text)}
+.calendar-note b,.calendar-note-wide b{color:var(--ui-text)!important;font-size:12px}
+.calendar-note p,.calendar-note-wide p{color:var(--ui-text-muted)!important;font-size:11px;line-height:1.65}
+.calendar-note>span{color:var(--fx-gold)}
+.calendar-refreshing{display:inline-flex;align-items:center;gap:7px;margin-top:9px;color:var(--ui-text-muted);font-size:11px}
+.calendar-refreshing .spinner{width:13px;height:13px}
+.calendar-load-error{display:flex;align-items:flex-start;gap:12px;margin:0 0 16px;padding:15px 17px;border:1px solid rgba(147,19,20,.3);border-radius:14px;background:var(--ui-danger-bg);color:var(--ui-text)}
+.calendar-load-error-icon{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border-radius:10px;background:var(--ui-surface);color:var(--ui-danger-text)}
+.calendar-load-error>div{min-width:0;flex:1}
+.calendar-load-error b{display:block;font-size:13px}
+.calendar-load-error p,.calendar-empty-error p{margin:4px 0 12px;color:var(--ui-text-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.calendar-created-message{align-items:center}
+.calendar-created-message>button{margin-left:auto;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--ui-border);border-radius:8px;background:transparent;color:inherit}
+.calendar-list-loading{display:flex;align-items:center;justify-content:center;gap:10px;min-height:110px;color:var(--ui-text-muted)}
+.calendar-empty-error{display:grid;justify-items:start;gap:6px;padding:26px 10px;color:var(--ui-text)}
+.calendar-empty-error>svg{color:var(--fx-saffron-red)}
+.calendar-empty-error b{font-size:13px}
+.calendar-empty-error p{max-width:520px;margin:0 0 8px}
+
+/* Policy Center: usable loading/error/retry states and readable long-form policy copy. */
+.employee-policy-page{gap:18px}
+.employee-policy-hero{position:relative;overflow:hidden;min-height:190px;align-items:center;background:radial-gradient(circle at 92% 50%,rgba(218,175,81,.15),transparent 24%),linear-gradient(115deg,rgba(147,19,20,.07),rgba(218,175,81,.12)),var(--ui-surface);border-color:rgba(218,175,81,.38)}
+.employee-policy-hero h1{max-width:760px}
+.employee-policy-hero p{max-width:720px}
+.employee-policy-hero-mark{display:grid;place-items:center;gap:10px;flex:0 0 100px;width:100px;height:100px;border:1px solid rgba(218,175,81,.42);border-radius:26px;background:var(--ui-selected);color:var(--fx-gold);transform:rotate(3deg)}
+.employee-policy-hero-mark span{font-size:8px;line-height:1.6;letter-spacing:.15em;text-align:center;font-weight:800}
+.employee-policies-panel{padding:clamp(18px,2.7vw,30px);border-radius:20px}
+.employee-policy-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:19px;padding-bottom:19px;border-bottom:1px solid var(--ui-border)}
+.employee-policy-panel-head h2{margin:5px 0 4px;color:var(--ui-text);font-size:20px;letter-spacing:-.035em}
+.employee-policy-panel-head p{margin:0;color:var(--ui-text-muted);font-size:12px;line-height:1.5}
+.employee-policy-panel-head .button{flex:0 0 auto}
+.employee-policy-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.employee-policy-summary>div{display:grid;gap:5px;min-width:0;padding:14px 16px;border:1px solid var(--ui-border);border-radius:13px;background:var(--ui-surface-muted)}
+.employee-policy-summary span{color:var(--ui-text-muted);font-size:10px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+.employee-policy-summary b{color:var(--ui-text);font-size:24px;line-height:1.15;letter-spacing:-.04em}
+.employee-policy-summary small{color:var(--ui-text-muted);font-size:10px;line-height:1.45}
+.employee-policy-list{display:grid}
+.employee-policy-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:24px;padding:23px 0;border-bottom:1px solid var(--ui-border)}
+.employee-policy-card:first-child{padding-top:10px}
+.employee-policy-card:last-child{padding-bottom:4px;border-bottom:0}
+.employee-policy-content{min-width:0}
+.employee-policy-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.employee-policy-meta .eyebrow{color:var(--fx-saffron-red);font-size:10px;letter-spacing:.12em}
+html[data-theme="dark"] .employee-policy-meta .eyebrow{color:var(--fx-gold)}
+.employee-policy-meta .policy-version{display:inline-flex;align-items:center;min-height:23px;padding:3px 8px;border:1px solid var(--ui-border);border-radius:999px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:10px;font-weight:700}
+.employee-policy-card h2{margin:0 0 13px;color:var(--ui-text);font-size:18px;line-height:1.4;letter-spacing:-.025em}
+.employee-policy-card .policy-body{max-width:88ch;margin:0;padding:14px 16px;border-left:3px solid var(--fx-gold);border-radius:0 10px 10px 0;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+.employee-policy-published{display:block;margin-top:12px;color:var(--ui-text-muted);font-size:10px}
+.policy-actions{display:flex;align-items:flex-start;justify-content:flex-end;min-width:145px}
+.policy-actions .button{min-width:132px;white-space:nowrap}
+.employee-policy-acknowledged{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 11px;border:1px solid rgba(218,175,81,.45);border-radius:10px;background:var(--ui-selected);color:var(--ui-text);font-size:11px;font-weight:750;white-space:nowrap}
+.employee-policy-error{display:flex;align-items:flex-start;gap:13px;margin:8px 0 15px;padding:17px;border:1px solid rgba(147,19,20,.3);border-radius:14px;background:var(--ui-danger-bg);color:var(--ui-text)}
+.employee-policy-error-icon{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-surface);color:var(--ui-danger-text)}
+.employee-policy-error>div{min-width:0;flex:1}
+.employee-policy-error h2{margin:0 0 6px;color:var(--ui-text);font-size:15px}
+.employee-policy-error p{margin:0 0 10px;color:var(--ui-text-muted);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+.employee-policy-error .employee-policy-error-help{margin-top:3px}
+.employee-policy-inline-error,.employee-policy-inline-success{display:flex;align-items:flex-start;gap:9px;margin:8px 0 14px;padding:11px 13px;border:1px solid var(--ui-border);border-radius:11px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.employee-policy-inline-error{background:var(--ui-danger-bg);color:var(--ui-danger-text);border-color:rgba(147,19,20,.28)}
+.employee-policy-inline-success{background:var(--ui-selected);color:var(--ui-text);border-color:rgba(218,175,81,.42)}
+.employee-policy-inline-error svg,.employee-policy-inline-success svg{flex:0 0 auto}
+.employee-policy-loading{display:flex;align-items:center;justify-content:center;gap:10px;min-height:180px;color:var(--ui-text-muted)}
+.employee-policy-loading p{margin:0;font-size:12px}
+.employee-policy-empty{padding:35px 20px}
+.employee-policy-empty p{max-width:520px;margin:0 auto 16px}
+@media(max-width:900px){
+ .profile-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .profile-info-grid>div:nth-child(3n){border-right:1px solid var(--ui-border)}
+ .profile-info-grid>div:nth-child(2n){border-right:0}
+ .profile-info-grid>div:nth-last-child(-n+3){border-bottom:1px solid var(--ui-border)}
+ .profile-info-grid>div:nth-last-child(-n+2){border-bottom:0}
+ .employee-policy-hero-mark{display:none}
+ .holiday-grid{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px}
+ .holiday-grid .holiday-row:nth-child(-n+3){border-top:1px solid var(--ui-border)}
+ .holiday-grid .holiday-row:nth-child(-n+2){border-top:0}
+}
+@media(max-width:620px){
+ .profile-identity{align-items:flex-start;flex-wrap:wrap;gap:14px}
+ .profile-identity-avatar{width:72px;height:72px}
+ .profile-identity-copy{min-width:calc(100% - 90px);flex:1}
+ .profile-identity>.status{margin-left:86px}
+ .profile-photo-actions{align-items:stretch}
+ .profile-photo-actions .photo-button,.profile-photo-actions .photo-remove-button{flex:1}
+ .profile-photo-hint{width:100%;margin:0}
+ .profile-info-card,.profile-preferences-card{padding:17px}
+ .profile-info-grid{grid-template-columns:1fr 1fr;margin-top:17px}
+ .profile-info-grid>div{min-height:72px;padding:12px 10px}
+ .profile-info-grid>div:nth-child(3n){border-right:1px solid var(--ui-border)}
+ .profile-info-grid>div:nth-child(2n){border-right:0}
+ .profile-info-grid>div:nth-last-child(-n+2){border-bottom:0}
+ .profile-info-grid span{font-size:9px!important}
+ .profile-info-grid b{font-size:11px!important}
+ .profile-contact-form{grid-template-columns:1fr}
+ .profile-contact-form .profile-security{grid-column:auto}
+ .profile-contact-form>.button{width:100%;justify-self:stretch}
+ .preference-row{align-items:flex-start;flex-direction:column;gap:10px}
+ .preference-segment{width:100%}
+ .preference-segment button{flex:1}
+ .calendar-card{padding:12px}
+ .calendar-day{min-height:58px;padding:6px 5px}
+ .calendar-day b{font-size:10px!important}
+ .calendar-day small{font-size:7px!important;padding:3px}
+ .calendar-toolbar h2{font-size:19px!important}
+ .calendar-controls{gap:4px}
+ .calendar-controls .icon-button{width:32px;height:32px;min-width:32px}
+ .calendar-controls .button{min-height:32px;padding:0 9px}
+ .holiday-grid{grid-template-columns:1fr}
+ .holiday-grid .holiday-row:nth-child(n){border-top:1px solid var(--ui-border)}
+ .holiday-grid .holiday-row:first-child{border-top:0}
+ .holiday-section-head{align-items:flex-start}
+ .calendar-load-error{padding:13px}
+ .employee-policy-hero{min-height:0}
+ .employee-policy-hero h1{font-size:clamp(28px,8vw,36px)}
+ .employee-policies-panel{padding:17px}
+ .employee-policy-panel-head{align-items:flex-start}
+ .employee-policy-panel-head h2{font-size:17px}
+ .employee-policy-panel-head .button{padding:0 10px}
+ .employee-policy-summary{grid-template-columns:1fr 1fr}
+ .employee-policy-summary>div:last-child{grid-column:1/-1}
+ .employee-policy-card{grid-template-columns:1fr;gap:14px;padding:19px 0}
+ .employee-policy-card h2{font-size:16px}
+ .employee-policy-card .policy-body{padding:12px;font-size:12px}
+ .policy-actions{justify-content:flex-start;min-width:0}
+ .policy-actions .button{width:100%}
+ .employee-policy-error{padding:13px}
+}
+@media(prefers-reduced-motion:reduce){
+ .profile-photo-actions .photo-button,.profile-photo-actions .photo-remove-button,.profile-info-grid>div{transition:none}
+}

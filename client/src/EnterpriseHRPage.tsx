@@ -189,19 +189,84 @@ function DocumentModal({save,close}) {
 }
 
 export function EmployeePoliciesPage() {
-  const [policies,setPolicies]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busyId,setBusyId]=useState(null);
+  const [policies,setPolicies]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState('');
+  const [actionError,setActionError]=useState('');
+  const [successMessage,setSuccessMessage]=useState('');
+  const [busyId,setBusyId]=useState(null);
+  const policyRequest=useRef(0);
+
   const load=async()=>{
-    setLoading(true);setError('');
-    try {const result=await get('/enterprise/policies');setPolicies(Array.isArray(result.policies)?result.policies:[]);}
-    catch(e){setError(e.message||'Could not load policies.');}
-    finally{setLoading(false);}
+    const requestId=++policyRequest.current;
+    setLoading(true);
+    setLoadError('');
+    setActionError('');
+    setSuccessMessage('');
+    try {
+      const result=await get('/enterprise/policies');
+      if(requestId!==policyRequest.current)return;
+      setPolicies(Array.isArray(result.policies)?result.policies:[]);
+    } catch(e) {
+      if(requestId===policyRequest.current)setLoadError(e.message||'Could not load published policies.');
+    } finally {
+      if(requestId===policyRequest.current)setLoading(false);
+    }
   };
-  useEffect(()=>{load();},[]);
+
+  useEffect(()=>{
+    void load();
+    return ()=>{policyRequest.current+=1;};
+  },[]);
+
+  const acknowledged=(policy)=>policy.acknowledged===true||Number(policy.acknowledged)===1;
+  const pendingCount=policies.filter((policy)=>!acknowledged(policy)).length;
+
   const ack=async(id)=>{
-    setBusyId(id);setError('');
-    try {await post('/enterprise/policies/'+id+'/acknowledge');await load();}
-    catch(e){setError(e.message||'Could not acknowledge this policy.');}
-    finally{setBusyId(null);}
+    if(busyId)return;
+    setBusyId(id);setActionError('');setSuccessMessage('');
+    try {
+      await post('/enterprise/policies/'+id+'/acknowledge');
+      setPolicies((current)=>current.map((policy)=>policy.id===id?{...policy,acknowledged:1}:policy));
+      setSuccessMessage('Your acknowledgement has been recorded.');
+    } catch(e) {
+      setActionError(e.message||'Could not acknowledge this policy. Please try again.');
+    } finally {
+      setBusyId(null);
+    }
   };
-  return <div className="enterprise-page"><section className="enterprise-hero"><div><div className="eyebrow">PEOPLE · POLICY CENTER</div><h1>Policies that stay clear.</h1><p>Read current company policies, see the latest version, and acknowledge what requires your attention.</p></div></section><section className="card employee-policies-panel" aria-live="polite">{loading?<div className="loading-panel" role="status"><span className="spinner"/><p>Loading policies…</p></div>:error?<div className="employee-policy-error" role="alert"><span className="employee-policy-error-icon"><CircleAlert size={20}/></span><div><h2>We couldn’t load your policies</h2><p>{error}</p><button className="button button-secondary button-sm" type="button" onClick={load} disabled={loading}><RefreshCw size={14}/> Try again</button></div></div>:policies.length?policies.map(p=><article className="employee-policy-card" key={p.id}><div><div className="eyebrow">{p.category} · v{p.version}</div><h2>{p.title}</h2><p className="policy-body">{p.body}</p></div><div className="policy-actions">{p.acknowledged?<span className="status status-active"><i className="status-dot"/>Acknowledged</span>:<button className="button button-primary" disabled={busyId===p.id} onClick={()=>ack(p.id)}>{busyId===p.id?<><span className="spinner"/> Saving…</>:'Acknowledge'}</button>}</div></article>):<div className="empty-state"><span className="empty-icon"><FileText size={20}/></span><h3>No published policies</h3><p>Your HR team has not published a policy yet. Check back when your HR team shares an update.</p><button className="button button-secondary button-sm" type="button" onClick={load}><RefreshCw size={14}/> Refresh</button></div>}</section></div>;
+
+  return <div className="enterprise-page employee-policy-page">
+    <section className="enterprise-hero employee-policy-hero">
+      <div><div className="eyebrow">PEOPLE · POLICY CENTER</div><h1>Policies that stay clear.</h1><p>Read current company policies, see the latest version, and acknowledge what requires your attention.</p></div>
+      <div className="employee-policy-hero-mark" aria-hidden="true"><ShieldCheck size={34}/><span>PEOPLE<br/>· TRUST ·</span></div>
+    </section>
+
+    <section className="card employee-policies-panel" aria-busy={loading}>
+      <div className="employee-policy-panel-head">
+        <div><div className="eyebrow">YOUR POLICY LIBRARY</div><h2>Published policies</h2><p>Current guidance from your HR team, in one place.</p></div>
+        <button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading||busyId!==null}><RefreshCw size={15}/> Refresh</button>
+      </div>
+
+      {!loading&&!loadError&&<div className="employee-policy-summary" aria-label="Policy summary">
+        <div><span>Published</span><b>{policies.length}</b><small>Current company policies</small></div>
+        <div><span>Needs acknowledgement</span><b>{pendingCount}</b><small>{pendingCount===1?'One policy':'Policies'} awaiting your review</small></div>
+        <div><span>Completed</span><b>{policies.length-pendingCount}</b><small>Already acknowledged</small></div>
+      </div>}
+
+      {loadError&&<div className="employee-policy-error" role="alert">
+        <span className="employee-policy-error-icon"><CircleAlert size={20}/></span>
+        <div><h2>We couldn’t load your policies</h2><p>{loadError}</p><p className="employee-policy-error-help">Retry the request. If the problem continues, share the error reference with your HR administrator.</p><button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Try again</button></div>
+      </div>}
+      {actionError&&<div className="employee-policy-inline-error" role="alert"><CircleAlert size={16}/><span>{actionError}</span></div>}
+      {successMessage&&<div className="employee-policy-inline-success" role="status"><Check size={16}/><span>{successMessage}</span></div>}
+
+      {loading?<div className="loading-panel employee-policy-loading" role="status"><span className="spinner"/><p>Loading published policies…</p></div>
+      :!loadError&&policies.length? <div className="employee-policy-list">{policies.map((p)=><article className="employee-policy-card" key={p.id}>
+          <div className="employee-policy-content"><div className="employee-policy-meta"><span className="eyebrow">{p.category||'COMPANY POLICY'}</span><span className="policy-version">Version {p.version||'1'}</span></div><h2>{p.title}</h2><p className="policy-body">{p.body}</p>{p.published_at&&<small className="employee-policy-published">Published {formatDate(p.published_at)}</small>}</div>
+          <div className="policy-actions">{acknowledged(p)?<span className="employee-policy-acknowledged"><Check size={15}/> Acknowledged</span>:<button className="button button-primary" type="button" disabled={busyId===p.id||busyId!==null} aria-busy={busyId===p.id||undefined} onClick={()=>void ack(p.id)}>{busyId===p.id?<><span className="spinner"/> Saving…</>:'Acknowledge'}</button>}</div>
+        </article>)}</div>
+      :!loadError?<div className="empty-state employee-policy-empty"><span className="empty-icon"><FileText size={21}/></span><h3>No published policies</h3><p>Your HR team has not published a policy yet. When a policy is shared, it will appear here for you to read and acknowledge.</p><button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh policies</button></div>:null}
+    </section>
+  </div>;
 }

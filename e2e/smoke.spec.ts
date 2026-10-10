@@ -87,3 +87,18 @@ test('profile and calendar surfaces remain readable when switching themes', asyn
   expect(lightProfile.background).toBe('rgb(255, 255, 255)');
   expect(lightProfile.color).toBe('rgb(17, 17, 17)');
 });
+
+
+test('policy center loads with a useful empty or published state', async ({ page }) => {
+  await signInDev(page, 'employee');
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/enterprise/policies') && response.request().method() === 'GET'
+  );
+  await openSidebarLink(page, 'Policy center');
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Policies that stay clear.' })).toBeVisible();
+  await expect(page.locator('.employee-policies-panel')).toBeVisible();
+  await expect(page.locator('.employee-policy-error')).toHaveCount(0);
+  await expect(page.locator('.employee-policy-card, .employee-policy-empty')).not.toHaveCount(0);
+});

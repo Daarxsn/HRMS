@@ -41,6 +41,8 @@ Readiness is the database dependency check.
 
 Run migrations before directing production traffic to a new application version. The migration runner uses a MySQL advisory lock so concurrent migration processes do not execute the same schema migration at the same time.
 
+**Enterprise HR / Policy Center schema gate:** The current policy and employee-lifecycle APIs require migration `006_enterprise_hr.sql`, including `company_policies` and `policy_acknowledgements`. After applying migrations, run `npm run db:verify --workspace server`; database verification must report migration 006 and all enterprise tables present. A Policy Center server-error reference should be correlated with API logs and `schema_migrations`. If migration 006 is absent, apply it through the approved production migration workflow before routing traffic to the new API. Do not run the seed script against production.
+
 ## Vercel configuration
 
 Import the repository as one **Services** project, with root directory `./`; do not import the client and server as separate projects.

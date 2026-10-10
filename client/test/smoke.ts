@@ -91,6 +91,18 @@ assert.ok(css.includes('html[data-theme] .calendar-today'), 'Today highlight mus
 assert.ok(!css.includes('HRMS appearance system — contrast and cross-surface consistency'), 'Duplicate legacy theme layer must be removed');
 
 assert.ok(css.includes('profile-details-grid'), 'Theme regression coverage must include profile data grids');
+assert.ok(app.includes("function Card({ children, className='', ...props })"), 'Shared cards must forward ids and accessibility attributes');
+assert.ok(app.includes('profileLoadError')===false, 'Profile load recovery should use the current explicit loadError state');
+assert.ok(app.includes('setProfileRetry((v)=>v+1)'), 'Profile fetch failure must offer retry');
+assert.ok(app.includes('disabled={!phoneChanged||profileLoading}'), 'Profile save must be disabled when no phone change is pending');
+assert.ok(app.includes('return ()=>{active=false;}'), 'Calendar fetch must ignore stale responses after year changes');
+assert.ok(app.includes('calendar-empty-error'), 'Calendar API failure must not masquerade as an empty holiday list');
+assert.ok(enterprise.includes('const policyRequest=useRef(0)'), 'Policy fetches must reject stale responses');
+assert.ok(enterprise.includes('setPolicies((current)=>current.map((policy)=>policy.id===id?{...policy,acknowledged:1}:policy))'), 'Policy acknowledgements should update locally without reloading the entire page');
+assert.ok(enterprise.includes('share the error reference with your HR administrator'), 'Policy failures must explain the support recovery path');
+assert.ok(css.includes('.profile-load-error'), 'Profile load failure needs a styled retry state');
+assert.ok(css.includes('.calendar-load-error'), 'Calendar load failure needs a styled retry state');
+assert.ok(css.includes('.employee-policy-error'), 'Policy errors must remain visible in both themes');
 
 
 console.log('Frontend smoke contracts: PASS');

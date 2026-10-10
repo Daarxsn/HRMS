@@ -125,6 +125,64 @@ try {
   assert.equal(adminMe.data.user.platform, 'ADMIN');
   assert.equal(adminMe.data.user.landingPath, '/admin');
 
+  const employeePolicies = await request('/enterprise/policies', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(employeePolicies.response.status, 200, 'Employee policy center must load published policies.');
+  assert.ok(Array.isArray(employeePolicies.data.policies), 'Employee policy response must contain a policies array.');
+
+  const employeeAdminPoliciesAttempt = await request('/enterprise/admin/policies', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(employeeAdminPoliciesAttempt.response.status, 403, 'Employees must not access administrator policy management.');
+
+  const adminPolicies = await request('/enterprise/admin/policies', {
+    headers: { Cookie: adminSession.cookie }
+  });
+  assert.equal(adminPolicies.response.status, 200, 'Administrator policy management must load.');
+  assert.ok(Array.isArray(adminPolicies.data.policies));
+
+  const draftPolicy = await request('/enterprise/admin/policies', {
+    method: 'POST',
+    headers: { Cookie: adminSession.cookie },
+    body: JSON.stringify({
+      title: 'Phase 2 integration policy ' + Date.now(),
+      category: 'TESTING',
+      version: '1.0',
+      body: 'This policy exists only to verify publishing and acknowledgement in the isolated test database.'
+    })
+  });
+  assert.equal(draftPolicy.response.status, 201, 'Administrator must be able to create a policy draft.');
+  assert.ok(draftPolicy.data?.id, 'Created policy must have an identifier.');
+
+  const publishPolicy = await request('/enterprise/admin/policies/' + draftPolicy.data.id, {
+    method: 'PATCH',
+    headers: { Cookie: adminSession.cookie },
+    body: JSON.stringify({ status: 'PUBLISHED' })
+  });
+  assert.equal(publishPolicy.response.status, 200, 'Administrator must be able to publish a policy.');
+
+  const publishedPolicies = await request('/enterprise/policies', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(publishedPolicies.response.status, 200);
+  const publishedPolicy = publishedPolicies.data.policies.find((policy) => policy.id === draftPolicy.data.id);
+  assert.ok(publishedPolicy, 'Newly published policy must appear in the employee policy center.');
+  assert.equal(Number(publishedPolicy.acknowledged), 0, 'Newly published policy must start unacknowledged.');
+
+  const acknowledgePolicy = await request('/enterprise/policies/' + draftPolicy.data.id + '/acknowledge', {
+    method: 'POST',
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(acknowledgePolicy.response.status, 200, 'Employee must be able to acknowledge a published policy.');
+  assert.equal(acknowledgePolicy.data?.ok, true);
+
+  const acknowledgedPolicies = await request('/enterprise/policies', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  const acknowledgedPolicy = acknowledgedPolicies.data.policies.find((policy) => policy.id === draftPolicy.data.id);
+  assert.equal(Number(acknowledgedPolicy?.acknowledged), 1, 'Acknowledgement status must persist after a fresh request.');
+
   const adminHealth = await request('/admin/system-health', {
     headers: { Cookie: adminSession.cookie }
   });

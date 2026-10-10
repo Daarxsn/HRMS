@@ -67,7 +67,7 @@ function StatusPill({ value, children }) {
   return <span className={`status status-${key}`}><i className="status-dot" aria-hidden="true"/>{labels[String(raw).toLowerCase()]||raw}</span>;
 }
 function EmptyState({ icon:Icon=FileText, title, body, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={21}/></span><h3>{title}</h3><p>{body}</p>{action}</div>; }
-function Card({ children, className='' }) { return <section className={`card ${className}`}>{children}</section>; }
+function Card({ children, className='', ...props }) { return <section {...props} className={`card ${className}`}>{children}</section>; }
 function CardHeading({ title, subtitle, action }) { return <div className="card-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>{action}</div>; }
 
 function App({ requestGmailAccess = null }) {
@@ -683,34 +683,67 @@ function OutPage(){
 }
 
 function CalendarPage(){
-  const {user}=useApp();const [month,setMonth]=useState(()=>{const p=today.split('-').map(Number);return new Date(p[0],p[1]-1,1);});const [holidays,setHolidays]=useState([]);const [loading,setLoading]=useState(false);const [addOpen,setAddOpen]=useState(false);const [error,setError]=useState('');const [created,setCreated]=useState(false);
-  const year=month.getFullYear();const monthNo=month.getMonth();
-  useEffect(()=>{setLoading(true);get(`/calendar?year=${year}`).then((r)=>setHolidays(r.holidays)).catch((e)=>setError(e.message)).finally(()=>setLoading(false));},[year]);
-  const firstDay=new Date(year,monthNo,1).getDay();const days=new Date(year,monthNo+1,0).getDate();const total=Math.ceil((firstDay+days)/7)*7;const holidayMap=new Map(holidays.map((h)=>[h.date,h]));
-  const prev=()=>setMonth(new Date(year,monthNo-1,1));const next=()=>setMonth(new Date(year,monthNo+1,1));
-  const rows=Array.from({length:total},(_,i)=>{const day=i-firstDay+1;if(day<1||day>days)return null;const key=`${year}-${String(monthNo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;return {day,key,holiday:holidayMap.get(key),isToday:key===today,isSunday:new Date(year,monthNo,day).getDay()===0};});
-  return <><PageTitle eyebrow="PLAN AHEAD, LEAVE SPACE" title="Holiday calendar" description="National holidays and company observances for your year." action={user.role==='ADMIN'?<Button variant="soft" icon={Plus} onClick={()=>setAddOpen(true)}>Add holiday</Button>:null}/>{error&&<InlineError>{error}</InlineError>}
-    {created&&<div className="inline-alert alert-success"><CircleCheck size={16}/> Holiday added to the company calendar.<button onClick={()=>setCreated(false)}><X size={15}/></button></div>}
+  const {user}=useApp();
+  const [month,setMonth]=useState(()=>{const p=today.split('-').map(Number);return new Date(p[0],p[1]-1,1);});
+  const [holidays,setHolidays]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [reloadKey,setReloadKey]=useState(0);
+  const [addOpen,setAddOpen]=useState(false);
+  const [error,setError]=useState('');
+  const [created,setCreated]=useState(false);
+  const year=month.getFullYear();
+  const monthNo=month.getMonth();
+
+  useEffect(()=>{
+    let active=true;
+    setLoading(true);
+    setError('');
+    get('/calendar?year='+year)
+      .then((r)=>{if(active)setHolidays(Array.isArray(r.holidays)?r.holidays:[]);})
+      .catch((e)=>{if(active)setError(e.message||'The holiday calendar could not be loaded.');})
+      .finally(()=>{if(active)setLoading(false);});
+    return ()=>{active=false;};
+  },[year,reloadKey]);
+
+  const firstDay=new Date(year,monthNo,1).getDay();
+  const days=new Date(year,monthNo+1,0).getDate();
+  const total=Math.ceil((firstDay+days)/7)*7;
+  const holidayMap=new Map(holidays.map((h)=>[h.date,h]));
+  const yearHolidays=holidays.filter((h)=>String(h.date).startsWith(String(year)));
+  const prev=()=>setMonth(new Date(year,monthNo-1,1));
+  const next=()=>setMonth(new Date(year,monthNo+1,1));
+  const retry=()=>setReloadKey((v)=>v+1);
+  const rows=Array.from({length:total},(_,i)=>{
+    const day=i-firstDay+1;
+    if(day<1||day>days)return null;
+    const key=String(year)+'-'+String(monthNo+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    return {day,key,holiday:holidayMap.get(key),isToday:key===today,isSunday:new Date(year,monthNo,day).getDay()===0};
+  });
+
+  return <>
+    <PageTitle eyebrow="PLAN AHEAD, LEAVE SPACE" title="Holiday calendar" description="National holidays and company observances for your year." action={user.role==='ADMIN'?<Button variant="soft" icon={Plus} onClick={()=>setAddOpen(true)}>Add holiday</Button>:null}/>
+    {error&&<div className="calendar-load-error" role="alert"><span className="calendar-load-error-icon"><CircleAlert size={17}/></span><div><b>We couldn’t refresh the holiday calendar.</b><p>{error}</p><Button variant="soft" size="small" icon={RefreshCw} onClick={retry} disabled={loading}>Retry calendar</Button></div></div>}
+    {created&&<div className="inline-alert alert-success calendar-created-message" role="status" aria-live="polite"><CircleCheck size={16}/> Holiday added to the company calendar.<button type="button" onClick={()=>setCreated(false)} aria-label="Dismiss confirmation"><X size={15}/></button></div>}
 
     <div className="calendar-main-stage">
-      <Card className="calendar-card">
+      <Card className="calendar-card" aria-busy={loading}>
         <div className="calendar-toolbar">
-          <div><div className="calendar-eyebrow">FALCHION XENIAA · PUNE</div><h2>{new Intl.DateTimeFormat("en-IN",{month:"long",year:"numeric"}).format(month)}</h2></div>
-          <div className="calendar-controls"><button className="icon-button" onClick={prev} aria-label="Previous month"><ChevronLeft size={19}/></button><button className="button button-soft button-small" onClick={()=>setMonth(new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1))}>Today</button><button className="icon-button" onClick={next} aria-label="Next month"><ChevronRight size={19}/></button></div>
+          <div><div className="calendar-eyebrow">FALCHION XENIAA · PUNE</div><h2>{new Intl.DateTimeFormat("en-IN",{month:"long",year:"numeric"}).format(month)}</h2>{loading&&<span className="calendar-refreshing" role="status"><Spinner/> Updating calendar…</span>}</div>
+          <div className="calendar-controls"><button className="icon-button" type="button" onClick={prev} aria-label="Previous month"><ChevronLeft size={19}/></button><button className="button button-soft button-small" type="button" onClick={()=>setMonth(new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1))} aria-label="Go to current month">Today</button><button className="icon-button" type="button" onClick={next} aria-label="Next month"><ChevronRight size={19}/></button></div>
         </div>
-        <div className="calendar-weekdays">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d)=><span key={d}>{d}</span>)}</div>
-        <div className="calendar-grid">{rows.map((cell,i)=>cell?<div key={cell.key} className={"calendar-day"+(cell.isToday?" calendar-today":"")+(cell.holiday?" calendar-holiday":"")+(cell.holiday?.kind==="FIXED"?" calendar-holiday-fixed":"")+(cell.holiday?.kind==="FLOATING"?" calendar-holiday-floating":"")+(cell.isSunday?" calendar-sunday":"")}><b>{cell.day}</b>{cell.holiday&&<small title={cell.holiday.name}>{cell.holiday.name}</small>}</div>:<div className="calendar-day calendar-day-empty" key={"empty-"+i}/>)}</div>
+        <div className="calendar-weekdays" aria-hidden="true">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d)=><span key={d}>{d}</span>)}</div>
+        <div className="calendar-grid" role="grid" aria-label={new Intl.DateTimeFormat("en-IN",{month:"long",year:"numeric"}).format(month)}>{rows.map((cell,i)=>cell?<div role="gridcell" aria-label={cell.key+(cell.holiday?', '+cell.holiday.name:'')+(cell.isToday?', today':'')} key={cell.key} className={"calendar-day"+(cell.isToday?" calendar-today":"")+(cell.holiday?" calendar-holiday":"")+(cell.holiday?.kind==="FIXED"?" calendar-holiday-fixed":"")+(cell.holiday?.kind==="FLOATING"?" calendar-holiday-floating":"")+(cell.isSunday?" calendar-sunday":"")}><b>{cell.day}</b>{cell.holiday&&<small title={cell.holiday.name}>{cell.holiday.name}</small>}</div>:<div className="calendar-day calendar-day-empty" role="gridcell" aria-hidden="true" key={"empty-"+i}/>)}</div>
         <div className="calendar-legend"><span><i className="legend-dot legend-fixed"/> Fixed</span><span><i className="legend-dot legend-floating"/> Floating</span><span><i className="legend-dot legend-done"/> Today</span><span>Working days: Monday – Saturday</span></div>
       </Card>
     </div>
     <section className="holiday-section">
-      <div className="section-head holiday-section-head"><div><h2>Holidays in {year}</h2><p>One clean view of national and company observances.</p></div><div className="holiday-section-meta"><span className="holiday-count">{holidays.filter((h)=>h.date.startsWith(String(year))).length}</span><span>{loading?"Updating calendar…":"Updated for this year"}</span></div></div>
-      <Card className="holidays-card holidays-card-wide">
-        {loading?<div className="table-message"><Spinner/></div>:holidays.filter((h)=>h.date.startsWith(String(year))).length?<div className="holiday-grid">{holidays.filter((h)=>h.date.startsWith(String(year))).map((h)=><div className={"holiday-row holiday-row-"+(h.kind==="FLOATING"?"floating":"fixed")} key={h.date}><div className="holiday-date"><b>{formatDate(h.date,{day:"2-digit"})}</b><small>{formatDate(h.date,{month:"short"}).toUpperCase()}</small></div><div className="holiday-row-copy"><b>{h.name}</b><small>{formatDate(h.date,{weekday:"long"})} · {h.kind==="FLOATING"?"Floating":"Fixed"}</small></div><span className="holiday-pin"><Sun size={16}/></span></div>)}</div>:<EmptyState icon={CalendarDays} title="No holidays found" body="Company holidays will show here once they’re added."/>}
+      <div className="section-head holiday-section-head"><div><h2>Holidays in {year}</h2><p>One clean view of national and company observances.</p></div><div className="holiday-section-meta"><span className="holiday-count">{yearHolidays.length}</span><span>{loading?"Updating calendar…":error?"Last available data":"Updated for this year"}</span></div></div>
+      <Card className="holidays-card holidays-card-wide" aria-busy={loading}>
+        {loading?<div className="table-message calendar-list-loading" role="status"><Spinner/> Loading annual holidays…</div>:yearHolidays.length?<div className="holiday-grid">{yearHolidays.map((h)=><div className={"holiday-row holiday-row-"+(h.kind==="FLOATING"?"floating":"fixed")} key={h.date}><div className="holiday-date"><b>{formatDate(h.date,{day:"2-digit"})}</b><small>{formatDate(h.date,{month:"short"}).toUpperCase()}</small></div><div className="holiday-row-copy"><b>{h.name}</b><small>{formatDate(h.date,{weekday:"long"})} · {h.kind==="FLOATING"?"Floating":"Fixed"}</small></div><span className="holiday-pin"><Sun size={16}/></span></div>)}</div>:error?<div className="calendar-empty-error"><CircleAlert size={18}/><b>Holiday data is unavailable.</b><p>Try loading the calendar again. No changes have been made to your leave balance.</p><Button variant="soft" size="small" icon={RefreshCw} onClick={retry}>Retry calendar</Button></div>:<EmptyState icon={CalendarDays} title="No holidays found" body="Company holidays will show here once they’re added."/>}
       </Card>
       <div className="calendar-note calendar-note-wide"><span><ShieldCheck size={17}/></span><div><b>How leave days are counted</b><p>Sundays and holidays are excluded from leave balance calculations. Saturday is a working day.</p></div></div>
     </section>
-    {addOpen&&<AddHolidayModal close={()=>setAddOpen(false)} onDone={()=>{setAddOpen(false);setCreated(true);get(`/calendar?year=${year}`).then((r)=>setHolidays(r.holidays));}}/>}
+    {addOpen&&<AddHolidayModal close={()=>setAddOpen(false)} onDone={()=>{setAddOpen(false);setCreated(true);retry();}}/>}
   </>;
 }
 function AddHolidayModal({close,onDone}){const [date,setDate]=useState('');const [name,setName]=useState('');const [kind,setKind]=useState('FLOATING');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/calendar',{date,name,kind});onDone();}catch(e){setError(e.message);}finally{setBusy(false);}};return <Modal title="Add a company holiday" subtitle="This date will be excluded from working-day leave calculations." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input type="date" value={date} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Holiday name</span><input value={name} maxLength="160" onChange={(e)=>setName(e.target.value)} placeholder="For example: Diwali" required/></label><label className="form-field"><span>Holiday type</span><div className="select-wrap"><select value={kind} onChange={(e)=>setKind(e.target.value)}><option value="FLOATING">Floating festival / observance · yellow</option><option value="FIXED">Fixed company holiday · red</option></select><ChevronDown size={15}/></div></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy}>Add holiday</Button></div></form></Modal>;}
@@ -766,21 +799,41 @@ function ProfilePage(){
   const [busy,setBusy]=useState(false);
   const [photoBusy,setPhotoBusy]=useState(false);
   const [error,setError]=useState('');
+  const [loadError,setLoadError]=useState('');
+  const [profileLoading,setProfileLoading]=useState(true);
+  const [profileRetry,setProfileRetry]=useState(0);
   const [photoVersion,setPhotoVersion]=useState(Date.now());
 
   useEffect(()=>{
+    let active=true;
+    setProfileLoading(true);
+    setLoadError('');
     get('/account/profile')
-      .then((r)=>{setProfile(r.profile);setPhone(r.profile.phone||'');setPhotoVersion(Date.now());})
-      .catch((e)=>setError(e.message));
-  },[]);
+      .then((r)=>{
+        if(!active)return;
+        setProfile(r.profile);
+        setPhone(r.profile.phone||'');
+        setPhotoVersion(Date.now());
+      })
+      .catch((e)=>{if(active)setLoadError(e.message||'Your profile details could not be loaded.');})
+      .finally(()=>{if(active)setProfileLoading(false);});
+    return ()=>{active=false;};
+  },[profileRetry]);
+
+  const normalizedPhone=phone.trim()||null;
+  const phoneChanged=normalizedPhone!==(profile.phone||null);
 
   const save=async(e)=>{
-    e.preventDefault();setBusy(true);setError('');
+    e.preventDefault();
+    if(!phoneChanged||busy)return;
+    setBusy(true);setError('');
     try{
-      await patch('/account/profile',{phone:phone||null});
-      const updated={...profile,phone:phone||null};
-      setProfile(updated);setUser({...user,phone:phone||null});notify('Your contact details were saved.');
-    }catch(e){setError(e.message);}
+      await patch('/account/profile',{phone:normalizedPhone});
+      setProfile((current)=>({...current,phone:normalizedPhone}));
+      setUser((current)=>({...current,phone:normalizedPhone}));
+      setPhone(normalizedPhone||'');
+      notify('Your contact details were saved.');
+    }catch(e){setError(e.message||'Your mobile number could not be saved.');}
     finally{setBusy(false);}
   };
 
@@ -796,11 +849,12 @@ function ProfilePage(){
       setUser((u)=>({...u,profile_photo_available:true}));
       setPhotoVersion(Date.now());
       notify('Profile photo updated.');
-    }catch(e){setError(e.message);}
+    }catch(e){setError(e.message||'The profile photo could not be updated.');}
     finally{setPhotoBusy(false);}
   };
 
   const removePhoto=async()=>{
+    if(photoBusy)return;
     setPhotoBusy(true);setError('');
     try{
       await del('/account/profile/photo');
@@ -808,11 +862,11 @@ function ProfilePage(){
       setUser((u)=>({...u,profile_photo_available:false}));
       setPhotoVersion(Date.now());
       notify('Profile photo removed.');
-    }catch(e){setError(e.message);}
+    }catch(e){setError(e.message||'The profile photo could not be removed.');}
     finally{setPhotoBusy(false);}
   };
 
-  const photoSrc=profile.profile_photo_available?assetUrl('/account/profile/photo')+`?v=${photoVersion}`:null;
+  const photoSrc=profile.profile_photo_available?assetUrl('/account/profile/photo')+'?v='+photoVersion:null;
   const displayRole=profile.role==='ADMIN'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee';
   const profileCompletion=[Boolean(profile.full_name),Boolean(profile.email),Boolean(profile.profile_photo_available),Boolean(profile.phone),Boolean(profile.department),Boolean(profile.position)].filter(Boolean).length*100/6;
 
@@ -823,21 +877,23 @@ function ProfilePage(){
       description="Keep your work identity, contact details and organization information current."
     />
 
+    {profileLoading&&<div className="profile-loading-strip" role="status"><Spinner/><span>Syncing your work details…</span></div>}
+    {loadError&&<div className="profile-load-error" role="alert"><span><CircleAlert size={17}/></span><div><b>We couldn’t refresh your profile.</b><p>{loadError}</p><Button variant="soft" size="small" icon={RefreshCw} onClick={()=>setProfileRetry((v)=>v+1)} disabled={profileLoading}>Retry profile details</Button></div></div>}
     {error&&<InlineError>{error}</InlineError>}
 
-    {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><Sparkles size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress"><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
+    {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><Sparkles size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress" role="progressbar" aria-label="Profile completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(profileCompletion)}><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
 
-    <div className="profile-page">
+    <div className="profile-page" aria-busy={profileLoading}>
       <Card className="profile-identity-card">
         <div className="profile-identity">
           <div className="profile-identity-avatar">
-            {photoSrc?<img src={photoSrc} alt={profile.full_name} loading="lazy" decoding="async"/>:initials(profile.full_name)}
+            {photoSrc?<img src={photoSrc} alt={profile.full_name||'Profile photo'} decoding="async"/>:initials(profile.full_name)}
           </div>
           <div className="profile-identity-copy">
-            <h2>{profile.full_name}</h2>
-            <p>{profile.position||profile.title} <span>·</span> {displayRole}</p>
+            <h2>{profile.full_name||'Your profile'}</h2>
+            <p>{profile.position||profile.title||'Team member'} <span>·</span> {displayRole}</p>
             <div className="profile-identity-meta">
-              <span>{profile.employee_code}</span>
+              <span>{profile.employee_code||'Employee ID pending'}</span>
               <span>{profile.department||'General'}</span>
               <span>{profile.branch||'Pune'}</span>
             </div>
@@ -845,8 +901,9 @@ function ProfilePage(){
           <StatusPill value={profile.status}/>
         </div>
         <div className="profile-photo-actions profile-photo-actions-clean">
-          <label className="photo-button"><Camera size={15}/>{photoBusy?'Updating…':'Change photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>
-          {profile.profile_photo_available&&<button className="photo-remove-button" type="button" onClick={removePhoto} disabled={photoBusy}>Remove</button>}
+          <label className={'photo-button'+(photoBusy?' photo-button-busy':'')}><Camera size={15}/>{photoBusy?'Updating…':'Change photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>
+          {profile.profile_photo_available&&<button className="photo-remove-button" type="button" onClick={removePhoto} disabled={photoBusy}>{photoBusy?'Please wait…':'Remove photo'}</button>}
+          <span className="profile-photo-hint">JPG, PNG or WebP · Up to 4 MB</span>
         </div>
       </Card>
 
@@ -855,12 +912,12 @@ function ProfilePage(){
           <div><span className="profile-info-icon"><BriefcaseBusiness size={18}/></span><div><h2>Work information</h2><p>Your organization and employment details.</p></div></div>
         </div>
         <div className="profile-info-grid">
-          <div><span>Employee ID</span><b>{profile.employee_code}</b></div>
-          <div><span>Work email</span><b className="profile-value-wrap">{profile.email}</b></div>
+          <div><span>Employee ID</span><b>{profile.employee_code||'—'}</b></div>
+          <div><span>Work email</span><b className="profile-value-wrap">{profile.email||'—'}</b></div>
           <div><span>Position</span><b>{profile.position||profile.title||'Employee'}</b></div>
           <div><span>Department</span><b>{profile.department||'General'}</b></div>
           <div><span>Branch</span><b>{profile.branch||'Pune'}</b></div>
-          <div><span>Employment type</span><b>{displayRole==='Administrator'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee'}</b></div>
+          <div><span>Employment type</span><b>{profile.user_type==='ADMIN'?'Administrator':profile.user_type==='INTERN'?'Intern':'Employee'}</b></div>
           <div><span>Joining date</span><b>{formatDate(profile.joined_on)}</b></div>
           <div><span>Probation ends</span><b>{profile.probation_end_date?formatDate(profile.probation_end_date):'Not set'}</b></div>
           <div><span>Reports to</span><b>{profile.manager||'Falchion Xeniaa administrator'}</b></div>
@@ -874,15 +931,15 @@ function ProfilePage(){
           <div><span className="profile-info-icon"><CircleUserRound size={18}/></span><div><h2>Contact details</h2><p>Your name and work email are controlled by administrators. You can update your mobile number.</p></div></div>
         </div>
         <form className="profile-contact-form" onSubmit={save}>
-          <label className="form-field"><span>Full name</span><input value={profile.full_name} disabled/></label>
-          <label className="form-field"><span>Work email</span><input value={profile.email} disabled/></label>
-          <label className="form-field"><span>Mobile number</span><input type="tel" value={phone} maxLength="32" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …"/></label>
-          <div className="profile-security"><ShieldCheck size={16}/><span>Google Sign-In secures access. Role, branch, department and position remain administrator-controlled.</span></div>
-          <Button type="submit" loading={busy}>Save mobile number</Button>
+          <label className="form-field"><span>Full name</span><input value={profile.full_name||''} disabled autoComplete="name"/></label>
+          <label className="form-field"><span>Work email</span><input type="email" value={profile.email||''} disabled autoComplete="email"/></label>
+          <label className="form-field"><span>Mobile number</span><input type="tel" value={phone} maxLength="32" autoComplete="tel" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …" aria-describedby="profile-phone-help"/></label>
+          <div id="profile-phone-help" className="profile-security"><ShieldCheck size={16}/><span>Google Sign-In secures access. Role, branch, department and position remain administrator-controlled.</span></div>
+          <Button type="submit" loading={busy} disabled={!phoneChanged||profileLoading}>Save mobile number</Button>
         </form>
       </Card>
 
-      <Card className="profile-preferences-card"><div className="profile-preferences-heading"><span className="profile-info-icon"><Settings size={18}/></span><div><h2>Workspace preferences</h2><p>Personalize how the People Portal feels on your devices.</p></div></div><div className="preference-row"><div><b>Appearance</b><small>Choose the visual mode for this browser.</small></div><div className="preference-segment"><button className={theme==='light'?'active':''} onClick={()=>setTheme('light')} type="button"><Sun size={14}/> Light</button><button className={theme==='dark'?'active':''} onClick={()=>setTheme('dark')} type="button"><Moon size={14}/> Dark</button></div></div><div className="preference-row"><div><b>Motion</b><small>Interface animations respect your system accessibility settings.</small></div><span className="preference-note"><ShieldCheck size={14}/> Accessible by default</span></div></Card>
+      <Card className="profile-preferences-card"><div className="profile-preferences-heading"><span className="profile-info-icon"><Settings size={18}/></span><div><h2>Workspace preferences</h2><p>Personalize how the People Portal feels on your devices.</p></div></div><div className="preference-row"><div><b>Appearance</b><small>Choose the visual mode for this browser.</small></div><div className="preference-segment" role="group" aria-label="Appearance"><button className={theme==='light'?'active':''} aria-pressed={theme==='light'} onClick={()=>setTheme('light')} type="button"><Sun size={14}/> Light</button><button className={theme==='dark'?'active':''} aria-pressed={theme==='dark'} onClick={()=>setTheme('dark')} type="button"><Moon size={14}/> Dark</button></div></div><div className="preference-row"><div><b>Motion</b><small>Interface animations respect your system accessibility settings.</small></div><span className="preference-note"><ShieldCheck size={14}/> Accessible by default</span></div></Card>
 
       <Card className="privacy-card">
         <div className="privacy-icon"><ShieldCheck size={18}/></div>
