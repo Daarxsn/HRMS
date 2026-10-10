@@ -5,6 +5,7 @@ import path from 'node:path';
 const root = process.cwd();
 const app = fs.readFileSync(path.join(root, 'src/App.tsx'), 'utf8');
 const enterprise = fs.readFileSync(path.join(root, 'src/EnterpriseHRPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/styles.css'), 'utf8');
 
 const api = fs.readFileSync(path.join(root, 'src/api.ts'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
