@@ -77,8 +77,8 @@ function App({ requestGmailAccess = null }) {
   const [bootError,setBootError]=useState('');
   const [notifications,setNotifications]=useState({unread:0,notifications:[]});
   const [refresh,setRefresh]=useState(0);
-  const [theme,setTheme]=useState(()=>localStorage.getItem('hrms-theme')||'light');
-  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('hrms-theme',theme);},[theme]);
+  const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('hrms-theme')||'light';}catch{return 'light';}});
+  useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('hrms-theme',theme);}catch{/* Theme remains active for this session when storage is unavailable. */}},[theme]);
   const notify=(message,type='success')=>setToast({message,type});
   const refreshNotifications=async()=>{if(!user)return;try{setNotifications(await get('/account/notifications'));}catch{}}
   useEffect(()=>{
@@ -108,7 +108,6 @@ function App({ requestGmailAccess = null }) {
     window.addEventListener('hrms:session-expired',onSessionExpired);
     return ()=>window.removeEventListener('hrms:session-expired',onSessionExpired);
   },[]);
-  useEffect(()=>{ if(import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{}); },[]);
   const gmailRequest = requestGmailAccess || (async () => { throw new Error('Google Gmail access is not configured for this deployment.'); });
   const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme,requestGmailAccess:gmailRequest}),[user,notifications,theme,requestGmailAccess]);
   const retryBoot=()=>{setBootError('');setLoading(true);window.location.reload();};
