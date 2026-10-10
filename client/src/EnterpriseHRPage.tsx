@@ -189,9 +189,19 @@ function DocumentModal({save,close}) {
 }
 
 export function EmployeePoliciesPage() {
-  const [policies,setPolicies]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const load=async()=>{try{setPolicies((await get('/enterprise/policies')).policies||[]);}catch(e){setError(e.message||'Could not load policies.')}finally{setLoading(false)}};
+  const [policies,setPolicies]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busyId,setBusyId]=useState(null);
+  const load=async()=>{
+    setLoading(true);setError('');
+    try {const result=await get('/enterprise/policies');setPolicies(Array.isArray(result.policies)?result.policies:[]);}
+    catch(e){setError(e.message||'Could not load policies.');}
+    finally{setLoading(false);}
+  };
   useEffect(()=>{load();},[]);
-  const ack=async(id)=>{try{await post('/enterprise/policies/'+id+'/acknowledge');load();}catch(e){setError(e.message)}};
-  return <div className="enterprise-page"><section className="enterprise-hero"><div><div className="eyebrow">PEOPLE · POLICY CENTER</div><h1>Policies that stay clear.</h1><p>Read current company policies, see the latest version, and acknowledge what requires your attention.</p></div></section><section className="card">{loading?<div className="loading-panel"><span className="spinner"/><p>Loading policies…</p></div>:error?<><h2>Policy center unavailable</h2><p>{error}</p></>:policies.length?policies.map(p=><article className="employee-policy-card" key={p.id}><div><div className="eyebrow">{p.category} · v{p.version}</div><h2>{p.title}</h2><p className="policy-body">{p.body}</p></div><div className="policy-actions">{p.acknowledged?<span className="status status-active"><i className="status-dot"/>Acknowledged</span>:<button className="button button-primary" onClick={()=>ack(p.id)}>Acknowledge</button>}</div></article>):<div className="empty-state"><span className="empty-icon"><FileText size={20}/></span><h3>No published policies</h3><p>Your HR team has not published a policy yet.</p></div>}</section></div>;
+  const ack=async(id)=>{
+    setBusyId(id);setError('');
+    try {await post('/enterprise/policies/'+id+'/acknowledge');await load();}
+    catch(e){setError(e.message||'Could not acknowledge this policy.');}
+    finally{setBusyId(null);}
+  };
+  return <div className="enterprise-page"><section className="enterprise-hero"><div><div className="eyebrow">PEOPLE · POLICY CENTER</div><h1>Policies that stay clear.</h1><p>Read current company policies, see the latest version, and acknowledge what requires your attention.</p></div></section><section className="card employee-policies-panel" aria-live="polite">{loading?<div className="loading-panel" role="status"><span className="spinner"/><p>Loading policies…</p></div>:error?<div className="employee-policy-error" role="alert"><span className="employee-policy-error-icon"><CircleAlert size={20}/></span><div><h2>We couldn’t load your policies</h2><p>{error}</p><button className="button button-secondary button-sm" type="button" onClick={load} disabled={loading}><RefreshCw size={14}/> Try again</button></div></div>:policies.length?policies.map(p=><article className="employee-policy-card" key={p.id}><div><div className="eyebrow">{p.category} · v{p.version}</div><h2>{p.title}</h2><p className="policy-body">{p.body}</p></div><div className="policy-actions">{p.acknowledged?<span className="status status-active"><i className="status-dot"/>Acknowledged</span>:<button className="button button-primary" disabled={busyId===p.id} onClick={()=>ack(p.id)}>{busyId===p.id?<><span className="spinner"/> Saving…</>:'Acknowledge'}</button>}</div></article>):<div className="empty-state"><span className="empty-icon"><FileText size={20}/></span><h3>No published policies</h3><p>Your HR team has not published a policy yet. Check back when your HR team shares an update.</p><button className="button button-secondary button-sm" type="button" onClick={load}><RefreshCw size={14}/> Refresh</button></div>}</section></div>;
 }
