@@ -3030,3 +3030,174 @@ html[data-theme="dark"] .notification-page-item small { opacity: .72; }
 html[data-theme="dark"] .modal-head,
 html[data-theme="dark"] .popover-heading { border-color: rgba(244,244,245,.22) !important; }
 html[data-theme="dark"] .modal-body { color: #FFFFFF !important; }
+
+
+/* Brand-system pass 2: remove legacy green accents from light-mode controls too. */
+:root,
+html[data-theme="light"] {
+  --fx-gold: #DAAF51;
+  --fx-red: #931314;
+  --fx-charcoal: #111111;
+  --fx-platinum: #F4F4F5;
+  --fx-white: #FFFFFF;
+  --ink: #111111;
+  --text: #111111;
+  --muted: #555555;
+  --paper: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-alt: #F4F4F5;
+  --canvas: #F4F4F5;
+  --line: #E1E1E3;
+  --border-color: #E1E1E3;
+  color-scheme: light;
+}
+html[data-theme="light"] ::selection { background: #DAAF51; color: #111111; }
+html[data-theme="light"] :is(.button, .button-primary) {
+  background: #931314;
+  color: #FFFFFF;
+  border-color: #931314;
+  box-shadow: none;
+}
+html[data-theme="light"] :is(.button, .button-primary):hover:not(:disabled) {
+  background: #7B1011;
+  border-color: #7B1011;
+  box-shadow: 0 5px 14px rgba(147,19,20,.14);
+}
+html[data-theme="light"] :is(.button-soft, .button-light, .button-dark) {
+  background: #F4F4F5;
+  color: #111111;
+  border-color: #E1E1E3;
+  box-shadow: none;
+}
+html[data-theme="light"] .button-danger {
+  background: #931314;
+  border-color: #931314;
+  color: #FFFFFF;
+}
+html[data-theme="light"] :is(.text-button, .text-link) { color: #931314; }
+html[data-theme="light"] :is(.text-button, .text-link):hover { color: #7B1011; }
+html[data-theme="light"] :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgba(218,175,81,.78);
+  outline-offset: 2px;
+}
+html[data-theme="light"] .spinner { border-color: #E1E1E3; border-top-color: #931314; }
+html[data-theme="light"] .nav-active {
+  background: rgba(218,175,81,.20);
+  color: #111111 !important;
+}
+html[data-theme="light"] .nav-active svg { color: #931314 !important; }
+html[data-theme="light"] .nav-count {
+  background: #DAAF51;
+  color: #111111;
+}
+html[data-theme="light"] .workspace-avatar,
+html[data-theme="light"] .note-spark,
+html[data-theme="light"] .notification-icon {
+  background: #F4F4F5;
+  color: #931314;
+}
+html[data-theme="light"] .pulse-dot {
+  background: #DAAF51;
+  box-shadow: 0 0 0 3px rgba(218,175,81,.2);
+}
+html[data-theme="light"] .notification-dot { background: #931314; }
+html[data-theme="light"] :is(.status, .mini-status) {
+  background: #F4F4F5;
+  color: #111111;
+  border-color: #E1E1E3;
+}
+html[data-theme="light"] :is(.status-pending, .mini-pending, .mini-assigned,
+  .mini-in-progress, .mini-open) {
+  background: rgba(218,175,81,.20);
+  color: #111111;
+  border-color: rgba(218,175,81,.6);
+}
+html[data-theme="light"] :is(.status-rejected, .status-cancelled, .status-inactive,
+  .status-late-entry, .mini-rejected, .mini-cancelled, .mini-inactive, .mini-archived) {
+  background: rgba(147,19,20,.08);
+  color: #931314;
+  border-color: rgba(147,19,20,.22);
+}
+html[data-theme="light"] :is(.status-approved, .status-active, .status-on-time,
+  .mini-approved, .mini-active, .mini-completed, .mini-available) {
+  background: #F4F4F5;
+  color: #111111;
+  border-color: #E1E1E3;
+}
+html[data-theme="light"] .enterprise-tabs button.active {
+  background: #DAAF51;
+  color: #111111;
+}
+html[data-theme="light"] .enterprise-tabs button.active svg { color: #111111; }
+html[data-theme="light"] .enterprise-page .bar-row i,
+html[data-theme="light"] .enterprise-page .trend-bars i,
+html[data-theme="light"] .enterprise-page .leave-row > div i {
+  background: #DAAF51;
+}
+html[data-theme="light"] .enterprise-page .check-circle.done {
+  background: #931314;
+  color: #FFFFFF;
+  border-color: #931314;
+}
+html[data-theme="light"] .enterprise-page .enterprise-toast {
+  background: #111111;
+  color: #FFFFFF;
+}
+html[data-theme="light"] .login-art,
+html[data-theme="light"] .login-page .login-art {
+  background-color: #111111;
+}
+html[data-theme="light"] .login-art em,
+html[data-theme="light"] .login-art .art-label,
+html[data-theme="light"] .login-art .art-note { color: #DAAF51; }
+html[data-theme="light"] .login-art .pulse-dot {
+  background: #DAAF51;
+  box-shadow: 0 0 0 3px rgba(218,175,81,.18);
+}
+
+/* Dark mode control states keep the exact same brand language. */
+html[data-theme="dark"] ::selection { background: #DAAF51; color: #111111; }
+html[data-theme="dark"] :is(.button, .button-primary, .button-danger) {
+  background: #931314;
+  color: #FFFFFF;
+  border-color: #931314;
+  box-shadow: none;
+}
+html[data-theme="dark"] :is(.button, .button-primary, .button-danger):hover:not(:disabled) {
+  background: #A51B1C;
+  border-color: #A51B1C;
+  box-shadow: none;
+}
+html[data-theme="dark"] :is(.button-soft, .button-light, .button-dark) {
+  background: #111111;
+  color: #FFFFFF;
+  border-color: rgba(244,244,245,.25);
+}
+html[data-theme="dark"] :is(.text-button, .text-link) { color: #DAAF51; }
+html[data-theme="dark"] :is(.text-button, .text-link):hover { color: #FFFFFF; }
+html[data-theme="dark"] .spinner { border-color: rgba(244,244,245,.22); border-top-color: #DAAF51; }
+html[data-theme="dark"] .nav-count {
+  background: #DAAF51;
+  color: #111111;
+}
+html[data-theme="dark"] .workspace-avatar,
+html[data-theme="dark"] .note-spark,
+html[data-theme="dark"] .notification-icon {
+  background: rgba(218,175,81,.12);
+  color: #DAAF51;
+}
+html[data-theme="dark"] .pulse-dot {
+  background: #DAAF51;
+  box-shadow: 0 0 0 3px rgba(218,175,81,.16);
+}
+html[data-theme="dark"] .notification-dot { background: #DAAF51; }
+html[data-theme="dark"] .enterprise-page .enterprise-toast {
+  background: #DAAF51;
+  color: #111111;
+}
+html[data-theme="dark"] .enterprise-page .enterprise-toast svg { color: #111111; }
+html[data-theme="dark"] .login-art,
+html[data-theme="dark"] .login-page .login-art { background-color: #111111; }
+html[data-theme="dark"] .login-art em,
+html[data-theme="dark"] .login-art .art-label,
+html[data-theme="dark"] .login-art .art-note { color: #DAAF51; }
