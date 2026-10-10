@@ -3262,3 +3262,9 @@ table tbody tr { transition: background-color .14s ease; }
 @media(prefers-reduced-motion:reduce){
  .login-feature{transition:none}
 }
+
+
+/* Theme changes should switch calendar surfaces immediately; only geometry/details animate. */
+html[data-theme] .calendar-day {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease!important;
+}
