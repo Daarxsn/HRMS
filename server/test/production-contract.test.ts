@@ -73,7 +73,7 @@ assert.match(email,/HR_NOTIFICATION_EMAIL/);
 assert.match(email,/sendHrNotificationEmail/);
 assert.match(email,/sendEmployeeHrEmail/);
 assert.match(email,/gmail.googleapis.com/);
-assert.match(email,/gmail.send/);
+assert.match(main,/gmailSendScope/);
 assert.match(email,/socket\.destroyed/);
 assert.match(email,/responsePromise = this\.readResponse\(\)/);
 assert.match(email,/greetingPromise = client\.readResponse\(\)/);
