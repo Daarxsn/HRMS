@@ -3322,3 +3322,84 @@ html[data-theme="dark"] .login-art .art-note { color: #DAAF51; }
  .login-art-copy>p,.login-feature-row,.login-auth-card{animation:login-rise .7s .08s cubic-bezier(.2,.7,.2,1) both}
  @keyframes login-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 }
+
+
+/* Theme reliability pass: semantic surfaces and readable contrast on every route.
+   Keep this block last so legacy component styles cannot reintroduce white-on-dark
+   or dark-on-dark controls when the appearance changes. */
+:root{
+  color-scheme:light;
+  --ui-bg:#f5f5f3;--ui-surface:#ffffff;--ui-surface-muted:#f8f9f7;
+  --ui-text:#202923;--ui-text-muted:#68766d;--ui-border:#e1e6e0;
+  --ui-field:#ffffff;--ui-field-text:#202923;--ui-hover:#f1f5f0;
+  --ui-shadow:0 8px 26px rgba(24,38,29,.06)
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --ui-bg:#111311;--ui-surface:#171a17;--ui-surface-muted:#1c211d;
+  --ui-text:#f1f3ef;--ui-text-muted:#a4aea5;--ui-border:#343a34;
+  --ui-field:#171b18;--ui-field-text:#f1f3ef;--ui-hover:#222923;
+  --ui-shadow:0 8px 26px rgba(0,0,0,.2)
+}
+html,body,#root{min-height:100%;background:var(--ui-bg);color:var(--ui-text)}
+html[data-theme] body{color:var(--ui-text)}
+html[data-theme] :is(.page-wrap,.main-shell,.content-shell){color:var(--ui-text)}
+html[data-theme] :is(.card,.table-card,.profile-info-card,.profile-preferences-card,.profile-contact-card,
+ .calendar-card,.calendar-shell,.history-calendar,.history-summary,.report-filter-card,.report-card,
+ .settings-card,.notification-preferences,.notification-page-item,.person-card,.person-drawer,
+ .people-strip-stats>span,.attendance-health-metrics>div,.wfh-usage-grid>div,.demo-box,
+ .modal,.command-palette,.dropdown-menu,.notification-popover,.search-popover){
+ background:var(--ui-surface);color:var(--ui-text);border-color:var(--ui-border)
+}
+html[data-theme] :is(.card p,.profile-info-card p,.profile-contact-card p,.page-title p,
+ .muted-copy,.subtle-copy,.table-message,.empty-state p,.profile-preferences-heading p,
+ .profile-info-grid small,.profile-details-grid small,.person-card-role,.person-card-footer,
+ .notification-page-item small,.calendar-note,.field-hint,.form-help){
+ color:var(--ui-text-muted)
+}
+html[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+ select,textarea,.search-box input,.command-search input,.select-wrap select){
+ color:var(--ui-field-text);background:var(--ui-field);border-color:var(--ui-border)
+}
+html[data-theme] :is(input,select,textarea)::placeholder{color:var(--ui-text-muted);opacity:.8}
+html[data-theme] :is(input,select,textarea):disabled{opacity:.65;background:var(--ui-surface-muted);color:var(--ui-text-muted)}
+html[data-theme] :is(.table-scroll,.table-card,.profile-info-grid,.profile-details-grid){background:var(--ui-surface);color:var(--ui-text)}
+html[data-theme] :is(.table,.profile-info-grid,.profile-details-grid) :is(th,td,.profile-info-item,.profile-detail-item){
+ background:var(--ui-surface);color:var(--ui-text);border-color:var(--ui-border)
+}
+html[data-theme] :is(.table thead th,th){background:var(--ui-surface-muted);color:var(--ui-text-muted)}
+html[data-theme] :is(.table tbody tr:hover,.table-row-click:hover,.calendar-day:hover,.person-card:hover){background:var(--ui-hover)}
+html[data-theme] :is(.profile-info-grid b,.profile-details-grid b,.profile-info-grid strong,.profile-details-grid strong){color:var(--ui-text)}
+html[data-theme] :is(.calendar-day,.calendar-weekdays,.calendar-toolbar,.calendar-legend){color:var(--ui-text-muted)}
+html[data-theme] :is(.calendar-day-empty){background:var(--ui-surface-muted)}
+html[data-theme] :is(.calendar-day.calendar-today){background:color-mix(in srgb,#5c9a74 10%,var(--ui-surface));border-color:#5c9a74}
+html[data-theme] :is(.setup-note,.login-auth-card,.login-auth-card-heading,.login-auth-assurance){color:var(--ui-text)}
+html[data-theme] .login-auth-card{background:var(--ui-surface);border-color:var(--ui-border)}
+html[data-theme] .login-auth-card-heading b{color:var(--ui-text)}
+html[data-theme] .login-auth-card-heading small,html[data-theme] .login-auth-assurance{color:var(--ui-text-muted)}
+html[data-theme] .login-auth-assurance{border-color:var(--ui-border)}
+html[data-theme] .login-auth-card .setup-note{background:var(--ui-surface-muted);border-color:var(--ui-border);color:var(--ui-text-muted)}
+html[data-theme="dark"] :is(.profile-info-grid,.profile-details-grid) :is(th,td,.profile-info-item,.profile-detail-item),
+html[data-theme="dark"] :is(.profile-info-grid,.profile-details-grid) :is(div,span){color:var(--ui-text)}
+html[data-theme="dark"] :is(.profile-info-grid,.profile-details-grid) :is(small,.muted-copy){color:var(--ui-text-muted)}
+html[data-theme="dark"] :is(.people-strip-stats>span,.view-toggle,.preference-segment,.select-wrap select,
+ .setup-note,.demo-box,.select-wrap,.profile-preferences-card .preference-note){background:var(--ui-surface-muted);color:var(--ui-text);border-color:var(--ui-border)}
+html[data-theme="dark"] :is(.view-toggle button.active,.preference-segment button.active){background:#30392f;color:#f5f5ef}
+html[data-theme="dark"] :is(.person-card-name,.person-card-role,.person-card-meta span,.person-card-footer,
+ .people-strip-stats b,.preference-row b,.profile-onboarding-copy h2){color:var(--ui-text)}
+html[data-theme="dark"] :is(.person-card-meta span,.person-card-arrow,.profile-info-icon,.profile-onboarding-icon){background:var(--ui-surface-muted);border-color:var(--ui-border)}
+html[data-theme="dark"] :is(.login-panel){background:#151a16;color:#f1f3ef}
+html[data-theme="dark"] :is(.login-panel h2,.login-auth-card-heading b){color:#f1f3ef}
+html[data-theme="dark"] .login-panel:before{opacity:.25}
+html[data-theme="dark"] .login-google-g{background:#fff;color:#4285f4}
+html[data-theme="light"]{
+ color-scheme:light
+}
+html[data-theme="light"] :is(.profile-info-grid,.profile-details-grid) :is(th,td,.profile-info-item,.profile-detail-item){
+ background:#fff;color:#202923;border-color:#e1e6e0
+}
+html[data-theme="light"] :is(.profile-info-grid,.profile-details-grid) :is(small,.muted-copy){color:#68766d}
+@media(prefers-reduced-motion:reduce){
+ html:focus-within{scroll-behavior:auto}
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
