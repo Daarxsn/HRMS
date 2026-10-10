@@ -2783,3 +2783,250 @@ html[data-theme="dark"] .text-input:focus {
   .enterprise-hero { box-shadow: none; }
   .enterprise-tabs { box-shadow: none; }
 }
+
+
+/* --------------------------------------------------------------------------
+   STRICT FALCHION XENIAA BRAND PALETTE
+   Approved colors only:
+   Gold #DAAF51 · Saffron Red #931314 · Charcoal #111111
+   Platinum #F4F4F5 · White #FFFFFF
+   This final layer intentionally removes generic green/blue status accents.
+   -------------------------------------------------------------------------- */
+:root,
+html[data-theme="light"] {
+  --fx-gold: #DAAF51;
+  --fx-saffron-red: #931314;
+  --fx-charcoal: #111111;
+  --fx-platinum: #F4F4F5;
+  --fx-white: #FFFFFF;
+  --ink: #111111;
+  --text: #111111;
+  --muted: #111111;
+  --paper: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-alt: #F4F4F5;
+  --canvas: #F4F4F5;
+  --line: #F4F4F5;
+  --border-color: #F4F4F5;
+  --shadow: 0 8px 28px rgba(17,17,17,.06);
+  color-scheme: light;
+}
+html[data-theme="light"] body,
+html[data-theme="light"] .app-shell,
+html[data-theme="light"] .main-shell,
+html[data-theme="light"] .page-wrap {
+  background: #F4F4F5;
+  color: #111111;
+}
+html[data-theme="light"] :is(.sidebar, .topbar, .card, .table-card, .modal,
+  .modal-card, .notification-popover, .command-palette, .person-drawer,
+  .profile-preferences-card, .profile-info-card, .privacy-card) {
+  background-color: #FFFFFF;
+  color: #111111;
+  border-color: #F4F4F5;
+}
+html[data-theme="light"] :is(.page-title h1, .section-head h2, .card-heading h2,
+  .workspace-chip b, .person-cell b, .user-lines b, .breadcrumb b,
+  .enterprise-page h1, .enterprise-page h2, .enterprise-page h3,
+  .enterprise-page h4, .enterprise-page strong, .enterprise-page b,
+  .employee-policy-card h2) { color: #111111; }
+html[data-theme="light"] :is(.page-title p, .section-head p, .card-heading p,
+  .breadcrumb, .person-cell small, .user-lines small, .enterprise-page p,
+  .enterprise-page small, .muted-copy, .app-footer) { color: #111111; opacity: .72; }
+html[data-theme="light"] :is(input, select, textarea, .input, .text-input,
+  .enterprise-select, .enterprise-textarea) {
+  color: #111111;
+  background: #FFFFFF;
+  border-color: #F4F4F5;
+}
+html[data-theme="light"] :is(th, .enterprise-th) {
+  color: #111111;
+  background: #F4F4F5;
+  border-color: #F4F4F5;
+}
+html[data-theme="light"] :is(.enterprise-metric, .enterprise-detail,
+  .enterprise-checklist, .enterprise-table, .policy-list, .attention-item,
+  .enterprise-toolbar, .workspace-chip, .sidebar-note, .people-toolbar,
+  .report-executive-strip > div) {
+  background-color: #F4F4F5;
+  border-color: #F4F4F5;
+  color: #111111;
+}
+
+/* Dark theme uses only charcoal, white, platinum, gold and saffron red. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #FFFFFF;
+  --text: #FFFFFF;
+  --muted: #FFFFFF;
+  --paper: #111111;
+  --surface: #111111;
+  --surface-alt: #111111;
+  --canvas: #111111;
+  --line: #F4F4F5;
+  --border-color: #F4F4F5;
+  --shadow: 0 12px 34px rgba(17,17,17,.45);
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root,
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] .main-shell,
+html[data-theme="dark"] .page-wrap,
+html[data-theme="dark"] .loading-screen {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] :is(.sidebar, .topbar, .card, .table-card, .modal,
+  .modal-card, .notification-popover, .command-palette, .person-drawer,
+  .profile-preferences-card, .profile-info-card, .privacy-card,
+  .notification-page-card, .approval-workspace, .report-trend-card,
+  .attendance-history-card, .attendance-support-grid > *, .wfh-side) {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(244,244,245,.22) !important;
+}
+html[data-theme="dark"] :is(.page-title h1, .section-head h2, .card-heading h2,
+  .workspace-chip b, .person-cell b, .user-lines b, .breadcrumb b,
+  .drawer-heading h2, .drawer-facts b, .profile-preferences-heading h2,
+  .preference-row b, .announcement-banner-copy h2, .announcement-launch b,
+  .attendance-health-head h2, .report-trend-heading h2, .report-executive-strip b,
+  .approval-command-intro b, .mobile-report-grid b, .mobile-report-leave-main b,
+  .enterprise-page h1, .enterprise-page h2, .enterprise-page h3,
+  .enterprise-page h4, .enterprise-page strong, .enterprise-page b,
+  .enterprise-page .enterprise-tr, .employee-policy-card h2) {
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] :is(.page-title p, .section-head p, .card-heading p,
+  .breadcrumb, .person-cell small, .user-lines small, td, th,
+  .drawer-heading p, .drawer-facts small, .profile-preferences-heading p,
+  .preference-row small, .announcement-banner-copy p, .announcement-launch small,
+  .attendance-health-head p, .report-trend-heading p, .report-trend-col > small,
+  .report-trend-value, .report-executive-strip small, .approval-command-intro small,
+  .mobile-report-grid small, .mobile-report-leave-main span, .enterprise-page p,
+  .enterprise-page small, .enterprise-page .muted-copy, .app-footer) {
+  color: #FFFFFF !important;
+  opacity: .72;
+}
+html[data-theme="dark"] :is(.workspace-chip, .sidebar-note, .command-trigger,
+  .theme-toggle, .button-soft, .history-calendar, .history-day,
+  .calendar-note-wide, .next-holiday-card, .admin-intro, .people-toolbar,
+  .people-hero-strip, .attendance-health-score, .attendance-health-metrics > div,
+  .preference-segment, .preference-note, .leave-upcoming-strip, .leave-upcoming-item,
+  .wfh-usage-grid > div, .report-executive-strip > div, .report-trend-score,
+  .report-trend-bar, .approval-workspace-toolbar, .approval-command-bar,
+  .audit-retention, .export-preview, .export-field-grid > div,
+  .enterprise-page .enterprise-metric, .enterprise-page .enterprise-detail,
+  .enterprise-page .enterprise-checklist, .enterprise-page .enterprise-table,
+  .enterprise-page .enterprise-select, .enterprise-page .enterprise-textarea,
+  .enterprise-page .check-row, .enterprise-page .policy-row,
+  .enterprise-page .attention-item, .enterprise-page .enterprise-tabs,
+  .enterprise-page .leave-row > div, .leave-request-preview, .wfh-request-preview) {
+  background: #111111 !important;
+  border-color: rgba(244,244,245,.22) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] :is(input, select, textarea, .input, .text-input,
+  .enterprise-select, .enterprise-textarea, .command-head input) {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(244,244,245,.35) !important;
+}
+html[data-theme="dark"] :is(input, select, textarea, .input, .text-input)::placeholder {
+  color: #FFFFFF !important;
+  opacity: .58;
+}
+html[data-theme="dark"] :is(th, .table thead th, .enterprise-th) {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(244,244,245,.22) !important;
+}
+html[data-theme="dark"] :is(td, .enterprise-tr, .enterprise-detail-row, .check-row, .policy-row) {
+  border-color: rgba(244,244,245,.18) !important;
+}
+html[data-theme="dark"] :is(.table-card tbody tr:hover, .enterprise-row:hover,
+  .enterprise-row.selected, .notification-item:hover, .notification-unread,
+  .command-item:hover) { background: rgba(244,244,245,.08) !important; }
+html[data-theme="dark"] :is(.nav-link, .icon-button, .text-button, .enterprise-tabs button) {
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] .nav-active,
+html[data-theme="dark"] .mobile-bottom-item.active,
+html[data-theme="dark"] .mobile-bottom-item[aria-current="page"] {
+  background: rgba(218,175,81,.18) !important;
+  color: #DAAF51 !important;
+}
+html[data-theme="dark"] .nav-active svg { color: #DAAF51 !important; }
+html[data-theme="dark"] :is(.button-soft, .tiny-arrow, .select-wrap select) {
+  background: #111111 !important;
+  border-color: rgba(244,244,245,.3) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] :is(.status, .mini-status) {
+  background: rgba(244,244,245,.08) !important;
+  border-color: rgba(244,244,245,.22) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] :is(.status-pending, .mini-assigned, .mini-in-progress, .mini-open) {
+  background: rgba(218,175,81,.15) !important;
+  color: #DAAF51 !important;
+}
+html[data-theme="dark"] :is(.status-late-entry, .status-rejected, .status-inactive,
+  .mini-inactive, .mini-archived, .mini-retired, .mini-cancelled) {
+  background: rgba(147,19,20,.28) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="dark"] .enterprise-tabs button.active {
+  background: #DAAF51 !important;
+  color: #111111 !important;
+}
+html[data-theme="dark"] .enterprise-hero {
+  background: linear-gradient(135deg, rgba(147,19,20,.24), rgba(218,175,81,.12)) !important;
+  border-color: rgba(218,175,81,.3) !important;
+}
+html[data-theme="dark"] .enterprise-page .bar-row i,
+html[data-theme="dark"] .enterprise-page .trend-bars i,
+html[data-theme="dark"] .enterprise-page .leave-row > div i {
+  background: #DAAF51 !important;
+}
+html[data-theme="dark"] .enterprise-page .check-circle.done {
+  background: #931314 !important;
+  color: #FFFFFF !important;
+  border-color: #931314 !important;
+}
+html[data-theme="dark"] .enterprise-page .enterprise-toast {
+  background: #DAAF51 !important;
+  color: #111111 !important;
+}
+html[data-theme="dark"] .login-panel,
+html[data-theme="dark"] .demo-box,
+html[data-theme="dark"] .setup-note {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(244,244,245,.22) !important;
+}
+html[data-theme="dark"] .login-panel h2,
+html[data-theme="dark"] .demo-heading h3 { color: #FFFFFF !important; }
+html[data-theme="dark"] .login-lede,
+html[data-theme="dark"] .login-footer { color: #FFFFFF !important; opacity: .72; }
+html[data-theme="dark"] .mobile-bottom-nav {
+  background: #111111 !important;
+  border-color: rgba(244,244,245,.22) !important;
+}
+html[data-theme="dark"] .mobile-scrim,
+html[data-theme="dark"] .drawer-backdrop,
+html[data-theme="dark"] .command-overlay { background: rgba(17,17,17,.85) !important; }
+html[data-theme="dark"] .notification-item,
+html[data-theme="dark"] .notification-page-item {
+  background: #111111 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(244,244,245,.18) !important;
+}
+html[data-theme="dark"] .notification-item b,
+html[data-theme="dark"] .notification-page-item b,
+html[data-theme="dark"] .notification-item small,
+html[data-theme="dark"] .notification-page-item small { color: #FFFFFF !important; }
+html[data-theme="dark"] .notification-item small,
+html[data-theme="dark"] .notification-page-item small { opacity: .72; }
+html[data-theme="dark"] .modal-head,
+html[data-theme="dark"] .popover-heading { border-color: rgba(244,244,245,.22) !important; }
+html[data-theme="dark"] .modal-body { color: #FFFFFF !important; }
