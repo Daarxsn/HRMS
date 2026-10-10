@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendEmployeeHrEmail, smtpConfigured } from '../mailer.mts';
+import { htmlEscape, sendEmployeeHrEmail } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
@@ -56,7 +56,7 @@ async function emailLeaveRequestToAdmin(request) {
       request_id:request.id,
       error:String(error?.message || error)
     }));
-    return { configured:smtpConfigured(), sent:0, recipients:0 };
+    return { configured:false, sent:0, recipients:0 };
   }
 }
 
