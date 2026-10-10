@@ -49,6 +49,7 @@ assert.ok(api.includes('AbortController'), 'API timeout contract missing');
 assert.ok(api.includes('Z|[+-]'), 'Timezone-aware timestamp parsing contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
 assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the production UI');
+assert.ok(!/\\balert\\s*\\(/.test(enterprise), 'Enterprise HR actions must not use blocking browser alerts');
 assert.ok(sw.includes("url.pathname.startsWith('/api/')"), 'Service worker must exclude API responses');
 assert.ok(manifest.includes('"display": "standalone"'), 'PWA standalone display contract missing');
 assert.ok(index.includes('Permissions-Policy'), 'Browser Permissions-Policy contract missing');
