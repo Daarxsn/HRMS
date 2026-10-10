@@ -64,7 +64,7 @@ export function formatTime(value?: string | number | Date | null) {
     const input = value.trim();
     // SQL timestamps are interpreted as UTC; ISO timestamps with an explicit
     // zone are already unambiguous and must not receive a second `Z` suffix.
-    normalized = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(input)
+    normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(input)
       ? input
       : `${input.replace(' ', 'T')}Z`;
   }
