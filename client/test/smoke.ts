@@ -80,8 +80,14 @@ assert.ok(enterprise.includes('We couldn’t load your policies'), 'Employee pol
 assert.ok(enterprise.includes('Try again'), 'Employee policy loading must provide retry feedback');
 assert.ok(app.includes("localStorage.getItem('hrms-theme')"), 'Appearance preference must persist across reloads');
 assert.ok(app.includes("document.documentElement.dataset.theme=theme"), 'Appearance preference must update the document theme');
-assert.ok(css.includes('--ui-surface:#171a17'), 'Dark mode must define a semantic dark surface');
-assert.ok(css.includes('--ui-text:#f1f3ef'), 'Dark mode must define readable foreground text');
+assert.ok(css.includes('--ui-surface: var(--fx-white)'), 'Light mode must define a semantic white surface');
+assert.ok(css.includes('--ui-text: var(--fx-charcoal)'), 'Light mode must define readable brand foreground text');
+assert.ok(css.includes('--ui-bg: var(--fx-charcoal)'), 'Dark mode must use the approved charcoal canvas');
+assert.ok(css.includes('--ui-text: var(--fx-white)'), 'Dark mode must use readable white foreground text');
+assert.ok(css.includes('html[data-theme] .profile-info-grid > div'), 'Profile grid cells must follow the active theme');
+assert.ok(css.includes('html[data-theme] .calendar-day'), 'Calendar day cells must follow the active theme');
+assert.ok(!css.includes('HRMS appearance system — contrast and cross-surface consistency'), 'Duplicate legacy theme layer must be removed');
+
 assert.ok(css.includes('profile-details-grid'), 'Theme regression coverage must include profile data grids');
 
 
