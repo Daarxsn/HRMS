@@ -125,12 +125,39 @@ function LoginScreen() {
     catch(e){setError(e.message);setBusy(false);}
   };
   return <div className="login-page">
-    <div className="login-art"><div className="login-art-top"><IconLogo/></div><div className="login-art-copy"><div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div><h1>Good work<br/><em>starts here.</em></h1><p>One thoughtful place for your workday, your time away, and the people you work with.</p><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-note"><Sparkles size={15}/> Built around people, not presence</div></div><div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div></div>
-    <div className="login-panel"><div className="login-panel-inner"><div className="mobile-login-brand"><IconLogo/></div><div className="eyebrow">THE PEOPLE PORTAL</div><h2>Welcome in.</h2><p className="login-lede">Sign in with the Google account your administrator has added.</p>
-      {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
-      {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
-      <div className="login-trust"><span><LockKeyholeIcon/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
-    </div><div className="login-footer">Need access? Contact your Falchion Xeniaa administrator.</div></div>
+    <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
+      <div className="login-art-top"><IconLogo/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
+      <div className="login-art-copy">
+        <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
+        <h1>Good work<br/><em>starts here.</em></h1>
+        <p>Everything that makes your workday work — thoughtfully brought together in one place.</p>
+        <div className="login-feature-row" aria-label="People portal features">
+          <div className="login-feature"><span className="login-feature-icon"><CalendarDays size={17}/></span><span><b>Your time</b><small>Attendance & leave</small></span></div>
+          <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
+          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Private by design</small></span></div>
+        </div>
+        <div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/>
+        <div className="art-note"><Sparkles size={15}/> Built around people, not presence</div>
+      </div>
+      <div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div>
+    </section>
+    <section className="login-panel" aria-label="Sign in">
+      <div className="login-panel-inner">
+        <div className="mobile-login-brand"><IconLogo/><span>FALCHION XENIAA</span></div>
+        <div className="login-access-mark"><span className="login-access-icon"><ShieldCheck size={17}/></span><span>YOUR WORKSPACE, SECURED</span></div>
+        <div className="eyebrow">THE PEOPLE PORTAL</div>
+        <h2>Welcome in<span className="login-title-period">.</span></h2>
+        <p className="login-lede">A better workday starts with the right people. Sign in with the Google account your administrator has added.</p>
+        <div className="login-auth-card">
+          <div className="login-auth-card-heading"><span className="login-google-g">G</span><span><b>Continue with Google</b><small>Use your authorised work account</small></span><ShieldCheck size={17} className="login-auth-shield"/></div>
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
+          {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
+          <div className="login-auth-assurance"><LockKeyholeIcon/> Your account is verified securely by Google.</div>
+        </div>
+        <div className="login-trust"><span><ShieldCheck size={14}/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
+      </div>
+      <div className="login-footer"><span>Need access?</span> Contact your Falchion Xeniaa administrator.</div>
+    </section>
   </div>;
 }
 function LockKeyholeIcon(){return <ShieldCheck size={14}/>;}
