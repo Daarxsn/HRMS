@@ -28,14 +28,19 @@ test('mobile navigation opens and remains usable', async ({ page }, testInfo) =>
   await expect(page.locator('nav.main-nav').getByRole('link', { name: 'Attendance', exact: true })).toBeVisible();
 });
 
+async function openSidebarLink(page: any, name: string) {
+  const openNav = page.getByRole('button', { name: 'Open navigation' });
+  if (await openNav.isVisible()) await openNav.click();
+  await page.locator('.sidebar').getByRole('link', { name, exact: true }).click();
+}
+
 test('profile and calendar surfaces remain readable when switching themes', async ({ page }) => {
   await signInDev(page, 'employee');
 
-  const themeToggle = page.getByRole('button', { name: 'Switch to dark mode' });
-  await themeToggle.click();
+  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
-  await page.getByRole('link', { name: 'My profile', exact: true }).first().click();
+  await openSidebarLink(page, 'My profile');
   const profileCell = page.locator('.profile-info-grid > div').first();
   await expect(profileCell).toBeVisible();
   const darkProfile = await profileCell.evaluate((el) => ({
@@ -46,7 +51,7 @@ test('profile and calendar surfaces remain readable when switching themes', asyn
   expect(darkProfile.color).not.toBe('rgb(17, 17, 17)');
   expect(darkProfile.color).not.toBe('rgb(0, 0, 0)');
 
-  await page.getByRole('link', { name: 'Holiday calendar', exact: true }).click();
+  await openSidebarLink(page, 'Holiday calendar');
   const calendarCell = page.locator('.calendar-day:not(.calendar-day-empty):not(.calendar-today)').first();
   await expect(calendarCell).toBeVisible();
   const darkCalendar = await calendarCell.evaluate((el) => ({
@@ -65,4 +70,14 @@ test('profile and calendar surfaces remain readable when switching themes', asyn
   }));
   expect(lightCalendar.background).toBe('rgb(255, 255, 255)');
   expect(lightCalendar.color).not.toBe('rgb(255, 255, 255)');
+
+  await openSidebarLink(page, 'My profile');
+  const lightProfileCell = page.locator('.profile-info-grid > div').first();
+  await expect(lightProfileCell).toBeVisible();
+  const lightProfile = await lightProfileCell.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    color: getComputedStyle(el.querySelector('b') || el).color
+  }));
+  expect(lightProfile.background).toBe('rgb(255, 255, 255)');
+  expect(lightProfile.color).not.toBe('rgb(255, 255, 255)');
 });
