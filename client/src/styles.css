@@ -2793,6 +2793,47 @@ html[data-theme] :is(.calendar-note,.calendar-note-wide) {
 html[data-theme] :is(.calendar-note b,.calendar-note-wide b) { color: var(--ui-text)!important; }
 html[data-theme] :is(.calendar-note p,.calendar-note-wide p) { color: var(--ui-text-muted)!important; }
 
+/* Critical compatibility guard: explicit theme-scoped surfaces for legacy cells. */
+html[data-theme="light"] .profile-info-grid > div,
+html[data-theme="light"] .profile-details-grid > div {
+  background-color: #FFFFFF!important;
+  color: #111111!important;
+}
+html[data-theme="light"] .profile-info-grid span,
+html[data-theme="light"] .profile-details-grid span { color: #555555!important; }
+html[data-theme="light"] .profile-info-grid b,
+html[data-theme="light"] .profile-details-grid b { color: #111111!important; }
+
+html[data-theme="dark"] .profile-info-grid > div,
+html[data-theme="dark"] .profile-details-grid > div {
+  background-color: #1B1B1B!important;
+  color: #FFFFFF!important;
+  border-color: rgba(244,244,245,.22)!important;
+}
+html[data-theme="dark"] .profile-info-grid span,
+html[data-theme="dark"] .profile-details-grid span { color: #C7C7C7!important; }
+html[data-theme="dark"] .profile-info-grid b,
+html[data-theme="dark"] .profile-details-grid b { color: #FFFFFF!important; }
+
+html[data-theme="light"] .calendar-day:not(.calendar-holiday-fixed):not(.calendar-holiday-floating):not(.calendar-today) {
+  background-color: #FFFFFF!important;
+  color: #111111!important;
+}
+html[data-theme="light"] .calendar-day b,
+html[data-theme="light"] .calendar-weekdays span { color: #555555!important; }
+html[data-theme="light"] .calendar-day small { color: #111111!important; }
+html[data-theme="dark"] .calendar-day:not(.calendar-holiday-fixed):not(.calendar-holiday-floating):not(.calendar-today) {
+  background-color: #1B1B1B!important;
+  color: #FFFFFF!important;
+  border-color: rgba(244,244,245,.22)!important;
+}
+html[data-theme="dark"] .calendar-day b,
+html[data-theme="dark"] .calendar-weekdays span { color: #C7C7C7!important; }
+html[data-theme="dark"] .calendar-day small {
+  background-color: #242424!important;
+  color: #FFFFFF!important;
+}
+
 /* Buttons, navigation, selection and status pills follow brand semantics. */
 html[data-theme] .button-soft {
   background-color: var(--ui-surface-muted)!important;
