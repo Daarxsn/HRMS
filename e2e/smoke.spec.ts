@@ -27,3 +27,42 @@ test('mobile navigation opens and remains usable', async ({ page }, testInfo) =>
   await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible();
   await expect(page.locator('nav.main-nav').getByRole('link', { name: 'Attendance', exact: true })).toBeVisible();
 });
+
+test('profile and calendar surfaces remain readable when switching themes', async ({ page }) => {
+  await signInDev(page, 'employee');
+
+  const themeToggle = page.getByRole('button', { name: 'Switch to dark mode' });
+  await themeToggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+  await page.getByRole('link', { name: 'My profile', exact: true }).first().click();
+  const profileCell = page.locator('.profile-info-grid > div').first();
+  await expect(profileCell).toBeVisible();
+  const darkProfile = await profileCell.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    color: getComputedStyle(el.querySelector('b') || el).color
+  }));
+  expect(darkProfile.background).not.toBe('rgb(255, 255, 255)');
+  expect(darkProfile.color).not.toBe('rgb(17, 17, 17)');
+  expect(darkProfile.color).not.toBe('rgb(0, 0, 0)');
+
+  await page.getByRole('link', { name: 'Holiday calendar', exact: true }).click();
+  const calendarCell = page.locator('.calendar-day:not(.calendar-day-empty):not(.calendar-today)').first();
+  await expect(calendarCell).toBeVisible();
+  const darkCalendar = await calendarCell.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    color: getComputedStyle(el.querySelector('b') || el).color
+  }));
+  expect(darkCalendar.background).not.toBe('rgb(255, 255, 255)');
+  expect(darkCalendar.color).not.toBe('rgb(17, 17, 17)');
+  expect(darkCalendar.color).not.toBe('rgb(0, 0, 0)');
+
+  await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  const lightCalendar = await calendarCell.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    color: getComputedStyle(el.querySelector('b') || el).color
+  }));
+  expect(lightCalendar.background).toBe('rgb(255, 255, 255)');
+  expect(lightCalendar.color).not.toBe('rgb(255, 255, 255)');
+});
