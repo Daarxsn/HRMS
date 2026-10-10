@@ -3403,3 +3403,121 @@ html[data-theme="light"] :is(.profile-info-grid,.profile-details-grid) :is(small
  html:focus-within{scroll-behavior:auto}
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+
+/* Sign-in masthead refinement: the logo must never collapse to the global avatar size. */
+.login-art-top{
+  align-items:center;
+  gap:20px;
+  min-height:56px;
+  padding:4px 0 18px;
+  border-bottom:1px solid rgba(244,244,245,.14);
+  max-width:100%;
+}
+.login-art-top .brand-logo-image{
+  width:clamp(240px,20vw,300px)!important;
+  height:48px!important;
+  min-width:0!important;
+  flex:0 0 auto!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+  background:transparent!important;
+}
+.login-art-top .brand-logo-image img{
+  display:block;
+  width:100%!important;
+  height:100%!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  border-radius:0!important;
+  filter:drop-shadow(0 3px 10px rgba(0,0,0,.12));
+}
+.login-brand-divider{height:36px;width:1px;flex:0 0 1px;background:linear-gradient(180deg,transparent,rgba(218,175,81,.8),transparent)}
+.login-brand-caption{font-size:10px;line-height:1.7;letter-spacing:.2em;color:#c3cfc4;font-weight:800;white-space:nowrap}
+.login-art-copy{max-width:610px}
+.login-art-copy::before{
+  content:"";
+  position:absolute;
+  width:3px;
+  height:78px;
+  left:-22px;
+  top:4px;
+  border-radius:4px;
+  background:linear-gradient(180deg,#DAAF51,rgba(218,175,81,0));
+  opacity:.75;
+}
+.login-art-copy h1{
+  text-wrap:balance;
+  text-shadow:0 4px 30px rgba(0,0,0,.09);
+}
+.login-feature-row{gap:12px;max-width:590px}
+.login-feature{
+  min-height:82px;
+  padding:14px 13px;
+  border-color:rgba(244,244,245,.16);
+  background:linear-gradient(145deg,rgba(244,244,245,.065),rgba(244,244,245,.025));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.055);
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.login-feature-icon{
+  width:40px;height:40px;
+  border-color:rgba(218,175,81,.4);
+  background:linear-gradient(145deg,rgba(218,175,81,.16),rgba(218,175,81,.055));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+.login-feature b{font-size:11px;letter-spacing:.01em}
+.login-feature small{font-size:9px;line-height:1.5}
+.art-note{
+  margin-top:29px;
+  border-color:rgba(218,175,81,.24);
+  background:linear-gradient(100deg,rgba(218,175,81,.09),rgba(244,244,245,.025));
+  color:#ead39d;
+  box-shadow:0 8px 26px rgba(0,0,0,.04);
+}
+.art-note svg{color:#DAAF51}
+.login-art-footer{padding-top:15px;border-top:1px solid rgba(244,244,245,.09)}
+.login-art:before{
+  width:min(70vw,940px);height:min(70vw,940px);
+  left:-33%;top:16%;
+  border-color:rgba(244,244,245,.09);
+  box-shadow:0 0 0 48px rgba(244,244,245,.012),0 0 0 96px rgba(244,244,245,.009);
+}
+.login-art:after{
+  width:min(47vw,630px);height:min(47vw,630px);
+  left:-15%;top:29%;
+  border-color:rgba(218,175,81,.12);
+}
+@media(hover:hover) and (pointer:fine){
+ .login-feature:hover{
+   transform:translateY(-3px);
+   border-color:rgba(218,175,81,.34);
+   background:linear-gradient(145deg,rgba(218,175,81,.095),rgba(244,244,245,.035));
+ }
+}
+@media(max-width:1050px) and (min-width:721px){
+ .login-art-top{gap:13px}
+ .login-art-top .brand-logo-image{width:clamp(190px,23vw,240px)!important;height:40px!important}
+ .login-brand-caption{font-size:8px;letter-spacing:.16em}
+ .login-art-copy::before{left:-14px}
+ .login-feature-row{grid-template-columns:1fr;max-width:300px;gap:8px}
+ .login-feature{min-height:66px;padding:10px}
+ .login-feature-icon{width:34px;height:34px}
+}
+@media(max-width:720px){
+ .login-art-top{padding:0 0 14px;min-height:44px;gap:0;border-bottom-color:rgba(244,244,245,.12)}
+ .login-art-top .brand-logo-image{
+   width:clamp(205px,62vw,250px)!important;
+   height:40px!important;
+ }
+ .login-art-copy::before{display:none}
+ .login-feature{min-height:0;padding:9px 7px}
+ .login-feature-icon{width:30px;height:30px}
+ .login-art:before{width:430px;height:430px;left:-55%;top:28%}
+ .login-art:after{width:310px;height:310px;left:-29%;top:40%}
+ .login-art-footer{border:0;padding-top:0}
+}
+@media(prefers-reduced-motion:reduce){
+ .login-feature{transition:none}
+}
