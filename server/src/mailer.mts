@@ -316,7 +316,7 @@ export async function sendHrNotificationEmail(message: Omit<EmailMessage, 'to'>)
     const message = typeof body?.error?.message === 'string' ? body.error.message : 'Gmail API request failed.';
     throw Object.assign(new Error(message), { status: response.status });
   }
-  return body;
+  return response.json();
 };
 
 const verifyGmailIdentity = async (accessToken: string, expectedEmail: string) => {
