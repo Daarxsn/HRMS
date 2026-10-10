@@ -8,7 +8,8 @@ try {
     'employees','system_settings','attendance_records','leave_requests','wfh_requests',
     'attendance_correction_requests','flex_start_requests','notifications','audit_logs',
     'company_holidays','attachments','qr_challenges','qr_challenge_uses','temporary_exits',
-    'employee_schedule_exceptions','employee_emergency_contacts','employment_history','onboarding_tasks',\n    'employee_documents','company_assets','company_policies','policy_acknowledgements','separation_cases','schema_migrations'
+    'employee_schedule_exceptions','employee_emergency_contacts','employment_history','onboarding_tasks',
+    'employee_documents','company_assets','company_policies','policy_acknowledgements','separation_cases','schema_migrations'
   ];
   for (const table of required) assert.ok(names.has(table), `Missing required table: ${table}`);
 
