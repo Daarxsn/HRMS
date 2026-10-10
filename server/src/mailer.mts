@@ -17,6 +17,7 @@ export type EmailMessage = {
   text: string;
   html: string;
   replyTo?: string | null;
+  fromName?: string | null;
 };
 
 const getConfig = () => ({
@@ -220,11 +221,13 @@ const startTls = async (client: SmtpClient, config): Promise<SmtpClient> => {
 
 const dotStuff = (body) => body.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
 
-const buildMessage = (message: EmailMessage) => {
-  const from = emailAddress(getConfig().from);
+const buildMessage = (message: EmailMessage, senderOverride: string | null = null) => {
+  const from = emailAddress(senderOverride || getConfig().from);
+  const fromName = message.fromName ? String(message.fromName).replace(/[\r\n"]/g, '').trim().slice(0, 120) : '';
+  const fromHeader = fromName ? '"' + fromName + '" <' + from + '>' : from;
   const to = message.to.map(emailAddress).filter(Boolean);
   return [
-    'From: ' + from,
+    'From: ' + fromHeader,
     'To: ' + to.join(', '),
     ...(message.replyTo ? ['Reply-To: ' + emailAddress(message.replyTo)] : []),
     'Subject: ' + message.subject.replace(/[\r\n]/g, ' '),
@@ -298,4 +301,55 @@ export async function sendHrNotificationEmail(message: Omit<EmailMessage, 'to'>)
   if (!recipient) return { sent:false, skipped:true, recipient:null };
   const result = await sendEmail({ ...message, to:[recipient] });
   return { sent:result.sent, skipped:result.skipped, recipient };
+}const gmailApiRequest = async (accessToken: string, path: string, init: RequestInit = {}) => {
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1' + path, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: 'Bearer ' + accessToken,
+      Accept: 'application/json',
+      ...(init.body ? { 'Content-Type': 'application/json' } : {})
+    }
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = typeof body?.error?.message === 'string' ? body.error.message : 'Gmail API request failed.';
+    throw Object.assign(new Error(message), { status: response.status });
+  }
+  return body;
+};
+
+const verifyGmailIdentity = async (accessToken: string, expectedEmail: string) => {
+  const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+    headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' }
+  });
+  if (!response.ok) {
+    throw Object.assign(new Error('Google Gmail permission is expired or invalid. Please authorize Gmail access again.'), { status: 401 });
+  }
+  const profile = await response.json().catch(() => ({}));
+  const email = emailAddress(String(profile?.email || '')).toLowerCase();
+  if (!email || email !== expectedEmail.toLowerCase()) {
+    throw Object.assign(new Error('The connected Google account does not match the email registered in HRMS.'), { status: 403 });
+  }
+  return email;
+};
+
+export async function sendEmployeeHrEmail(accessToken: string, employeeEmail: string, message: Omit<EmailMessage, 'to'>): Promise<{ sent: boolean; skipped: boolean; recipient: string; sender: string }> {
+  const token = String(accessToken || '').trim();
+  const expectedSender = emailAddress(employeeEmail).toLowerCase();
+  if (token.length < 20) throw Object.assign(new Error('Gmail authorization is missing or invalid.'), { status: 401 });
+  if (!expectedSender) throw Object.assign(new Error('Employee email is missing.'), { status: 400 });
+
+  const sender = await verifyGmailIdentity(token, expectedSender);
+  const recipient = getHrNotificationEmail();
+  if (!recipient) throw Object.assign(new Error('HR notification mailbox is not configured.'), { status: 503 });
+
+  const raw = Buffer.from(buildMessage({ ...message, to: [recipient] }, sender)).toString('base64url');
+  await gmailApiRequest(token, '/users/me/messages/send', {
+    method: 'POST',
+    body: JSON.stringify({ raw })
+  });
+  return { sent: true, skipped: false, recipient, sender };
 }
+
+

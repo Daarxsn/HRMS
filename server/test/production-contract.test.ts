@@ -28,6 +28,7 @@ const playwright=fs.readFileSync(path.join(root,'../playwright.config.ts'),'utf8
 const preflight=fs.readFileSync(path.join(root,'../.github/workflows/production-preflight.yml'),'utf8');
 const productionSmoke=fs.readFileSync(path.join(root,'../.github/workflows/production-smoke.yml'),'utf8');
 const app=fs.readFileSync(path.join(root,'../client/src/App.tsx'),'utf8');
+const main=fs.readFileSync(path.join(root,'../client/src/main.tsx'),'utf8');
 const e2e=fs.readFileSync(path.join(root,'../e2e/smoke.spec.ts'),'utf8');
 
 assert.match(index,/health\/live/);
@@ -57,11 +58,11 @@ assert.match(attendance,/OFFICE_NETWORK_IPS/);
 assert.doesNotMatch(attendance,/verifyQr|qrToken|'QR'/);
 assert.match(leave,/leaveMutationLimiter/);
 assert.match(leave,/emailLeaveRequestToAdmin/);
-assert.match(leave,/sendHrNotificationEmail/);
-assert.match(attendance,/sendHrNotificationEmail/);
+assert.match(leave,/sendEmployeeHrEmail/);
+assert.match(attendance,/sendEmployeeHrEmail/);
 assert.match(attendance,/Attendance correction request/);
 assert.match(attendance,/Flexible start request/);
-assert.match(workplace,/sendHrNotificationEmail/);
+assert.match(workplace,/sendEmployeeHrEmail/);
 assert.match(workplace,/New WFH request/);
 assert.match(email,/SMTP_HOST/);
 assert.match(email,/SMTP_PASSWORD/);
@@ -70,6 +71,9 @@ assert.match(email,/AUTH PLAIN/);
 assert.match(email,/SMTP_REQUIRED/);
 assert.match(email,/HR_NOTIFICATION_EMAIL/);
 assert.match(email,/sendHrNotificationEmail/);
+assert.match(email,/sendEmployeeHrEmail/);
+assert.match(email,/gmail.googleapis.com/);
+assert.match(email,/gmail.send/);
 assert.match(email,/socket\.destroyed/);
 assert.match(email,/responsePromise = this\.readResponse\(\)/);
 assert.match(email,/greetingPromise = client\.readResponse\(\)/);
@@ -126,6 +130,9 @@ assert.match(e2e,/signInDev/);
 assert.doesNotMatch(e2e,/Choose an account|Continue to preview/);
 assert.match(app,/Send test email to HR mailbox/);
 assert.match(app,/All HR request emails are sent to one designated HR mailbox/);
+assert.match(app,/requestGmailAccess/);
+assert.match(main,/gmailSendScope/);
+assert.match(main,/GmailAccessBridge/);
 
 
 assert.match(admin,/router\.get\('\/reports\.csv'/);

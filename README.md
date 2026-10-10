@@ -181,6 +181,9 @@ The implementation sends a plain-text and HTML email containing the employee, em
 
 For the current Vercel deployment, add the SMTP variables and `HR_NOTIFICATION_EMAIL` under **Project Settings → Environment Variables → Production**, then redeploy the application. Never commit SMTP credentials to Git.
 
+Employee-originated request emails now use the signed-in employee's Google account through Gmail OAuth with the narrow `gmail.send` and `userinfo.email` scopes. The server verifies the authorized Google email matches the HRMS employee record, then sends leave, WFH, attendance-correction and flexible-start requests to `HR_NOTIFICATION_EMAIL`. Gmail's `users.messages.send` API supports `gmail.send`; Google documents `gmail.send` as a sensitive scope. citeturn184989search0turn184989search4turn628086search1
+
+
 ## Locked policy defaults
 
 | Setting | Default |

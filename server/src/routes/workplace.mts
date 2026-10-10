@@ -6,7 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.mts';
-import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape, sendEmployeeHrEmail } from '../mailer.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, isScheduledWorkday } from '../policy.mts';
 import { saveObject, deleteObject, readObject } from '../object-storage.mts';
@@ -72,7 +72,7 @@ router.get('/wfh', requirePeople, asyncRoute(async (req, res) => {
   res.json({ enabled: Boolean(req.user.wfh_enabled), monthlyCap: Number(setting[0]?.setting_value || 4), requests });
 }));
 router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ date: dateSchema, kind: z.enum(['PLANNED','EMERGENCY']), reason: z.string().trim().min(8).max(1000) }), req.body);
+  const input = validate(z.object({ date: dateSchema, kind: z.enum(['PLANNED','EMERGENCY']), reason: z.string().trim().min(8).max(1000), gmailAccessToken: z.string().min(20).max(4096).optional() }), req.body);
   if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH has not been enabled for this employee. Ask an administrator if your eligibility needs to change.'), { status: 403 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
   if (input.kind === 'EMERGENCY' && input.date !== indiaDate()) throw Object.assign(new Error('Emergency WFH is for an unexpected same-day need. Use a planned request for a future date.'), { status:400 });
@@ -117,7 +117,7 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
         + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
         + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p>'
         + '</div></body></html>';
-      const result = await sendHrNotificationEmail({ subject, text, html, replyTo:req.user.email });
+      const result = await sendEmployeeHrEmail(input.gmailAccessToken || '', req.user.email, { subject, text, html, replyTo:req.user.email, fromName:req.user.full_name + ' · HRMS' });
       return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
     } catch (error) {
       console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));

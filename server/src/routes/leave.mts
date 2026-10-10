@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendHrNotificationEmail, smtpConfigured } from '../mailer.mts';
+import { htmlEscape, sendEmployeeHrEmail, smtpConfigured } from '../mailer.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
@@ -48,7 +48,7 @@ async function emailLeaveRequestToAdmin(request) {
       + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
       + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
       + '</div></body></html>';
-    const result = await sendHrNotificationEmail({ subject, text, html, replyTo:request.employeeEmail });
+    const result = await sendEmployeeHrEmail(request.gmailAccessToken, request.employeeEmail, { subject, text, html, replyTo:request.employeeEmail, fromName:request.employeeName + ' · HRMS' });
     return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
   } catch (error) {
     console.warn(JSON.stringify({
@@ -114,7 +114,7 @@ router.get('/', asyncRoute(async (req, res) => {
 router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({
     type: z.enum(['CASUAL','SICK','EARNED','FLOATING']), startDate: dateSchema,
-    endDate: dateSchema, reason: z.string().trim().min(8).max(1000), attachmentId: z.string().uuid().optional()
+    endDate: dateSchema, reason: z.string().trim().min(8).max(1000), attachmentId: z.string().uuid().optional(), gmailAccessToken: z.string().min(20).max(4096).optional()
   }), req.body);
   if (input.startDate > input.endDate) throw Object.assign(new Error('End date must be the same as or after the start date.'), { status: 400 });
   if (input.startDate.slice(0,4) !== input.endDate.slice(0,4)) throw Object.assign(new Error('Submit separate leave requests for each calendar year.'), { status: 400 });
@@ -160,7 +160,7 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
     days,
     reason:input.reason,
     attachmentId:input.attachmentId || null
-  });
+    });
   res.status(201).json({ ok: true, id, days, emailDelivery });
 }));
 
