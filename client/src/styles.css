@@ -3201,3 +3201,124 @@ html[data-theme="dark"] .login-page .login-art { background-color: #111111; }
 html[data-theme="dark"] .login-art em,
 html[data-theme="dark"] .login-art .art-label,
 html[data-theme="dark"] .login-art .art-note { color: #DAAF51; }
+
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   SIGN-IN EXPERIENCE · First contact deserves the same care as the product.
+   Scoped to the login surface so the workspace remains visually unchanged.
+   ────────────────────────────────────────────────────────────────────────── */
+.login-page{
+  --login-ink:#17231f;--login-muted:#77847d;--login-gold:#d9b45f;--login-green:#7ea88d;
+  min-height:100svh;grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);
+  background:#fbfaf7;overflow:hidden;isolation:isolate
+}
+.login-art{
+  min-height:100svh;padding:clamp(28px,4vw,58px) clamp(28px,5vw,76px) 26px;
+  background:radial-gradient(ellipse at 83% 24%,rgba(82,119,91,.22),transparent 38%),
+    radial-gradient(ellipse at 8% 86%,rgba(218,180,95,.075),transparent 32%),
+    linear-gradient(145deg,#142720 0%,#10221d 48%,#0c1b17 100%);
+  color:#f8f7f1
+}
+.login-art:before{width:min(70vw,880px);height:min(70vw,880px);left:-34%;top:18%;border-color:rgba(194,218,191,.105)}
+.login-art:after{width:min(48vw,620px);height:min(48vw,620px);left:-17%;top:30%;border-color:rgba(194,218,191,.085)}
+.login-art-top{gap:19px;min-height:44px}
+.login-art-top .brand-logo-image{width:clamp(160px,15vw,225px);height:42px}
+.login-brand-divider{height:28px;width:1px;background:rgba(222,230,215,.19)}
+.login-brand-caption{font-size:8px;line-height:1.55;letter-spacing:.17em;color:#9ab0a0;font-weight:750}
+.login-art-copy{max-width:590px;padding-left:0;transform:translateY(-2%);margin:auto 0}
+.art-label{color:#d9b45f;letter-spacing:.2em;font-size:10px;gap:12px}
+.art-label .pulse-dot{background:#d9b45f;box-shadow:0 0 0 4px rgba(217,180,95,.12);width:6px;height:6px}
+.login-art-copy h1{font-size:clamp(58px,6.4vw,96px);letter-spacing:-.082em;line-height:.99;margin:30px 0 23px;font-weight:720}
+.login-art-copy h1 em{color:#e1bd69}
+.login-art-copy>p{font-size:clamp(14px,1.1vw,16px);line-height:1.85;color:#b7c5ba;max-width:390px}
+.login-feature-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:540px;margin-top:34px}
+.login-feature{display:flex;align-items:center;gap:10px;min-width:0;padding:12px 10px;border:1px solid rgba(205,223,203,.12);border-radius:13px;background:rgba(231,242,226,.035);backdrop-filter:blur(8px)}
+.login-feature-icon{width:34px;height:34px;flex:0 0 auto;border:1px solid rgba(217,180,95,.22);border-radius:10px;display:grid;place-items:center;color:#e1bd69;background:rgba(217,180,95,.075)}
+.login-feature b,.login-feature small{display:block}
+.login-feature b{font-size:10px;font-weight:750;color:#f1f3eb;white-space:nowrap}
+.login-feature small{font-size:8px;color:#a8b9ab;margin-top:4px;white-space:nowrap}
+.art-note{margin-top:25px;padding:10px 13px;border-color:rgba(164,198,168,.18);background:rgba(211,234,214,.04);color:#c2d5c5}
+.art-note svg{color:#d9b45f}
+.orbit-one{width:clamp(360px,40vw,610px);height:clamp(360px,40vw,610px);right:-34%;top:-12%;border-color:rgba(148,200,164,.12)}
+.orbit-two{width:clamp(270px,30vw,440px);height:clamp(270px,30vw,440px);right:-23%;top:0;border-color:rgba(148,200,164,.1)}
+.login-art-footer{font-size:8px;letter-spacing:.18em;color:#80968a}
+.login-panel{padding:clamp(30px,5vw,72px);background:linear-gradient(155deg,#fff 0%,#fdfcf9 70%,#f8f7f1 100%);position:relative}
+.login-panel:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 95% 3%,rgba(225,212,176,.17),transparent 34%)}
+.login-panel-inner{position:relative;width:min(100%,420px);margin:auto 0}
+.login-access-mark{display:flex;align-items:center;gap:10px;margin-bottom:28px;color:#71867a;font-size:9px;letter-spacing:.15em;font-weight:800}
+.login-access-icon{display:grid;place-items:center;width:33px;height:33px;border:1px solid #e4e9df;border-radius:11px;background:#f7f8f2;color:#5c8c6c}
+.login-panel .eyebrow{font-size:9px;letter-spacing:.19em;color:#6b9576;font-weight:800;margin-bottom:12px}
+.login-panel h2{font-size:clamp(39px,3.4vw,48px);letter-spacing:-.075em;line-height:1.05;color:#1d3029;margin:0 0 14px;font-weight:720}
+.login-title-period{color:#c59b42}
+.login-lede{font-size:13px;line-height:1.8;color:#7b8981;margin:0 0 29px;max-width:365px}
+.login-auth-card{padding:21px;border:1px solid #e8e9e1;border-radius:19px;background:rgba(255,255,255,.87);box-shadow:0 18px 60px rgba(30,48,37,.055),0 2px 8px rgba(30,48,37,.025)}
+.login-auth-card-heading{display:flex;align-items:center;gap:12px;margin-bottom:19px}
+.login-google-g{width:42px;height:42px;display:grid;place-items:center;border:1px solid #e9ece6;border-radius:13px;background:#fff;color:#4285f4;font-family:Arial,sans-serif;font-size:23px;font-weight:800;box-shadow:0 2px 5px rgba(22,40,28,.035)}
+.login-auth-card-heading>span:nth-child(2){min-width:0;flex:1}
+.login-auth-card-heading b,.login-auth-card-heading small{display:block}
+.login-auth-card-heading b{font-size:13px;color:#26382f;font-weight:750}
+.login-auth-card-heading small{font-size:10px;color:#8b978e;margin-top:5px}
+.login-auth-shield{color:#80a189}
+.login-auth-card .google-login-wrap{min-height:44px;margin:0}
+.login-auth-card .google-login-wrap>div{max-width:100%}
+.login-auth-card .google-login-wrap iframe{max-width:100%}
+.login-auth-card .setup-note{margin:0;border-color:#e6ece2;background:#f7f9f4;font-size:11px;padding:14px}
+.login-auth-card .inline-alert{margin-top:14px;margin-bottom:0}
+.login-auth-assurance{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:17px;padding-top:15px;border-top:1px solid #f0f0e9;font-size:10px;color:#849187}
+.login-auth-assurance svg{color:#79a086}
+.login-trust{margin-top:24px;padding-top:18px;border-color:#e9ece5;color:#849187;font-size:10px;gap:12px}
+.login-trust span{gap:7px}
+.login-trust svg{color:#7fa48c}
+.login-footer{position:relative;bottom:auto;width:100%;margin-top:30px;color:#9aa39b;font-size:10px;line-height:1.7}
+.login-footer span{color:#64776a;font-weight:750;margin-right:4px}
+.mobile-login-brand{display:none}
+@media(min-width:1500px){
+ .login-page{grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr)}
+ .login-art{padding-left:clamp(72px,6vw,112px);padding-right:clamp(52px,5vw,88px)}
+ .login-art-copy h1{font-size:clamp(82px,5.5vw,112px)}
+ .login-panel{padding-left:clamp(72px,7vw,120px);padding-right:clamp(72px,7vw,120px)}
+}
+@media(max-width:1050px) and (min-width:721px){
+ .login-page{grid-template-columns:minmax(0,1fr) minmax(0,.95fr)}
+ .login-art{padding:32px}
+ .login-art-copy h1{font-size:clamp(54px,6vw,72px)}
+ .login-feature-row{grid-template-columns:1fr;max-width:270px;gap:8px;margin-top:24px}
+ .login-feature{padding:9px 10px}
+ .login-feature small{white-space:normal}
+ .login-panel{padding:32px}
+ .login-auth-card{padding:17px}
+}
+@media(max-width:720px){
+ .login-page{min-height:100svh;grid-template-columns:1fr;background:#faf9f5}
+ .login-art{display:flex;min-height:auto;padding:22px 24px 27px;gap:0;border-radius:0 0 25px 25px}
+ .login-art-top{min-height:32px}
+ .login-art-top .brand-logo-image{width:160px;height:32px}
+ .login-brand-divider,.login-brand-caption{display:none}
+ .login-art-copy{margin:35px 0 0;transform:none;padding:0}
+ .art-label{font-size:8px;letter-spacing:.15em}
+ .login-art-copy h1{font-size:clamp(48px,13vw,68px);margin:18px 0 13px}
+ .login-art-copy>p{font-size:12px;line-height:1.7;max-width:340px}
+ .login-feature-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:21px}
+ .login-feature{padding:9px 7px;display:block;border-radius:10px}
+ .login-feature-icon{width:29px;height:29px;margin-bottom:8px;border-radius:8px}
+ .login-feature b{font-size:9px}
+ .login-feature small{font-size:7px;white-space:normal;line-height:1.4}
+ .art-note{margin-top:18px;font-size:9px;padding:8px 11px}
+ .login-art-footer{display:none}
+ .login-panel{min-height:auto;padding:31px 24px 26px;background:#faf9f5}
+ .login-panel:before{display:none}
+ .login-panel-inner{width:min(100%,430px)}
+ .login-access-mark{margin-bottom:20px;font-size:8px}
+ .login-panel .eyebrow{margin-bottom:9px}
+ .login-panel h2{font-size:38px}
+ .login-lede{font-size:12px;margin-bottom:21px}
+ .login-auth-card{padding:17px;border-radius:15px}
+ .login-trust{margin-top:20px;padding-top:15px;font-size:9px}
+ .login-footer{margin-top:24px;text-align:center;font-size:9px}
+}
+@media(prefers-reduced-motion:no-preference){
+ .login-art-copy h1{animation:login-rise .7s cubic-bezier(.2,.7,.2,1) both}
+ .login-art-copy>p,.login-feature-row,.login-auth-card{animation:login-rise .7s .08s cubic-bezier(.2,.7,.2,1) both}
+ @keyframes login-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+}
