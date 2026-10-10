@@ -2707,3 +2707,79 @@ html[data-theme="dark"] .popover-heading { border-color: var(--border-color); }
 html[data-theme="dark"] .modal-body { color: var(--ink); }
 html[data-theme="dark"] .drawer-backdrop,
 html[data-theme="dark"] .command-overlay { background: rgba(0,0,0,.58); }
+
+
+/* Premium finish: consistent surfaces, focus, hierarchy and touch targets. */
+.page-wrap { max-width: 1560px; }
+.card {
+  border-radius: 16px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.card-heading h2, .section-head h2 { letter-spacing: -.025em; }
+.button { min-height: 42px; border-radius: 10px; }
+.button:focus-visible, .icon-button:focus-visible, .nav-link:focus-visible {
+  outline-offset: 3px;
+}
+.icon-button { min-width: 36px; min-height: 36px; }
+input, select, textarea, .input, .text-input {
+  border-radius: 10px;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+input:focus, select:focus, textarea:focus, .input:focus, .text-input:focus {
+  border-color: #b98a3a;
+  box-shadow: 0 0 0 3px rgba(218,175,81,.16);
+  outline: none;
+}
+.table-card { border-radius: 15px; }
+table tbody tr { transition: background-color .14s ease; }
+.page-title { margin-bottom: 26px; }
+.page-title h1 { letter-spacing: -.05em; }
+.enterprise-page { gap: 16px; }
+.enterprise-hero { box-shadow: 0 12px 30px rgba(28,40,30,.035); }
+.enterprise-tabs { box-shadow: 0 8px 22px rgba(28,40,30,.035); }
+.enterprise-tabs button { transition: background-color .16s ease, color .16s ease; }
+.enterprise-tabs button:focus-visible { outline-offset: -2px; }
+.enterprise-metric, .enterprise-detail, .attention-item {
+  transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+.enterprise-row:focus-visible { outline-offset: -3px; }
+.enterprise-toast { box-shadow: 0 16px 40px rgba(15,30,20,.18); }
+.status, .mini-status { line-height: 1.2; }
+.sidebar { box-shadow: 8px 0 28px rgba(20,35,25,.015); }
+.topbar { box-shadow: 0 4px 18px rgba(20,35,25,.018); }
+@media (hover:hover) and (pointer:fine) {
+  .card:hover { border-color: #dce5dc; }
+  .enterprise-metric:hover, .enterprise-detail:hover { border-color: #d0dfd2; }
+  .attention-item:hover { background: #f8faf7; border-color: #d5e1d5; }
+}
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .enterprise-metric,
+html[data-theme="dark"] .enterprise-detail,
+html[data-theme="dark"] .attention-item {
+  box-shadow: none;
+}
+html[data-theme="dark"] .card:hover,
+html[data-theme="dark"] .enterprise-metric:hover,
+html[data-theme="dark"] .enterprise-detail:hover,
+html[data-theme="dark"] .attention-item:hover {
+  border-color: #3b4a40;
+}
+html[data-theme="dark"] .attention-item:hover { background: #202d25; }
+html[data-theme="dark"] .sidebar { box-shadow: 8px 0 28px rgba(0,0,0,.08); }
+html[data-theme="dark"] .topbar { box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+html[data-theme="dark"] .enterprise-hero { box-shadow: none; }
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] .input:focus,
+html[data-theme="dark"] .text-input:focus {
+  border-color: #d9b45d;
+  box-shadow: 0 0 0 3px rgba(218,175,81,.2);
+}
+@media (max-width: 720px) {
+  .page-title { align-items: flex-start; }
+  .page-title h1 { font-size: clamp(23px, 6vw, 29px); }
+  .card { border-radius: 15px; }
+  .enterprise-hero { box-shadow: none; }
+  .enterprise-tabs { box-shadow: none; }
+}
