@@ -58,8 +58,18 @@ export function formatDate(value?: string | number | Date | null, options: Intl.
   return new Intl.DateTimeFormat('en-IN', options).format(date);
 }
 export function formatTime(value?: string | number | Date | null) {
-  if (!value) return '—';
-  const date = new Date(typeof value === 'string' && !value.endsWith('Z') ? `${value.replace(' ','T')}Z` : value);
+  if (value == null || value === '') return '—';
+  let normalized: string | number | Date = value;
+  if (typeof value === 'string') {
+    const input = value.trim();
+    // SQL timestamps are interpreted as UTC; ISO timestamps with an explicit
+    // zone are already unambiguous and must not receive a second `Z` suffix.
+    normalized = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(input)
+      ? input
+      : `${input.replace(' ', 'T')}Z`;
+  }
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', { hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata' }).format(date);
 }
 export function formatMinutes(minutes?: number | null) { if (minutes == null) return '—'; return `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2,'0')}m`; }
