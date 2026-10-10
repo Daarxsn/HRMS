@@ -121,13 +121,21 @@ function DetailList({title,rows,empty,render}) { return <section className="ente
 
 function Onboarding({people,reload,runAction}) {
   const [employeeId,setEmployeeId]=useState(people[0]?.id||''),[tasks,setTasks]=useState([]),[title,setTitle]=useState(''),[category,setCategory]=useState('GENERAL'),[due,setDue]=useState(''),[busy,setBusy]=useState(false);
-  const load=async()=>{if(employeeId){const r=await get('/enterprise/admin/employees/'+employeeId+'/lifecycle');setTasks(r.tasks||[]);}};
+  const [taskLoading,setTaskLoading]=useState(false),[taskError,setTaskError]=useState('');
+  const load=async()=>{
+    if(!employeeId){setTasks([]);setTaskError('Select an employee to view onboarding tasks.');return;}
+    setTaskLoading(true);setTaskError('');
+    try {const r=await get('/enterprise/admin/employees/'+employeeId+'/lifecycle');setTasks(r.tasks||[]);}
+    catch(e){setTaskError(e.message||'Could not load onboarding tasks.');}
+    finally{setTaskLoading(false);}
+  };
   useEffect(()=>{load();},[employeeId]);
-  const add=async()=>{if(!employeeId||!title.trim())return;setBusy(true);try{await runAction(async()=>{await post('/enterprise/admin/employees/'+employeeId+'/onboarding',{title:title.trim(),category:category.trim()||'GENERAL',dueDate:due||null});setTitle('');setDue('');});await load();}finally{setBusy(false)}};
+  const add=async()=>{if(!employeeId||!title.trim())return;setBusy(true);setTaskError('');try{await runAction(async()=>{await post('/enterprise/admin/employees/'+employeeId+'/onboarding',{title:title.trim(),category:category.trim()||'GENERAL',dueDate:due||null});setTitle('');setDue('');});await load();}finally{setBusy(false)}};
   return <section className="card"><div className="card-heading"><div><h2>Onboarding command</h2><p>Create a checklist for every joiner and move each task through a visible state.</p></div></div>
     <div className="enterprise-toolbar"><select className="input" value={employeeId} onChange={e=>setEmployeeId(e.target.value)}>{people.map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.employee_code}</option>)}</select></div>
     <div className="enterprise-inline-form"><input className="input" placeholder="Task title" value={title} onChange={e=>setTitle(e.target.value)}/><input className="input" placeholder="Category" value={category} onChange={e=>setCategory(e.target.value)}/><input className="input" type="date" value={due} onChange={e=>setDue(e.target.value)}/><button className="button button-primary" disabled={!title.trim()||busy} onClick={add}><Plus size={16}/> Add</button></div>
-    <div className="enterprise-checklist">{tasks.map(t=><div className="check-row" key={t.id}><span className={'check-circle '+(t.status==='COMPLETED'?'done':'')}>{t.status==='COMPLETED'?<Check size={13}/>:null}</span><div><b>{t.title}</b><small>{t.category}{t.due_date?' · Due '+formatDate(t.due_date):''}</small></div><select value={t.status} onChange={async e=>{const status=e.target.value;await runAction(()=>patch('/enterprise/admin/onboarding/'+t.id,{status}));await load();}}><option>PENDING</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>BLOCKED</option></select></div>)}</div>
+    {taskError&&<p className="muted-copy" role="alert">{taskError} <button className="button button-secondary button-sm" type="button" onClick={load} disabled={taskLoading}>{taskLoading?'Retrying…':'Retry'}</button></p>}
+    {taskLoading?<div className="loading-panel" role="status"><span className="spinner"/><p>Loading onboarding tasks…</p></div>:<div className="enterprise-checklist">{tasks.map(t=><div className="check-row" key={t.id}><span className={'check-circle '+(t.status==='COMPLETED'?'done':'')}>{t.status==='COMPLETED'?<Check size={13}/>:null}</span><div><b>{t.title}</b><small>{t.category}{t.due_date?' · Due '+formatDate(t.due_date):''}</small></div><select value={t.status} onChange={async e=>{const status=e.target.value;await runAction(()=>patch('/enterprise/admin/onboarding/'+t.id,{status}));await load();}}><option>PENDING</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>BLOCKED</option></select></div>)}</div>}
   </section>;
 }
 
