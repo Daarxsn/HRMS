@@ -2458,3 +2458,252 @@ html[data-theme="dark"] .wfh-request-preview-grid small{color:#9eaaa3}
 @media(max-width:720px){.enterprise-page{gap:12px}.enterprise-hero{padding:20px;border-radius:18px}.enterprise-hero h1{font-size:32px}.enterprise-tabs{top:0;border-radius:14px}.enterprise-tabs button{padding:10px 11px}.enterprise-metrics,.lifecycle-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.enterprise-table{overflow-x:auto}.enterprise-tr{min-width:680px}.enterprise-toolbar{align-items:stretch;flex-direction:column}.enterprise-toolbar .input{width:100%}.lifecycle-profile-head{flex-direction:column}.enterprise-action-grid{display:grid;grid-template-columns:1fr}.enterprise-action-grid .button{width:100%}.enterprise-inline-form{grid-template-columns:1fr}.enterprise-inline-form .button{grid-column:auto}.check-row{grid-template-columns:auto 1fr}.check-row select{grid-column:2;width:100%}.policy-row{grid-template-columns:1fr}.policy-row .button,.policy-row .mini-status{width:max-content}.employee-policy-card{grid-template-columns:1fr}.policy-actions{align-items:center}.enterprise-toast{bottom:calc(18px + env(safe-area-inset-bottom))}}
 
 .trend-list{display:grid;gap:10px}.trend-row{display:grid;grid-template-columns:58px 1fr 34px;gap:10px;align-items:center;font-size:12px}.trend-row>span{color:var(--muted)}.trend-row>b{text-align:right}.trend-bars{display:grid;gap:3px}.trend-bars i{display:block;height:4px;border-radius:999px;background:var(--fx-saffron-red);width:var(--present);opacity:.8}.trend-bars i:nth-child(2){width:var(--late);opacity:.55}.trend-bars i:nth-child(3){width:var(--absent);opacity:.3}.trend-legend{display:flex;gap:14px;margin-top:12px;color:var(--muted);font-size:10px}.trend-legend span{display:flex;align-items:center;gap:5px}.trend-legend i{width:7px;height:7px;border-radius:50%;background:var(--fx-saffron-red);opacity:.8}.trend-legend span:nth-child(2) i{opacity:.55}.trend-legend span:nth-child(3) i{opacity:.3}.leave-intelligence{display:grid;gap:12px}.leave-row{display:grid;grid-template-columns:70px 1fr auto;gap:8px;align-items:center;font-size:12px}.leave-row>div{height:6px;border-radius:999px;background:var(--surface-alt);overflow:hidden}.leave-row>div i{display:block;height:100%;width:var(--leave);background:var(--fx-gold);border-radius:999px}.leave-row small{grid-column:2/-1;color:var(--muted)}
+
+
+/* --------------------------------------------------------------------------
+   HRMS appearance system — contrast and cross-surface consistency
+   Keep these semantic overrides last so every role and nested component agrees
+   with the active theme instead of mixing hard-coded light and dark colors.
+   -------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+  --text: #1c2925;
+  --ink: #17262d;
+  --muted: #74827b;
+  --surface: #ffffff;
+  --surface-alt: #f6f8f5;
+  --canvas: #f4f4f5;
+  --border-color: #e3e9e4;
+  --line: #e3e9e4;
+  --focus-ring: rgba(147, 19, 20, .24);
+}
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="light"] body { background: var(--canvas); color: var(--ink); }
+html[data-theme="light"] .page-wrap { color: var(--ink); }
+html[data-theme="light"] :is(input, select, textarea, button) { color-scheme: light; }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+::placeholder { color: #8a9690; opacity: 1; }
+:disabled { cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Dark mode: establish readable defaults, then style common surfaces. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e7eee9;
+  --text: #e7eee9;
+  --muted: #a0aea6;
+  --paper: #151d1a;
+  --surface: #151d1a;
+  --surface-alt: #1b2721;
+  --canvas: #0e1411;
+  --line: #29362f;
+  --border-color: #29362f;
+  --shadow: 0 12px 34px rgba(0,0,0,.22);
+  --focus-ring: rgba(218,175,81,.45);
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root,
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] .main-shell,
+html[data-theme="dark"] .page-wrap {
+  background-color: var(--canvas);
+  color: var(--ink);
+}
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .table-card,
+html[data-theme="dark"] .notification-popover,
+html[data-theme="dark"] .command-palette,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-card,
+html[data-theme="dark"] .person-drawer,
+html[data-theme="dark"] .drawer-panel,
+html[data-theme="dark"] .profile-preferences-card,
+html[data-theme="dark"] .profile-info-card,
+html[data-theme="dark"] .privacy-card,
+html[data-theme="dark"] .notification-page-card,
+html[data-theme="dark"] .approval-workspace,
+html[data-theme="dark"] .report-trend-card,
+html[data-theme="dark"] .attendance-history-card,
+html[data-theme="dark"] .attendance-support-grid > *,
+html[data-theme="dark"] .wfh-side {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] .topbar {
+  background-color: rgba(18,26,22,.94);
+  border-bottom-color: var(--border-color);
+}
+html[data-theme="dark"] :is(.page-title h1, .section-head h2, .card-heading h2,
+  .workspace-chip b, .person-cell b, .user-lines b, .breadcrumb b,
+  .drawer-heading h2, .drawer-facts b, .profile-preferences-heading h2,
+  .preference-row b, .announcement-banner-copy h2, .announcement-launch b,
+  .attendance-health-head h2, .report-trend-heading h2, .report-executive-strip b,
+  .approval-command-intro b, .mobile-report-grid b, .mobile-report-leave-main b,
+  .enterprise-page h1, .enterprise-page h2, .enterprise-page h3,
+  .enterprise-page h4, .enterprise-page strong, .enterprise-page b,
+  .enterprise-page .enterprise-tr, .enterprise-page .enterprise-detail-row a,
+  .employee-policy-card h2, .leave-request-preview-main b, .wfh-request-preview-grid b) {
+  color: #edf3ee;
+}
+html[data-theme="dark"] :is(.page-title p, .section-head p, .card-heading p,
+  .breadcrumb, .person-cell small, .user-lines small, td, th,
+  .drawer-heading p, .drawer-facts small, .profile-preferences-heading p,
+  .preference-row small, .announcement-banner-copy p, .announcement-launch small,
+  .attendance-health-head p, .attendance-health-score small, .report-trend-heading p,
+  .report-trend-col > small, .report-trend-value, .report-executive-strip small,
+  .approval-command-intro small, .mobile-report-grid small, .mobile-report-leave-main span,
+  .enterprise-page p, .enterprise-page small, .enterprise-page .muted-copy,
+  .enterprise-page .enterprise-metric span, .enterprise-page .enterprise-metric small,
+  .employee-policy-card .policy-body, .leave-request-preview-main small,
+  .wfh-request-preview-grid small) {
+  color: #a0aea6;
+}
+html[data-theme="dark"] :is(.workspace-chip, .sidebar-note, .command-trigger,
+  .theme-toggle, .button-soft, .history-calendar, .history-day,
+  .calendar-note-wide, .next-holiday-card, .admin-intro, .people-toolbar,
+  .people-hero-strip, .attendance-health-score, .attendance-health-metrics > div,
+  .profile-preferences-card .preference-segment, .preference-note,
+  .leave-upcoming-strip, .leave-upcoming-item, .wfh-usage-grid > div,
+  .report-executive-strip > div, .report-trend-score, .report-trend-bar,
+  .approval-workspace-toolbar, .approval-command-bar, .audit-retention,
+  .export-preview, .export-field-grid > div, .enterprise-page .enterprise-metric,
+  .enterprise-page .enterprise-detail, .enterprise-page .enterprise-checklist,
+  .enterprise-page .enterprise-table, .enterprise-page .enterprise-select,
+  .enterprise-page .policy-list, .enterprise-page .enterprise-toolbar .input,
+  .enterprise-page .enterprise-textarea, .enterprise-page .check-row,
+  .enterprise-page .policy-row, .enterprise-page .attention-item,
+  .enterprise-page .enterprise-tabs, .enterprise-page .trend-bars,
+  .enterprise-page .leave-row > div, .leave-request-preview,
+  .wfh-request-preview) {
+  background-color: var(--surface-alt);
+  border-color: var(--border-color);
+  color: var(--ink);
+}
+html[data-theme="dark"] :is(input, select, textarea, .input, .text-input,
+  .enterprise-select, .enterprise-textarea, .command-head input) {
+  background-color: #101713;
+  color: #edf3ee;
+  border-color: #35443a;
+}
+html[data-theme="dark"] :is(input, select, textarea, .input, .text-input)::placeholder {
+  color: #87978d;
+}
+html[data-theme="dark"] :is(th, .table thead th, .enterprise-th) {
+  background-color: #111814;
+  color: #a0aea6;
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] :is(td, .enterprise-tr, .enterprise-detail-row, .check-row, .policy-row) {
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] :is(.table-card tbody tr:hover, .enterprise-row:hover,
+  .enterprise-row.selected, .notification-item:hover, .notification-unread,
+  .command-item:hover) {
+  background-color: #202d25;
+}
+html[data-theme="dark"] :is(.nav-link, .icon-button, .text-button, .enterprise-tabs button) {
+  color: #aab8af;
+}
+html[data-theme="dark"] .nav-link:hover { background: #1b2721; color: #e7eee9; }
+html[data-theme="dark"] .nav-active,
+html[data-theme="dark"] .mobile-bottom-item.active,
+html[data-theme="dark"] .mobile-bottom-item[aria-current="page"] {
+  background: rgba(218,175,81,.15) !important;
+  color: #f1d38d !important;
+}
+html[data-theme="dark"] .nav-active svg { color: #f1d38d !important; }
+html[data-theme="dark"] :is(.button-soft, .tiny-arrow, .select-wrap select) {
+  background-color: #202b24 !important;
+  border-color: #35443a !important;
+  color: #e4ece6 !important;
+}
+html[data-theme="dark"] :is(.status, .mini-status, .demo-tag, .policy-chip) {
+  border-color: #35443a;
+}
+html[data-theme="dark"] :is(.status-on-time, .status-approved, .status-active,
+  .mini-active, .mini-published, .mini-completed, .mini-available) {
+  background: rgba(103,175,122,.16);
+  color: #a8d9b3;
+}
+html[data-theme="dark"] :is(.status-pending, .mini-assigned, .mini-in-progress, .mini-open) {
+  background: rgba(245,194,92,.14);
+  color: #e6ca83;
+}
+html[data-theme="dark"] :is(.status-late-entry, .status-rejected, .status-inactive,
+  .mini-inactive, .mini-archived, .mini-retired, .mini-cancelled) {
+  background: rgba(242,81,56,.13);
+  color: #f0aaa0;
+}
+html[data-theme="dark"] .enterprise-tabs button.active {
+  background: #d9b45d;
+  color: #1c2119;
+}
+html[data-theme="dark"] .enterprise-hero {
+  background: linear-gradient(135deg, rgba(147,19,20,.20), rgba(218,175,81,.12));
+  border-color: #3a3327;
+}
+html[data-theme="dark"] .enterprise-page .enterprise-metric strong,
+html[data-theme="dark"] .enterprise-page .bar-row b,
+html[data-theme="dark"] .enterprise-page .trend-row b,
+html[data-theme="dark"] .enterprise-page .leave-row b {
+  color: #edf3ee;
+}
+html[data-theme="dark"] .enterprise-page .bar-row i { background: #d9b45d; }
+html[data-theme="dark"] .enterprise-page .check-circle.done {
+  background: var(--fx-saffron-red);
+  color: #fff;
+}
+html[data-theme="dark"] .enterprise-page .enterprise-toast {
+  background: #e8c66f;
+  color: #1a211b;
+}
+html[data-theme="dark"] .notification-item,
+html[data-theme="dark"] .notification-page-item {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] .notification-item b,
+html[data-theme="dark"] .notification-page-item b { color: #edf3ee; }
+html[data-theme="dark"] .notification-item small,
+html[data-theme="dark"] .notification-page-item small { color: #a0aea6; }
+html[data-theme="dark"] .app-footer { border-color: var(--border-color); color: #89988e; }
+html[data-theme="dark"] .login-panel { background: #151d1a; }
+html[data-theme="dark"] .login-panel h2 { color: #edf3ee; }
+html[data-theme="dark"] .login-lede { color: #a0aea6; }
+html[data-theme="dark"] .demo-box,
+html[data-theme="dark"] .setup-note {
+  background: #1b2721;
+  color: #a0aea6;
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] .demo-heading h3 { color: #edf3ee; }
+html[data-theme="dark"] .login-footer { color: #89988e; }
+html[data-theme="dark"] .mobile-bottom-nav {
+  background: rgba(20,28,24,.96);
+  border-color: var(--border-color);
+}
+html[data-theme="dark"] .mobile-scrim { background: rgba(0,0,0,.58); }
+html[data-theme="dark"] .sidebar-note p { color: #a0aea6; }
+html[data-theme="dark"] .sidebar-note b { color: #e5eee7; }
+html[data-theme="dark"] .notification-dot { border-color: #151d1a; }
+html[data-theme="dark"] .empty-state h3,
+html[data-theme="dark"] .empty-state p { color: #a0aea6; }
+html[data-theme="dark"] .modal-head,
+html[data-theme="dark"] .popover-heading { border-color: var(--border-color); }
+html[data-theme="dark"] .modal-body { color: var(--ink); }
+html[data-theme="dark"] .drawer-backdrop,
+html[data-theme="dark"] .command-overlay { background: rgba(0,0,0,.58); }
