@@ -38,6 +38,8 @@ assert.ok(app.includes('hrms:session-expired'), 'Session-expiry recovery contrac
 assert.ok(app.includes('What needs your attention'), 'Employee action-center contract missing');
 assert.ok(app.includes('approved this month') || app.includes('approvedWfhThisMonth'), 'Employee WFH usage visibility contract missing');
 assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract missing');
+assert.ok(app.includes('Attach a doctor’s note for sick leave of 3 or more consecutive calendar days.'), 'Sick leave doctor-note validation contract missing');
+assert.ok(app.includes('The last day cannot be before the first day.'), 'Leave date range validation contract missing');
 assert.ok(app.includes('path="/notifications"'), 'Employee notifications route contract missing');
 assert.ok(app.includes('get(\'/account/notifications\')'), 'Employee notifications API integration contract missing');
 assert.ok(app.includes('Workplace pulse'), 'Administrator workplace pulse contract missing');
