@@ -46,7 +46,7 @@ assert.ok(app.includes('Workplace pulse'), 'Administrator workplace pulse contra
 assert.ok(app.includes('Next to review'), 'Administrator review preview contract missing');
 assert.ok(app.includes("get('/admin/approvals')"), 'Administrator approval queue integration contract missing');
 assert.ok(api.includes('AbortController'), 'API timeout contract missing');
-assert.ok(api.includes('\\\\d{2}:?\\\\d{2}'), 'Timezone-aware timestamp parsing contract missing');
+assert.ok(api.includes('Z|[+-]'), 'Timezone-aware timestamp parsing contract missing');
 assert.ok(api.includes("credentials: 'include'"), 'HTTP-only session credential contract missing');
 assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the production UI');
 assert.ok(sw.includes("url.pathname.startsWith('/api/')"), 'Service worker must exclude API responses');
