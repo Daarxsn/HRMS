@@ -43,41 +43,47 @@ test('profile and calendar surfaces remain readable when switching themes', asyn
   await openSidebarLink(page, 'My profile');
   const profileCell = page.locator('.profile-info-grid > div').first();
   await expect(profileCell).toBeVisible();
+  await expect(profileCell).toHaveCSS('background-color', 'rgb(27, 27, 27)');
   const darkProfile = await profileCell.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
     color: getComputedStyle(el.querySelector('b') || el).color
   }));
-  expect(darkProfile.background).not.toBe('rgb(255, 255, 255)');
-  expect(darkProfile.color).not.toBe('rgb(17, 17, 17)');
-  expect(darkProfile.color).not.toBe('rgb(0, 0, 0)');
+  expect(darkProfile.background).toBe('rgb(27, 27, 27)');
+  expect(darkProfile.color).toBe('rgb(255, 255, 255)');
 
   await openSidebarLink(page, 'Holiday calendar');
   const calendarCell = page.locator('.calendar-day:not(.calendar-day-empty):not(.calendar-today)').first();
   await expect(calendarCell).toBeVisible();
+  await expect(calendarCell).toHaveCSS('background-color', 'rgb(27, 27, 27)');
+  await expect(calendarCell.locator('b')).toHaveCSS('color', 'rgb(199, 199, 199)');
   const darkCalendar = await calendarCell.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
     color: getComputedStyle(el.querySelector('b') || el).color
   }));
-  expect(darkCalendar.background).not.toBe('rgb(255, 255, 255)');
-  expect(darkCalendar.color).not.toBe('rgb(17, 17, 17)');
-  expect(darkCalendar.color).not.toBe('rgb(0, 0, 0)');
+  expect(darkCalendar.background).toBe('rgb(27, 27, 27)');
+  expect(darkCalendar.color).toBe('rgb(199, 199, 199)');
 
   await page.getByRole('button', { name: 'Switch to light mode' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  /* Theme changes animate surfaces briefly; assert the settled state, not an intermediate frame. */
+  await expect(calendarCell).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(calendarCell.locator('b')).toHaveCSS('color', 'rgb(85, 85, 85)');
   const lightCalendar = await calendarCell.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
     color: getComputedStyle(el.querySelector('b') || el).color
   }));
   expect(lightCalendar.background).toBe('rgb(255, 255, 255)');
-  expect(lightCalendar.color).not.toBe('rgb(255, 255, 255)');
+  expect(lightCalendar.color).toBe('rgb(85, 85, 85)');
 
   await openSidebarLink(page, 'My profile');
   const lightProfileCell = page.locator('.profile-info-grid > div').first();
   await expect(lightProfileCell).toBeVisible();
+  await expect(lightProfileCell).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(lightProfileCell.locator('b')).toHaveCSS('color', 'rgb(17, 17, 17)');
   const lightProfile = await lightProfileCell.evaluate((el) => ({
     background: getComputedStyle(el).backgroundColor,
     color: getComputedStyle(el.querySelector('b') || el).color
   }));
   expect(lightProfile.background).toBe('rgb(255, 255, 255)');
-  expect(lightProfile.color).not.toBe('rgb(255, 255, 255)');
+  expect(lightProfile.color).toBe('rgb(17, 17, 17)');
 });
