@@ -122,12 +122,19 @@ function DetailList({title,rows,empty,render}) { return <section className="ente
 function Onboarding({people,reload,runAction}) {
   const [employeeId,setEmployeeId]=useState(people[0]?.id||''),[tasks,setTasks]=useState([]),[title,setTitle]=useState(''),[category,setCategory]=useState('GENERAL'),[due,setDue]=useState(''),[busy,setBusy]=useState(false);
   const [taskLoading,setTaskLoading]=useState(false),[taskError,setTaskError]=useState('');
+  const taskRequest = useRef(0);
   const load=async()=>{
-    if(!employeeId){setTasks([]);setTaskError('Select an employee to view onboarding tasks.');return;}
-    setTaskLoading(true);setTaskError('');
-    try {const r=await get('/enterprise/admin/employees/'+employeeId+'/lifecycle');setTasks(r.tasks||[]);}
-    catch(e){setTaskError(e.message||'Could not load onboarding tasks.');}
-    finally{setTaskLoading(false);}
+    const requestId=++taskRequest.current;
+    if(!employeeId){setTasks([]);setTaskError('Select an employee to view onboarding tasks.');setTaskLoading(false);return;}
+    setTasks([]);setTaskLoading(true);setTaskError('');
+    try {
+      const r=await get('/enterprise/admin/employees/'+employeeId+'/lifecycle');
+      if(requestId===taskRequest.current)setTasks(r.tasks||[]);
+    } catch(e) {
+      if(requestId===taskRequest.current)setTaskError(e.message||'Could not load onboarding tasks.');
+    } finally {
+      if(requestId===taskRequest.current)setTaskLoading(false);
+    }
   };
   useEffect(()=>{load();},[employeeId]);
   const add=async()=>{if(!employeeId||!title.trim())return;setBusy(true);setTaskError('');try{await runAction(async()=>{await post('/enterprise/admin/employees/'+employeeId+'/onboarding',{title:title.trim(),category:category.trim()||'GENERAL',dueDate:due||null});setTitle('');setDue('');});await load();}finally{setBusy(false)}};
