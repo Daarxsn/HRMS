@@ -86,6 +86,8 @@ assert.ok(css.includes('--ui-bg: var(--fx-charcoal)'), 'Dark mode must use the a
 assert.ok(css.includes('--ui-text: var(--fx-white)'), 'Dark mode must use readable white foreground text');
 assert.ok(css.includes('html[data-theme] .profile-info-grid > div'), 'Profile grid cells must follow the active theme');
 assert.ok(css.includes('html[data-theme] .calendar-day'), 'Calendar day cells must follow the active theme');
+assert.ok(css.includes('html[data-theme] .calendar-day b'), 'Calendar date text must override legacy important colors');
+assert.ok(css.includes('html[data-theme] .calendar-today'), 'Today highlight must adapt to the active theme');
 assert.ok(!css.includes('HRMS appearance system — contrast and cross-surface consistency'), 'Duplicate legacy theme layer must be removed');
 
 assert.ok(css.includes('profile-details-grid'), 'Theme regression coverage must include profile data grids');
