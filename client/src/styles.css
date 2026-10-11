@@ -3509,3 +3509,110 @@ html[data-theme="dark"] .employee-policy-meta .eyebrow{color:var(--fx-gold)}
 @media(prefers-reduced-motion:reduce){
  .profile-photo-actions .photo-button,.profile-photo-actions .photo-remove-button,.profile-info-grid>div{transition:none}
 }
+
+
+/* ==========================================================================
+   PHASE 3 · EMPLOYEE WORKSPACE RELIABILITY & VISUAL FINISH
+   Overview · Attendance · Leave · WFH · Out of office · Notifications
+   ========================================================================== */
+.employee-page-error,.employee-page-error-inline,.employee-page-loading{display:flex;align-items:center;gap:10px;min-width:0}
+.employee-page-error{margin:0 0 16px;padding:13px 15px;border:1px solid rgba(147,19,20,.28);border-radius:13px;background:var(--ui-danger-bg);color:var(--ui-text)}
+.employee-page-error>svg,.employee-page-error-inline>svg{flex:0 0 auto;color:var(--ui-danger-text)}
+.employee-page-error>span,.employee-page-error-inline>span{flex:1;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.employee-page-error .button{flex:0 0 auto}
+.employee-page-error-inline{padding:12px 13px;border:1px solid rgba(147,19,20,.28);border-radius:11px;background:var(--ui-danger-bg);color:var(--ui-text);font-size:12px}
+.employee-page-loading{justify-content:center;min-height:110px;color:var(--ui-text-muted);font-size:12px}
+.employee-page-loading .spinner{flex:0 0 auto}
+.employee-action-item{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}
+.employee-action-item:focus-visible{outline:3px solid var(--ui-focus);outline-offset:3px}
+.employee-action-item:hover{border-color:rgba(218,175,81,.55);background:var(--ui-hover)}
+.employee-action-button{font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+a.employee-action-button{color:inherit}
+.day-hero{border-color:rgba(218,175,81,.25);box-shadow:0 12px 32px rgba(17,17,17,.045)}
+html[data-theme="dark"] .day-hero{box-shadow:0 16px 40px rgba(0,0,0,.14)}
+.hero-pulse-interactive{transition:border-color .16s ease,background-color .16s ease}
+.hero-pulse-interactive:focus-visible{outline:3px solid var(--ui-focus);outline-offset:3px}
+.hero-pulse-interactive:hover{border-color:rgba(218,175,81,.55)}
+.overview-attendance-card,.attendance-overview-card,.attendance-health-card,.attendance-history-card{border-color:var(--ui-border);border-radius:18px}
+.attendance-overview-card{position:relative;overflow:hidden}
+.attendance-action-error{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid rgba(147,19,20,.25);border-radius:11px;background:var(--ui-danger-bg);color:var(--ui-text);font-size:12px;line-height:1.5}
+.attendance-action-error>svg{flex:0 0 auto;color:var(--ui-danger-text);margin-top:1px}
+.attendance-action-error>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.attendance-action-error button{display:grid;place-items:center;flex:0 0 auto;border:0;background:transparent;color:inherit;cursor:pointer}
+.attendance-overview-state .button:disabled,.attendance-overview-state button:disabled{opacity:.6}
+.attendance-last-updated{color:var(--ui-text-muted)!important}
+.attendance-health-metrics>div{background:var(--ui-surface-muted);border:1px solid var(--ui-border);border-radius:13px}
+.history-detail{background:var(--ui-surface);border-color:var(--ui-border)}
+.history-empty{background:var(--ui-surface-muted);border:1px solid var(--ui-border);color:var(--ui-text-muted)}
+.history-empty b{color:var(--ui-text)}
+.leave-balance-tile,.leave-form-card,.policy-card,.leave-help-card{border-color:var(--ui-border)}
+.leave-balance-tile{position:relative;overflow:hidden}
+.leave-balance-tile:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--fx-gold);opacity:.8}
+.leave-progress{overflow:hidden;background:var(--ui-border)}
+.leave-progress>span{background:var(--fx-gold)}
+.leave-tile-note,.leave-tile-foot,.leave-form-note,.field-help{color:var(--ui-text-muted)}
+.leave-request-preview,.wfh-request-preview{border-color:var(--ui-border);background:var(--ui-surface-muted);color:var(--ui-text)}
+.leave-request-preview b,.wfh-request-preview b{color:var(--ui-text)}
+.leave-upcoming-strip{border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-surface);padding:18px}
+.leave-upcoming-heading b{color:var(--ui-text)}
+.leave-upcoming-item{border:1px solid var(--ui-border);background:var(--ui-surface-muted);border-radius:12px;transition:border-color .16s ease,background .16s ease}
+.leave-upcoming-item:hover{border-color:var(--fx-gold);background:var(--ui-hover)}
+.wfh-banner,.wfh-request-card,.wfh-guidelines,.wfh-usage-grid>div,.wfh-quote{border-color:var(--ui-border)}
+.wfh-banner{position:relative;overflow:hidden}
+.wfh-usage-grid>div{border-radius:15px}
+.wfh-usage-main .wfh-usage-bar{background:var(--ui-border)}
+.wfh-usage-main .wfh-usage-bar i{background:var(--fx-gold)}
+.request-kind-toggle button{transition:border-color .15s ease,background .15s ease}
+.request-kind-toggle button:hover{border-color:var(--fx-gold)}
+.request-kind-toggle button.kind-selected{border-color:var(--fx-gold);background:var(--ui-selected);color:var(--ui-text)}
+.wfh-policy-note{border-color:var(--ui-border);background:var(--ui-surface-muted);color:var(--ui-text-muted)}
+.wfh-disabled{border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-surface-muted);padding:24px;color:var(--ui-text-muted)}
+.wfh-disabled h3{color:var(--ui-text)}
+.wfh-disabled p{color:var(--ui-text-muted)}
+.out-main-card,.out-explainer{border-color:var(--ui-border);border-radius:20px}
+.out-main-card{overflow:hidden}
+.out-card-content{min-width:0}
+.out-reason input{width:100%;min-height:44px;background:var(--ui-field);color:var(--ui-field-text);border-color:var(--ui-border)}
+.out-hint{display:block;margin-top:9px;color:var(--ui-text-muted);font-size:11px;line-height:1.5}
+.exit-timeline{border-top-color:var(--ui-border)}
+.exit-time-row{color:var(--ui-text-muted)}
+.exit-time-row b{color:var(--ui-text)}
+.notification-page-toolbar{gap:14px}
+.notification-page-card{overflow:hidden}
+.notification-page-item{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:start;gap:12px;padding:16px 18px;border:0;border-bottom:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text);text-align:left;cursor:pointer;transition:background-color .15s ease}
+.notification-page-item:last-child{border-bottom:0}
+.notification-page-item:hover{background:var(--ui-hover)}
+.notification-page-item-unread{background:var(--ui-selected)}
+.notification-page-item-unread:hover{background:var(--ui-hover)}
+.notification-page-icon{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-surface-muted);color:var(--fx-saffron-red)}
+html[data-theme="dark"] .notification-page-icon{color:var(--fx-gold)}
+.notification-page-copy{min-width:0;display:grid;gap:5px}
+.notification-page-copy b{color:var(--ui-text);font-size:13px;line-height:1.45}
+.notification-page-copy small{color:var(--ui-text-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.notification-page-copy em{font-style:normal;color:var(--ui-text-muted);font-size:10px}
+.notification-page-state{display:inline-flex;align-items:center;justify-content:center;min-width:60px;min-height:25px;padding:3px 8px;border:1px solid var(--ui-border);border-radius:999px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:10px;font-weight:700}
+.notification-page-item-unread .notification-page-state{border-color:rgba(218,175,81,.5);background:var(--ui-selected);color:var(--ui-text)}
+.notification-preferences{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;border-color:var(--ui-border)}
+.notification-preferences>div:first-child{display:grid;gap:5px}
+.notification-preferences b{color:var(--ui-text)}
+.notification-preferences small{color:var(--ui-text-muted)}
+.notification-preference-switches{display:flex;flex-wrap:wrap;gap:8px}
+.notification-preference-switches button{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 11px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:11px;cursor:pointer}
+.notification-preference-switches button.selected{border-color:rgba(218,175,81,.5);background:var(--ui-selected);color:var(--ui-text)}
+.notification-loading{min-height:180px}
+@media(max-width:720px){
+ .employee-page-error{align-items:flex-start;flex-wrap:wrap}
+ .employee-page-error>span{flex-basis:calc(100% - 30px)}
+ .employee-page-error .button{margin-left:26px}
+ .attendance-health-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .history-detail{min-width:0}
+ .leave-upcoming-strip{padding:14px}
+ .employee-action-item{min-height:68px}
+ .notification-page-item{grid-template-columns:34px minmax(0,1fr);gap:10px;padding:14px}
+ .notification-page-icon{width:32px;height:32px}
+ .notification-page-state{grid-column:2;justify-self:start}
+ .notification-preferences{align-items:stretch}
+ .notification-preference-switches{display:grid;grid-template-columns:1fr}
+ .notification-preference-switches button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.employee-action-item,.hero-pulse-interactive,.leave-upcoming-item,.request-kind-toggle button,.notification-page-item{transition:none}}

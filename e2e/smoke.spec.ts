@@ -102,3 +102,46 @@ test('policy center loads with a useful empty or published state', async ({ page
   await expect(page.locator('.employee-policy-error')).toHaveCount(0);
   await expect(page.locator('.employee-policy-card, .employee-policy-empty')).not.toHaveCount(0);
 });
+
+
+test('employee portal pages remain navigable and display useful states', async ({ page }) => {
+  await signInDev(page, 'employee');
+  await expect(page.getByText('What needs your attention')).toBeVisible();
+
+  await openSidebarLink(page, 'Attendance');
+  await expect(page.getByRole('heading', { name: 'Attendance', exact: true })).toBeVisible();
+  await expect(page.locator('.attendance-overview-card')).toBeVisible();
+
+  await openSidebarLink(page, 'Leave & time off');
+  await expect(page.getByRole('heading', { name: 'Leave & time off', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Request time off', exact: true })).toBeVisible();
+
+  await openSidebarLink(page, 'Work from home');
+  await expect(page.getByRole('heading', { name: 'Work from home', exact: true })).toBeVisible();
+  await expect(page.locator('.wfh-banner')).toBeVisible();
+
+  await openSidebarLink(page, 'Out of office');
+  await expect(page.getByRole('heading', { name: 'Out of office', exact: true })).toBeVisible();
+  await expect(page.locator('.out-layout')).toBeVisible();
+
+  await openSidebarLink(page, 'Notifications');
+  await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
+  await expect(page.locator('.notification-page-summary')).toBeVisible();
+  await expect(page.locator('.employee-page-error')).toHaveCount(0);
+});
+
+test('WFH access outage offers retry instead of claiming access is disabled', async ({ page }) => {
+  await signInDev(page, 'employee');
+  await page.route('**/api/wfh', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Test service unavailable', requestId: 'phase3-wfh-test' })
+    });
+  });
+
+  await openSidebarLink(page, 'Work from home');
+  await expect(page.getByText('We couldn’t verify WFH access.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry access check' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Not enabled for this account' })).toHaveCount(0);
+});
