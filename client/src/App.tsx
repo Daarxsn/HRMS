@@ -1189,16 +1189,16 @@ function SettingsPage(){
         </Card>
 
         <Card className="settings-card">
-          <CardHeading title="Office network verification" subtitle="The API verifies the network used for every GPS check-in and check-out."/>
+          <CardHeading title="Office network verification" subtitle="GPS attendance checks the public IP seen by the API against the OFFICE_NETWORK_IPS allow-list—not the Wi-Fi name or connection icon."/>
           {healthLoading?<div className="settings-loading"><Spinner/></div>:network?<div className="settings-health-grid">
             <div><small>Configuration</small><b>{network.configured?'Ready':'Not configured'}</b></div>
-            <div><small>This request</small><b>{network.matchedCurrentRequest?'Office network':'Outside office network'}</b></div>
-            <div><small>Observed IP</small><b>{network.currentClientIp||'—'}</b></div>
-            <div><small>Allowed IPs</small><b>{network.configuredIpCount}</b></div>
+            <div><small>Public IP match</small><b>{network.matchedCurrentRequest?'Matches allow-list':'No allow-list match'}</b></div>
+            <div><small>IP seen by API</small><b>{network.currentClientIp||'—'}</b></div>
+            <div><small>Allow-listed IPs</small><b>{network.configuredIpCount}</b></div>
             <div><small>Attendance gate</small><b>{network.configured?'Location + Wi-Fi':'Configuration required'}</b></div>
             <div><small>Tracking</small><b>One-time check only</b></div>
           </div>:<InlineError>{healthError || 'Network verification status is unavailable.'}</InlineError>}
-          <div className="privacy-promise"><ShieldCheck size={16}/><span>The browser does not need to know the Wi-Fi name. The server verifies the office network identity when the attendance request arrives.</span></div>
+          <div className="privacy-promise"><ShieldCheck size={16}/><span>Wi-Fi can show “Connected” while this check does not match. When on the actual office Wi-Fi, compare the IP seen by the API with the configured office public egress IPs. If the office internet IP changed, update OFFICE_NETWORK_IPS in the production environment and redeploy. Do not add a home or hotspot IP just to bypass the office check.</span></div>
         </Card>
 
         <Card className="settings-card">

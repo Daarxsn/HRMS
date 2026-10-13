@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, workingDaysInclusive } from '../src/policy.mts';
+import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
@@ -54,4 +54,11 @@ test('office network verification accepts configured IPs and rejects external ne
   assert.equal(isOfficeNetworkIpAllowed('127.0.0.1', '127.0.0.1;::1'), true);
   assert.equal(isOfficeNetworkIpAllowed('::1', '127.0.0.1;::1'), true);
   assert.equal(isOfficeNetworkIpAllowed('203.0.113.42', '127.0.0.1;::1'), false);
+});
+
+
+test('office network allow-list normalizes proxy IPv4-mapped addresses and separators', () => {
+  assert.equal(normalizeClientIp('::ffff:203.0.113.42'), '203.0.113.42');
+  assert.deepEqual(parseOfficeNetworkIps('203.0.113.42; 203.0.113.43,::1'), ['203.0.113.42','203.0.113.43','::1']);
+  assert.equal(isOfficeNetworkIpAllowed('::ffff:203.0.113.42', '203.0.113.42;203.0.113.43'), true);
 });

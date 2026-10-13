@@ -56,7 +56,7 @@ function verifyOfficeNetwork(req) {
   const { configured, allowed } = officeNetworkConfig();
   if (!configured || allowed.length === 0) throw Object.assign(new Error('Office network verification is not configured. Ask an administrator to complete the office network setup.'), { status: 503 });
   const clientIp = normalizeClientIp(req.ip);
-  if (!isOfficeNetworkIpAllowed(clientIp, configured)) throw Object.assign(new Error('Connect to the Falchion Xeniaa office Wi-Fi and try again.'), { status: 403 });
+  if (!isOfficeNetworkIpAllowed(clientIp, configured)) throw Object.assign(new Error('This connection’s public IP is not on the approved office-network list. If you are already on Falchion Xeniaa office Wi-Fi, ask an administrator to verify the production OFFICE_NETWORK_IPS allow-list.'), { status: 403 });
   return clientIp;
 }
 
