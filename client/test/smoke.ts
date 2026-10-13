@@ -44,7 +44,7 @@ assert.ok(app.includes('NEXT COMPANY HOLIDAY'), 'Employee next-holiday contract 
 assert.ok(app.includes('Promise.allSettled(['), 'Employee overview must tolerate partial data outages');
 assert.ok(app.includes('attendance action was recorded, but the latest status could not be refreshed'), 'Attendance success must not be reported as failed when only its refresh fails');
 assert.ok(!app.includes("document.querySelector('[aria-label=\"Notifications\"]')?.click()"), 'Overview notifications action must use a real navigation link');
-assert.ok(app.includes('WFH access could not be verified.'), 'WFH API outage must not be mistaken for disabled eligibility');
+assert.ok(app.includes('We couldn’t verify WFH access.'), 'WFH API outage must not be mistaken for disabled eligibility');
 assert.ok(app.includes('Retry notifications'), 'Notification loading failures must offer recovery');
 assert.ok(app.includes('outRequest.current+=1'), 'Out-of-office fetches must be invalidated on unmount');
 assert.ok(app.includes('Attach a doctor’s note for sick leave of 3 or more consecutive calendar days.'), 'Sick leave doctor-note validation contract missing');
