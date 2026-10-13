@@ -176,3 +176,33 @@ test('GPS check-in distinguishes unavailable location from denied permission', a
   await expect(page.getByText(/open Site settings.*set Location to Allow/i)).toHaveCount(0);
   expect(attendancePostAttempted).toBe(false);
 });
+
+
+test('administrator operational pages load and keep the main actions accessible', async ({ page }) => {
+  await signInDev(page, 'admin');
+  await expect(page.getByText('Workplace pulse')).toBeVisible();
+
+  await openSidebarLink(page, 'People');
+  await expect(page.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
+  await expect(page.locator('.people-table-card')).toBeVisible();
+
+  await openSidebarLink(page, 'Attendance');
+  await expect(page.getByRole('heading', { name: 'Attendance', exact: true })).toBeVisible();
+  await expect(page.locator('.admin-attendance-card')).toBeVisible();
+
+  await openSidebarLink(page, 'Requests');
+  await expect(page.getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+  await expect(page.locator('.approval-workspace')).toBeVisible();
+
+  await openSidebarLink(page, 'Reports');
+  await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible();
+  await expect(page.locator('.report-filter-card')).toBeVisible();
+
+  await openSidebarLink(page, 'Office settings');
+  await expect(page.getByRole('heading', { name: 'Office settings', exact: true })).toBeVisible();
+  await expect(page.locator('.settings-layout, .admin-empty-recovery')).toBeVisible();
+
+  await openSidebarLink(page, 'Audit trail');
+  await expect(page.getByRole('heading', { name: 'Audit trail', exact: true })).toBeVisible();
+  await expect(page.locator('.audit-table-card')).toBeVisible();
+});

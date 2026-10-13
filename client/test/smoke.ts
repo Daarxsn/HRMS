@@ -123,3 +123,18 @@ assert.ok(app.includes('The location request timed out'), 'Geolocation timeout m
 assert.ok(app.includes('Location permission was denied'), 'Permission denial must provide Chrome and macOS location settings instructions');
 
 assert.ok(app.includes("locationFailureMessage({code:3}"), 'A geolocation wait timeout must produce explicit timeout guidance');
+
+assert.ok(app.includes('Promise.allSettled(['), 'Admin overview and report loaders must tolerate partial API failures');
+assert.ok(app.includes('adminDashboardLoaded.current'), 'Admin dashboard polling must retain loaded data between refreshes');
+assert.ok(app.includes('Review queue could not be loaded.'), 'Admin dashboard must not show a false clear queue on an API failure');
+assert.ok(app.includes("try{return localStorage.getItem('hrms-people-view')||'cards';}catch{return 'cards';}"), 'People view must work when local storage is unavailable');
+assert.ok(app.includes('peopleRequest.current+=1'), 'People requests must be invalidated on unmount');
+assert.ok(app.includes('attendanceAdminRequest.current+=1'), 'Admin attendance refreshes must not race');
+assert.ok(app.includes('approvalsRequest.current+=1'), 'Approval queue refreshes must not race');
+assert.ok(app.includes('Review queue unavailable'), 'Failed approval queue loads must be distinct from an empty queue');
+assert.ok(app.includes('attendanceReportLoaded'), 'Report metrics must distinguish unavailable data from zero records');
+assert.ok(app.includes('settingsAvailable'), 'Settings must not display an editable blank form after a failed settings fetch');
+assert.ok(app.includes('Save remote-work limit'), 'The separate remote-work limit must have a working save action');
+assert.ok(app.includes('auditLoaded.current'), 'Audit trail fetches must be protected against stale responses');
+assert.ok(css.includes('.admin-page-error'), 'Admin error states must be styled with semantic theme tokens');
+assert.ok(css.includes('.admin-empty-recovery'), 'Failed admin data panels must remain distinct from empty results');

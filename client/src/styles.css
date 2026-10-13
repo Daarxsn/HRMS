@@ -3616,3 +3616,45 @@ html[data-theme="dark"] .notification-page-icon{color:var(--fx-gold)}
  .notification-preference-switches button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.employee-action-item,.hero-pulse-interactive,.leave-upcoming-item,.request-kind-toggle button,.notification-page-item{transition:none}}
+
+
+/* PHASE 4 · ADMIN WORKSPACE · OPERATIONS, RECOVERY AND RESPONSIVE FINISH */
+.admin-page-error{display:flex;align-items:center;gap:10px;margin:0 0 16px;padding:13px 15px;border:1px solid rgba(147,19,20,.28);border-radius:13px;background:var(--ui-danger-bg);color:var(--ui-text)}
+.admin-page-error>svg{flex:0 0 auto;color:var(--ui-danger-text)}
+.admin-page-error>span{flex:1;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.admin-page-error .button{flex:0 0 auto}
+.admin-data-unavailable{display:flex;align-items:center;gap:9px;margin:10px 0;padding:15px;border:1px dashed var(--ui-border);border-radius:12px;background:var(--ui-surface-muted);color:var(--ui-text-muted);font-size:12px;line-height:1.5}
+.admin-data-unavailable>svg{flex:0 0 auto;color:var(--fx-saffron-red)}
+html[data-theme="dark"] .admin-data-unavailable>svg{color:var(--fx-gold)}
+.admin-data-unavailable span{flex:1;min-width:0}
+.admin-data-unavailable .text-button{flex:0 0 auto}
+.admin-empty-recovery{display:grid;justify-items:center;gap:9px;padding:34px 20px;text-align:center;color:var(--ui-text-muted)}
+.admin-empty-recovery>svg{color:var(--fx-saffron-red)}
+html[data-theme="dark"] .admin-empty-recovery>svg{color:var(--fx-gold)}
+.admin-empty-recovery>b{color:var(--ui-text);font-size:14px}
+.admin-empty-recovery>span{max-width:500px;font-size:12px;line-height:1.65}
+.people-table-card[aria-busy="true"]{opacity:.88}
+.settings-inline-error{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid rgba(147,19,20,.26);border-radius:12px;background:var(--ui-danger-bg);color:var(--ui-text);font-size:12px;line-height:1.5}
+.settings-inline-error span{min-width:0}
+.settings-remote-save{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:13px}
+.settings-remote-save small{color:var(--ui-text-muted);font-size:11px;line-height:1.5}
+.admin-dashboard-attendance .table-message,.table-card .table-message{color:var(--ui-text-muted)}
+.admin-hero,.admin-pulse-card,.admin-review-preview,.team-presence,.approval-card,.announcement-card,.activity-card,.system-health-card,.admin-attendance-card,.report-filter-card,.report-trend-card,.report-leave-card,.audit-table-card,.people-table-card,.settings-card{border-color:var(--ui-border)}
+.admin-pulse-foot,.admin-attendance-foot{border-top-color:var(--ui-border)}
+.admin-hero-score>div{background:rgba(244,244,245,.22)}
+.admin-hero-score>div>i{background:var(--fx-gold)}
+.stat-card,.report-metrics>.card{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.stat-card:hover,.report-metrics>.card:hover{transform:translateY(-2px);border-color:rgba(218,175,81,.45);box-shadow:0 10px 26px rgba(17,17,17,.055)}
+html[data-theme="dark"] .stat-card:hover,html[data-theme="dark"] .report-metrics>.card:hover{box-shadow:0 10px 26px rgba(0,0,0,.16)}
+.admin-attendance-toolbar .button:disabled,.settings-layout .button:disabled{opacity:.6;cursor:not-allowed}
+@media(max-width:720px){
+ .admin-page-error{align-items:flex-start;flex-wrap:wrap}
+ .admin-page-error>span{flex-basis:calc(100% - 30px)}
+ .admin-page-error .button{margin-left:26px}
+ .admin-data-unavailable{align-items:flex-start;flex-wrap:wrap}
+ .admin-data-unavailable span{flex-basis:calc(100% - 28px)}
+ .settings-inline-error{align-items:flex-start;flex-direction:column}
+ .settings-remote-save{align-items:stretch;flex-direction:column}
+ .settings-remote-save .button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.stat-card,.report-metrics>.card{transition:none}}
