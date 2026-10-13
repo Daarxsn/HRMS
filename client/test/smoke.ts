@@ -116,3 +116,8 @@ console.log('Frontend smoke contracts: PASS');
 assert.ok(app.includes('OFFICE_NETWORK_IPS allow-list—not the Wi-Fi name'), 'Office network settings must explain that Wi-Fi connectivity is not the public-IP allow-list check');
 assert.ok(app.includes('IP seen by API'), 'Office network diagnostics must label the IP the API observes');
 assert.ok(app.includes('If the office internet IP changed'), 'Office network diagnostics must explain how to recover from a changed public IP');
+
+assert.ok(app.includes('function locationFailureMessage(error, action='), 'Geolocation errors need a shared, code-specific explanation');
+assert.ok(app.includes('Chrome could not determine your Mac’s location'), 'Unavailable position must not be misreported as denied permission');
+assert.ok(app.includes('The location request timed out'), 'Geolocation timeout must show recovery instructions distinct from permission denial');
+assert.ok(app.includes('Location permission was denied'), 'Permission denial must provide Chrome and macOS location settings instructions');

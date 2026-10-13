@@ -145,3 +145,31 @@ test('WFH access outage offers retry instead of claiming access is disabled', as
   await expect(page.getByRole('button', { name: 'Retry access check' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Not enabled for this account' })).toHaveCount(0);
 });
+
+
+test('GPS check-in distinguishes unavailable location from denied permission', async ({ page }) => {
+  await page.addInitScript(() => {
+    const geolocation = {
+      watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 25);
+        return 1;
+      },
+      clearWatch() {},
+      getCurrentPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 25);
+      }
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+
+  let attendancePostAttempted = false;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostAttempted = true;
+    await route.continue();
+  });
+  await signInDev(page, 'employee');
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' }).click();
+  await expect(page.getByText(/Chrome could not determine your Mac’s location for office check-in/i)).toBeVisible();
+  await expect(page.getByText(/open Site settings.*set Location to Allow/i)).toHaveCount(0);
+  expect(attendancePostAttempted).toBe(false);
+});

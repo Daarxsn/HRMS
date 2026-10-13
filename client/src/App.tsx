@@ -17,6 +17,20 @@ const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 const today = todayLocal();
 
+function locationFailureMessage(error, action='office check-in') {
+  const code = Number(error?.code || 0);
+  if (code === 1) {
+    return `Location permission was denied for ${action}. In Chrome, open Site settings for hr.fxcoworks.com and set Location to Allow. Also check macOS System Settings → Privacy & Security → Location Services, then reload and retry.`;
+  }
+  if (code === 2) {
+    return `Chrome could not determine your Mac’s location for ${action}. Check that macOS Location Services is enabled for Chrome and Wi-Fi is on, then retry. If location access is already allowed, move near a window or outdoors briefly and try again.`;
+  }
+  if (code === 3) {
+    return `The location request timed out for ${action}. Check Chrome’s Location permission for hr.fxcoworks.com and macOS Location Services. Keep Wi-Fi enabled, then retry near a window or outdoors briefly.`;
+  }
+  return `No location fix was received for ${action}. Check Chrome’s Location permission for hr.fxcoworks.com and macOS Location Services, keep Wi-Fi enabled, then reload and retry.`;
+}
+
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -285,16 +299,21 @@ function EmployeeHome(){
       if(!best||candidate.accuracy<best.accuracy)best=candidate;
       if(candidate.accuracy<=100)finish(null,candidate);
     };
-    const handleError=(error)=>{
+    const handleError=(geoError)=>{
       if(settled)return;
-      if(error.code===1)finish(new Error('Location access is required for office check-in. Allow location access for this site and try again.'));
-      else if(best&&best.accuracy<=100)finish(null,best);
+      if(geoError.code===1){finish(new Error(locationFailureMessage(geoError,'office check-in')));return;}
+      if(best&&best.accuracy<=100){finish(null,best);return;}
+      if(geoError.code===2||geoError.code===3){
+        finish(new Error(best
+          ?'Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'
+          :locationFailureMessage(geoError,'office check-in')));
+      }
     };
     watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
     timeoutId=globalThis.setTimeout(()=>{
       if(best&&best.accuracy<=100)finish(null,best);
       else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'));
-      else finish(new Error('We could not get your current location. Allow location access and try again.'));
+      else finish(new Error(locationFailureMessage(null,'office check-in')));
     },10000);
   });
   const quickPunch=async(type)=>{
@@ -399,7 +418,7 @@ function AdminSelfAttendanceCard(){
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
     navigator.geolocation.getCurrentPosition(
       ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
-      (geoError)=>reject(new Error(geoError.code===1?'Location access is required for office attendance. Allow location access for this site and try again.':'We could not get your current location. Keep location services enabled and try again.')),
+      (geoError)=>reject(new Error(locationFailureMessage(geoError,'office attendance'))),
       {enableHighAccuracy:true,timeout:12000,maximumAge:0}
     );
   });
@@ -518,9 +537,17 @@ function AttendancePage(){
     let best=null;let settled=false;let watchId=null;let timeoutId=null;
     const finish=(error,value)=>{if(settled)return;settled=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(timeoutId!==null)window.clearTimeout(timeoutId);error?reject(error):resolve(value);};
     const onPosition=({coords})=>{const candidate={latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy};if(!best||candidate.accuracy<best.accuracy)best=candidate;if(candidate.accuracy<=100)finish(null,candidate);};
-    const onError=(geoError)=>{if(geoError.code===1)finish(new Error('Location access is required for office attendance. Allow location access for this site and try again.'));else if(best&&best.accuracy<=100)finish(null,best);};
+    const onError=(geoError)=>{
+      if(geoError.code===1){finish(new Error(locationFailureMessage(geoError,'office attendance')));return;}
+      if(best&&best.accuracy<=100){finish(null,best);return;}
+      if(geoError.code===2||geoError.code===3){
+        finish(new Error(best
+          ?'Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'
+          :locationFailureMessage(geoError,'office attendance')));
+      }
+    };
     watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
-    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error('We could not get your current location. Allow location access and try again.')),10000);
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage(null,'office attendance'))),10000);
   });
   const punch=async(type)=>{
     setActionBusy(true);setActionError('');
