@@ -121,3 +121,5 @@ assert.ok(app.includes('function locationFailureMessage(error, action='), 'Geolo
 assert.ok(app.includes('Chrome could not determine your Mac’s location'), 'Unavailable position must not be misreported as denied permission');
 assert.ok(app.includes('The location request timed out'), 'Geolocation timeout must show recovery instructions distinct from permission denial');
 assert.ok(app.includes('Location permission was denied'), 'Permission denial must provide Chrome and macOS location settings instructions');
+
+assert.ok(app.includes("locationFailureMessage({code:3}"), 'A geolocation wait timeout must produce explicit timeout guidance');

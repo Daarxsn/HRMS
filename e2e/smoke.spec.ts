@@ -116,7 +116,9 @@ test('employee portal pages remain navigable and display useful states', async (
   await expect(page.getByRole('heading', { name: 'Leave & time off', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Request time off', exact: true })).toBeVisible();
 
-  await openSidebarLink(page, 'Work from home');
+  // WFH navigation is intentionally hidden for users whose administrator has not enabled it.
+  // Direct navigation lets this test verify the disabled state without assuming eligibility.
+  await page.goto('/wfh');
   await expect(page.getByRole('heading', { name: 'Work from home', exact: true })).toBeVisible();
   await expect(page.locator('.wfh-banner')).toBeVisible();
 
@@ -140,7 +142,8 @@ test('WFH access outage offers retry instead of claiming access is disabled', as
     });
   });
 
-  await openSidebarLink(page, 'Work from home');
+  // This nav item is omitted when WFH is not enabled for the account; test the route directly.
+  await page.goto('/wfh');
   await expect(page.getByText('We couldn’t verify WFH access.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry access check' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Not enabled for this account' })).toHaveCount(0);

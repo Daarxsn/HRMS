@@ -313,7 +313,7 @@ function EmployeeHome(){
     timeoutId=globalThis.setTimeout(()=>{
       if(best&&best.accuracy<=100)finish(null,best);
       else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'));
-      else finish(new Error(locationFailureMessage(null,'office check-in')));
+      else finish(new Error(locationFailureMessage({code:3},'office check-in')));
     },10000);
   });
   const quickPunch=async(type)=>{
@@ -547,7 +547,7 @@ function AttendancePage(){
       }
     };
     watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
-    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage(null,'office attendance'))),10000);
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),10000);
   });
   const punch=async(type)=>{
     setActionBusy(true);setActionError('');
