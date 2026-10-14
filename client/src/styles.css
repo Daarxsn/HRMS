@@ -3862,3 +3862,7 @@ html[data-theme="dark"] .onboarding-overdue-label{color:#f0b0b0;border-color:rgb
 .enterprise-attention .attention-button:hover>svg{transform:translateX(3px);color:var(--fx-saffron-red)}
 html[data-theme="dark"] .enterprise-attention .attention-button:hover>svg{color:var(--fx-gold)}
 .enterprise-attention .attention-button:focus-visible{outline:3px solid var(--ui-focus);outline-offset:2px}
+
+
+.security-action-note{display:block;color:var(--muted);font-size:11px;line-height:1.6;margin-top:2px}
+.enterprise-page .security-action-note{padding:11px 12px;border:1px solid var(--border-color);border-radius:12px;background:var(--surface-alt)}
