@@ -3825,3 +3825,28 @@ html[data-theme="dark"] .leave-tile-icon{color:var(--fx-gold)!important}
 @media(prefers-reduced-motion:reduce){
  .employee-page *, .employee-page *:before,.employee-page *:after{transition:none!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+
+/* Onboarding operations: progress, due dates and task states */
+.onboarding-metrics{grid-template-columns:repeat(4,minmax(0,1fr));margin:6px 0 18px}
+.onboarding-metrics .enterprise-metric{padding:15px 16px}
+.onboarding-metrics .enterprise-metric strong{font-size:clamp(23px,2vw,29px)}
+.onboarding-metrics .enterprise-metric small{white-space:normal;line-height:1.4}
+.enterprise-page .check-row{grid-template-columns:auto minmax(0,1fr) minmax(130px,170px);gap:13px;align-items:center;min-height:68px}
+.enterprise-page .check-row>div{min-width:0}
+.enterprise-page .check-row>div>b{display:block;line-height:1.45;overflow-wrap:anywhere}
+.enterprise-page .check-row>div>small{line-height:1.5}
+.check-row-overdue{background:var(--ui-danger-bg)}
+.check-row-overdue .check-circle{border-color:rgba(147,19,20,.38)}
+.onboarding-overdue-label{display:inline-flex;margin-top:5px;padding:3px 7px;border:1px solid rgba(147,19,20,.2);border-radius:999px;color:var(--fx-saffron-red);font-size:10px;font-weight:750}
+html[data-theme="dark"] .onboarding-overdue-label{color:#f0b0b0;border-color:rgba(240,176,176,.24)}
+.enterprise-page .enterprise-toolbar .enterprise-field-label{flex:1;min-width:220px}
+.enterprise-page .enterprise-toolbar .enterprise-field-label .input{margin-top:6px}
+@media(max-width:900px){.onboarding-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){
+ .onboarding-metrics{gap:9px;margin-bottom:14px}
+ .onboarding-metrics .enterprise-metric{padding:13px}
+ .enterprise-page .check-row{grid-template-columns:auto minmax(0,1fr);gap:10px;padding:13px}
+ .enterprise-page .check-row .enterprise-select{grid-column:2;width:100%}
+ .enterprise-page .enterprise-toolbar .enterprise-field-label{min-width:0;width:100%}
+}
