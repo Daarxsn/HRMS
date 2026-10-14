@@ -61,7 +61,7 @@ export default function EnterpriseHRPage() {
       <div className="enterprise-hero-meta"><span><i className="pulse-dot"/> Live controls</span><small>{data?.overview?.headcount?.active||0} active people</small></div>
     </section>
     <div className="enterprise-tabs" role="tablist">{adminTabs.map(([key,label,Icon])=><button key={key} role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>setTab(key)}><Icon size={16}/>{label}</button>)}</div>
-    {tab==='overview'&&<Overview data={data} readiness={data.readiness}/>}
+    {tab==='overview'&&<Overview data={data} readiness={data.readiness} onOpenPerson={(id)=>{setSelectedId(id);setTab('people');}}/>}
     {tab==='people'&&<People people={people} selectedId={selectedId} setSelectedId={setSelectedId} lifecycle={lifecycle} openHistory={()=>setModal('history')} openContact={()=>setModal('contact')} openDocument={()=>setModal('document')}/>}
     {tab==='onboarding'&&<Onboarding people={people} reload={load} runAction={act} />}
     {tab==='assets'&&<Assets assets={data.assets||[]} people={people} reload={load} runAction={act}/>}
@@ -75,7 +75,7 @@ export default function EnterpriseHRPage() {
   </div>;
 }
 
-function Overview({data,readiness}) {
+function Overview({data,readiness,onOpenPerson}) {
   const o=data?.overview, active=o?.headcount?.active||0, total=o?.headcount?.total||0;
   const onb=o?.onboarding?.summary||{}, tasks=Object.values(onb).reduce((a,v)=>a+Number(v),0), done=Number(onb.COMPLETED||0);
   return <div className="enterprise-grid">
@@ -89,8 +89,8 @@ function Overview({data,readiness}) {
     <section className="card"><div className="card-heading"><div><h2>Attendance trend</h2><p>Presence, late entries and absences over six months.</p></div></div><div className="trend-list">{(o?.attendanceTrend||[]).map(m=><div className="trend-row" key={m.month}><span>{m.month}</span><div className="trend-bars"><i style={{'--present':Math.max(5,Math.min(100,Number(m.present)*4))+'%'}}/><i style={{'--late':Math.max(2,Math.min(100,Number(m.late)*10))+'%'}}/><i style={{'--absent':Math.max(2,Math.min(100,Number(m.absent)*10))+'%'}}/></div><b>{m.present}</b></div>)}</div><div className="trend-legend"><span><i/>Present</span><span><i/>Late</span><span><i/>Absent</span></div></section>
     <section className="card"><div className="card-heading"><div><h2>Leave utilization</h2><p>Approved and pending leave committed this year.</p></div></div><div className="leave-intelligence">{(o?.leave||[]).map(l=><div className="leave-row" key={l.leave_type}><span>{l.leave_type.replaceAll('_',' ')}</span><div><i style={{'--leave':Math.min(100,Number(l.committed)*6)+'%'}}/></div><b>{Number(l.approved||0)} approved</b><small>{Number(l.pending||0)} pending</small></div>)}</div></section>
     <section className="card enterprise-wide"><div className="card-heading"><div><h2>Next 60 days</h2><p>Lifecycle items already visible to HR.</p></div></div><div className="enterprise-attention">
-      {(o?.upcomingProbation||[]).slice(0,4).map(p=><div className="attention-item" key={p.id}><span className="attention-icon"><CalendarClock size={17}/></span><div><b>{p.full_name}</b><small>Probation · {formatDate(p.probation_end_date)}</small></div><ArrowRight size={15}/></div>)}
-      {(o?.missingDocuments||[]).slice(0,4).map(p=><div className="attention-item" key={'doc-'+p.id}><span className="attention-icon"><FileText size={17}/></span><div><b>{p.full_name}</b><small>HR document coverage gap</small></div><ArrowRight size={15}/></div>)}
+      {(o?.upcomingProbation||[]).slice(0,4).map(p=><button type="button" className="attention-item attention-button" key={p.id} onClick={()=>onOpenPerson?.(p.id)} aria-label={'Open employee record for '+p.full_name}><span className="attention-icon"><CalendarClock size={17}/></span><span className="attention-copy"><b>{p.full_name}</b><small>Probation · {formatDate(p.probation_end_date)}</small></span><ArrowRight size={15}/></button>)}
+      {(o?.missingDocuments||[]).slice(0,4).map(p=><button type="button" className="attention-item attention-button" key={'doc-'+p.id} onClick={()=>onOpenPerson?.(p.id)} aria-label={'Open HR documents for '+p.full_name}><span className="attention-icon"><FileText size={17}/></span><span className="attention-copy"><b>{p.full_name}</b><small>HR document coverage gap</small></span><ArrowRight size={15}/></button>)
       {!(o?.upcomingProbation?.length||o?.missingDocuments?.length)&&<div className="empty-state"><span className="empty-icon"><Check size={20}/></span><h3>Clear</h3><p>No immediate lifecycle gaps are flagged.</p></div>}
     </div></section>
   </div>;
