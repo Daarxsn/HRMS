@@ -672,16 +672,18 @@ function Modal({title,subtitle,close,children}){
 function InlineError({children}){return <div className="inline-alert alert-error" role="alert"><CircleAlert size={16}/>{children}</div>;}
 
 function LeavePage(){
-  const {notify,refresh,requestGmailAccess}=useApp();const [balances,setBalances]=useState([]);const [requests,setRequests]=useState([]);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [withdrawBusy,setWithdrawBusy]=useState(null);const [error,setError]=useState('');const [loadError,setLoadError]=useState('');const leaveRequest=useRef(0);const leaveLoaded=useRef(false);const [file,setFile]=useState(null);const [type,setType]=useState('CASUAL');const [startDate,setStart]=useState('');const [endDate,setEnd]=useState('');const [reason,setReason]=useState('');
+  const {notify,refresh,requestGmailAccess}=useApp();const [balances,setBalances]=useState([]);const [requests,setRequests]=useState([]);const [loading,setLoading]=useState(true);const [refreshing,setRefreshing]=useState(false);const [busy,setBusy]=useState(false);const [withdrawBusy,setWithdrawBusy]=useState(null);const [error,setError]=useState('');const [loadError,setLoadError]=useState('');const leaveRequest=useRef(0);const leaveLoaded=useRef(false);const [file,setFile]=useState(null);const [type,setType]=useState('CASUAL');const [startDate,setStart]=useState('');const [endDate,setEnd]=useState('');const [reason,setReason]=useState('');
   const load=async()=>{
-    const requestId=++leaveRequest.current;setLoading(true);setLoadError('');
+    const requestId=++leaveRequest.current;
+    if(!leaveLoaded.current)setLoading(true);else setRefreshing(true);
+    setLoadError('');
     const results=await Promise.allSettled([get('/leave/balances'),get('/leave')]);
     if(requestId!==leaveRequest.current)return;
     const [balanceResult,requestResult]=results;const unavailable=[];
     if(balanceResult.status==='fulfilled')setBalances(balanceResult.value.balances||[]);else unavailable.push('leave balances');
     if(requestResult.status==='fulfilled')setRequests(requestResult.value.requests||[]);else unavailable.push('leave requests');
     setLoadError(unavailable.length?`Could not refresh ${unavailable.join(' and ')}. Your last available data is retained; retry when the connection is available.`:'');
-    leaveLoaded.current=true;setLoading(false);
+    leaveLoaded.current=true;setLoading(false);setRefreshing(false);
   };
   useEffect(()=>{void load();return()=>{leaveRequest.current+=1;};},[]);
   const sickDays=type==='SICK'&&startDate&&endDate?Math.round((new Date(`${endDate}T12:00:00`)-new Date(`${startDate}T12:00:00`))/86400000)+1:0;
@@ -692,7 +694,7 @@ function LeavePage(){
   const upcomingLeave=requests.filter((r)=>r.status==='APPROVED'&&String(r.end_date||r.start_date)>=today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date))).slice(0,3);
   return <><PageTitle eyebrow="TIME TO REST & RESET" title="Leave & time off" description="Your balances, requests and time away—all in one place." action={<span className="policy-chip"><ShieldCheck size={14}/> Clear balances, no surprises</span>}/>
     {error&&<InlineError>{error}</InlineError>}
-    {loadError&&<div className="employee-page-error" role="alert"><CircleAlert size={16}/><span>{loadError}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/>{loading?'Refreshing…':'Retry leave data'}</button></div>}
+    {loadError&&<div className="employee-page-error" role="alert"><CircleAlert size={16}/><span>{loadError}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading||refreshing}><RefreshCw size={14} className={refreshing?'spin':''}/>{loading||refreshing?'Refreshing…':'Retry leave data'}</button></div>}
     <div className="leave-balance-grid">{loading?<Card className="balance-loading"><Spinner/></Card>:balanceCards.map((b,i)=><Card className={`leave-balance-tile leave-balance-${i}`} key={b.type}><div className="leave-tile-top"><span>{b.type==='CASUAL'?'Casual + sick':b.label}</span><span className="leave-tile-icon">{b.type==='CASUAL'?<Sun size={17}/>:b.type==='EARNED'?<BriefcaseBusiness size={17}/>:<Sparkles size={17}/>}</span></div><div className="leave-tile-value">{b.remaining}<small>days available</small></div><div className="leave-progress"><span style={{width:`${b.entitlement?Math.max(4,Math.min(100,(b.remaining/b.entitlement)*100)):0}%`}}/></div><div className="leave-tile-foot"><span>{b.used} used</span><span>{b.pending?`${b.pending} pending`:`${b.accrued} allocated`}</span></div><p className="leave-tile-note">{b.type==='CASUAL'?'Shared 8-day annual balance for casual and sick leave.':b.type==='EARNED'?'Accrues 1 day/month after probation, up to 15 days/year.':'For cultural, religious or personal days.'}</p></Card>)}</div>
     {upcomingLeave.length>0&&<section className="leave-upcoming-strip"><div className="leave-upcoming-heading"><span className="eyebrow">UP NEXT</span><b>Your approved time away</b><small>Planned days already cleared by your approver.</small></div><div className="leave-upcoming-list">{upcomingLeave.map((r)=><Link to="/leave" key={r.id} className="leave-upcoming-item"><span className="leave-upcoming-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating'}[r.leave_type]||'Leave'}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})} · {r.days} day{Number(r.days)===1?'':'s'}</small></span><ArrowRight size={14}/></Link>)}</div></section>}
     <div className="leave-layout"><Card className="leave-form-card"><CardHeading title="Request time off" subtitle="Share the dates and a little context."/><form className="form-stack leave-request-form" onSubmit={submit}>
