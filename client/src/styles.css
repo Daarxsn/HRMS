@@ -3850,3 +3850,15 @@ html[data-theme="dark"] .onboarding-overdue-label{color:#f0b0b0;border-color:rgb
  .enterprise-page .check-row .enterprise-select{grid-column:2;width:100%}
  .enterprise-page .enterprise-toolbar .enterprise-field-label{min-width:0;width:100%}
 }
+
+
+/* Dashboard lifecycle alerts are real navigation controls */
+.enterprise-attention .attention-button{width:100%;font:inherit;text-align:left;color:var(--text);background:var(--surface);cursor:pointer;appearance:none}
+.enterprise-attention .attention-button .attention-copy{display:block;flex:1;min-width:0}
+.enterprise-attention .attention-button .attention-copy b{display:block;font-size:12px;line-height:1.45}
+.enterprise-attention .attention-button .attention-copy small{display:block;line-height:1.5;overflow-wrap:anywhere}
+.enterprise-attention .attention-button>svg{flex:0 0 auto;color:var(--muted);transition:transform .16s ease,color .16s ease}
+.enterprise-attention .attention-button:hover{border-color:rgba(218,175,81,.65);background:var(--ui-hover)}
+.enterprise-attention .attention-button:hover>svg{transform:translateX(3px);color:var(--fx-saffron-red)}
+html[data-theme="dark"] .enterprise-attention .attention-button:hover>svg{color:var(--fx-gold)}
+.enterprise-attention .attention-button:focus-visible{outline:3px solid var(--ui-focus);outline-offset:2px}
