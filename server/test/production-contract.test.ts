@@ -91,6 +91,8 @@ assert.match(enterprise,/Published or acknowledged policy content is immutable/)
 assert.match(enterprise,/SESSION_REVOKED/);
 assert.match(enterprise,/SESSION_REVOKED/);
 assert.match(enterprise,/SEPARATION_STARTED/);
+assert.match(enterprise,/completed separation cannot be reopened or cancelled/);
+assert.match(enterprise,/const result=await transaction\(async\(connection\)=>/);
 assert.match(enterpriseMigration,/CREATE TABLE IF NOT EXISTS employee_documents/);
 assert.match(enterpriseMigration,/CREATE TABLE IF NOT EXISTS onboarding_tasks/);
 assert.match(enterpriseMigration,/CREATE TABLE IF NOT EXISTS company_assets/);
