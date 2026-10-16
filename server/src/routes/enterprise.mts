@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import multer from 'multer';
 import { z } from 'zod';
-import { query } from '../db.mts';
+import { query, transaction } from '../db.mts';
 import { audit, notify, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { saveObject, deleteObject, readObject } from '../object-storage.mts';
@@ -188,10 +188,21 @@ router.post('/admin/separations',adminLimiter,asyncRoute(async(req,res)=>{
 }));
 router.patch('/admin/separations/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({status:z.enum(['OPEN','IN_PROGRESS','COMPLETED','CANCELLED']),notes:z.string().trim().max(2000).nullable().optional()}),req.body);
-  const rows=await query('SELECT id,employee_id FROM separation_cases WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]) throw Object.assign(new Error('Separation case not found.'),{status:404});
-  await query("UPDATE separation_cases SET status=:status,notes=COALESCE(:notes,notes),completed_at=CASE WHEN :status='COMPLETED' THEN UTC_TIMESTAMP() ELSE NULL END WHERE id=:id",{status:input.status,notes:input.notes===undefined?null:input.notes,id:req.params.id});
-  if(input.status==='COMPLETED') await query("UPDATE employees SET status='INACTIVE',session_version=session_version+1 WHERE id=:employee",{employee:rows[0].employee_id});
-  await audit({actorId:req.user.id,action:'SEPARATION_UPDATED',entityType:'separation_case',entityId:req.params.id,details:{status:input.status},ipAddress:req.ip}); res.json({ok:true});
+  const result=await transaction(async(connection)=>{
+    const [rows]=await connection.execute('SELECT id,employee_id,status FROM separation_cases WHERE id=? LIMIT 1 FOR UPDATE',[req.params.id]);
+    if(!rows[0]) throw Object.assign(new Error('Separation case not found.'),{status:404});
+    if(rows[0].status==='COMPLETED'&&input.status!=='COMPLETED') throw Object.assign(new Error('A completed separation cannot be reopened or cancelled. Create a new HR case if a correction is required.'),{status:409});
+    await connection.execute("UPDATE separation_cases SET status=?,notes=COALESCE(?,notes),completed_at=CASE WHEN ?='COMPLETED' THEN COALESCE(completed_at,UTC_TIMESTAMP()) ELSE NULL END WHERE id=?",[input.status,input.notes===undefined?null:input.notes,input.status,req.params.id]);
+    if(input.status==='COMPLETED') {
+      const [employeeResult]=await connection.execute("UPDATE employees SET status='INACTIVE',session_version=session_version+1 WHERE id=? AND status<>'INACTIVE'",[rows[0].employee_id]);
+      if(employeeResult.affectedRows===0) {
+        const [employeeRows]=await connection.execute('SELECT id,status FROM employees WHERE id=? LIMIT 1',[rows[0].employee_id]);
+        if(!employeeRows[0]) throw Object.assign(new Error('Employee record was not found; separation was not completed.'),{status:404});
+      }
+    }
+    return {previousStatus:rows[0].status};
+  });
+  await audit({actorId:req.user.id,action:'SEPARATION_UPDATED',entityType:'separation_case',entityId:req.params.id,details:{status:input.status,previous_status:result.previousStatus},ipAddress:req.ip}); res.json({ok:true});
 }));
 
 router.get('/admin/security',adminLimiter,asyncRoute(async(req,res)=>{
