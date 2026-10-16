@@ -61,7 +61,9 @@ assert.match(leave,/emailLeaveRequestToAdmin/);
 assert.match(leave,/sendHrNotificationEmail/);
 assert.match(leave,/replyTo:request\.employeeEmail/);
 assert.doesNotMatch(leave,/gmailAccessToken|sendEmployeeHrEmail/);
-assert.match(attendance,/sendEmployeeHrEmail/);
+assert.match(attendance,/sendHrNotificationEmail/);
+assert.match(attendance,/replyTo:employee\.email/);
+assert.doesNotMatch(attendance,/gmailAccessToken|sendEmployeeHrEmail/);
 assert.match(attendance,/Attendance correction request/);
 assert.match(attendance,/Flexible start request/);
 assert.match(workplace,/sendHrNotificationEmail/);
@@ -142,6 +144,7 @@ assert.match(app,/Send test email to HR mailbox/);
 assert.match(app,/All HR request emails are sent to one designated HR mailbox/);
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/leave/);
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/workplace\/wfh/);
+assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await post\('\/attendance\/(corrections|flex-requests)/);
 assert.match(main,/gmailSendScope/);
 assert.match(main,/GmailAccessBridge/);
 
