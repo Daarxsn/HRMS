@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
 
-const adminTabs = [
+const adminTabs: [string, string, React.ElementType][] = [
   ['overview','Command center',Activity], ['people','Lifecycle',Users], ['onboarding','Onboarding',Check],
   ['assets','Assets',Laptop], ['policies','Policies',FileText], ['offboarding','Offboarding',BriefcaseBusiness], ['security','Security',LockKeyhole]
 ];
@@ -15,7 +15,7 @@ function Modal({ title, children, close }) {
     </div>
   </div>;
 }
-function Metric({label,value,detail}) { return <div className="enterprise-metric"><span>{label}</span><strong>{value}</strong>{detail&&<small>{detail}</small>}</div>; }
+function Metric({label,value,detail}: {label:any;value:any;detail?:any}) { return <div className="enterprise-metric"><span>{label}</span><strong>{value}</strong>{detail&&<small>{detail}</small>}</div>; }
 function Status({value}) { const v=String(value||'—').toLowerCase().replaceAll('_','-'); return <span className={'mini-status mini-'+v}>{String(value||'—').replaceAll('_',' ')}</span>; }
 function today() { return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
 function documentExpiry(value) {
@@ -86,17 +86,17 @@ export default function EnterpriseHRPage() {
 
 function Overview({data,readiness,onOpenPerson}) {
   const o=data?.overview, active=o?.headcount?.active||0, total=o?.headcount?.total||0;
-  const onb=o?.onboarding?.summary||{}, tasks=Object.values(onb).reduce((a,v)=>a+Number(v),0), done=Number(onb.COMPLETED||0);
+  const onb=o?.onboarding?.summary||{}, tasks=Object.values(onb).reduce<number>((a,v)=>a+Number(v),0), done=Number(onb.COMPLETED||0);
   return <div className="enterprise-grid">
     <section className="card enterprise-wide"><div className="card-heading"><div><h2>Workforce pulse</h2><p>The management layer across the people system.</p></div><Status value={readiness?.status||'READY'}/></div><div className="enterprise-metrics">
       <Metric label="Active people" value={active} detail={total?Math.round(active*100/total)+'% of directory':''}/><Metric label="Active admins" value={o?.headcount?.admins||0}/>
       <Metric label="Late entries · 30d" value={o?.attendance30d?.late||0}/><Metric label="Absences · 30d" value={o?.attendance30d?.absent||0}/>
       <Metric label="Onboarding completion" value={tasks?Math.round(done*100/tasks)+'%':'0%'} detail={done+' of '+tasks+' tasks'}/>
     </div></section>
-    <section className="card"><div className="card-heading"><div><h2>Organization shape</h2><p>Where the active workforce sits.</p></div></div><div className="bar-list">{(o?.departments||[]).slice(0,7).map((d,i)=><div className="bar-row" key={d.department}><span>{d.department}</span><b>{d.total}</b><i style={{'--bar':Math.max(8,(d.total/Math.max(...(o.departments||[{total:1}]).map(x=>x.total)))*100)+'%'}}/></div>)}</div></section>
+    <section className="card"><div className="card-heading"><div><h2>Organization shape</h2><p>Where the active workforce sits.</p></div></div><div className="bar-list">{(o?.departments||[]).slice(0,7).map((d,i)=><div className="bar-row" key={d.department}><span>{d.department}</span><b>{d.total}</b><i style={{'--bar':Math.max(8,(Number(d.total)/Math.max(...(o.departments||[{total:1}]).map(x=>Number(x.total))))*100)+'%'} as React.CSSProperties}/></div>)}</div></section>
     <section className="card"><div className="card-heading"><div><h2>Readiness</h2><p>Every core layer checked.</p></div></div><div className="readiness-list">{(readiness?.checks||[]).map(c=><div key={c.key}><span className={c.status==='PASS'?'readiness-pass':'readiness-fail'}>{c.status}</span><b>{c.key.replaceAll('_',' ')}</b><small>{c.detail}</small></div>)}</div></section>
-    <section className="card"><div className="card-heading"><div><h2>Attendance trend</h2><p>Presence, late entries and absences over six months.</p></div></div><div className="trend-list">{(o?.attendanceTrend||[]).map(m=><div className="trend-row" key={m.month}><span>{m.month}</span><div className="trend-bars"><i style={{'--present':Math.max(5,Math.min(100,Number(m.present)*4))+'%'}}/><i style={{'--late':Math.max(2,Math.min(100,Number(m.late)*10))+'%'}}/><i style={{'--absent':Math.max(2,Math.min(100,Number(m.absent)*10))+'%'}}/></div><b>{m.present}</b></div>)}</div><div className="trend-legend"><span><i/>Present</span><span><i/>Late</span><span><i/>Absent</span></div></section>
-    <section className="card"><div className="card-heading"><div><h2>Leave utilization</h2><p>Approved and pending leave committed this year.</p></div></div><div className="leave-intelligence">{(o?.leave||[]).map(l=><div className="leave-row" key={l.leave_type}><span>{l.leave_type.replaceAll('_',' ')}</span><div><i style={{'--leave':Math.min(100,Number(l.committed)*6)+'%'}}/></div><b>{Number(l.approved||0)} approved</b><small>{Number(l.pending||0)} pending</small></div>)}</div></section>
+    <section className="card"><div className="card-heading"><div><h2>Attendance trend</h2><p>Presence, late entries and absences over six months.</p></div></div><div className="trend-list">{(o?.attendanceTrend||[]).map(m=><div className="trend-row" key={m.month}><span>{m.month}</span><div className="trend-bars"><i style={{'--present':Math.max(5,Math.min(100,Number(m.present)*4))+'%'} as React.CSSProperties}/><i style={{'--late':Math.max(2,Math.min(100,Number(m.late)*10))+'%'} as React.CSSProperties}/><i style={{'--absent':Math.max(2,Math.min(100,Number(m.absent)*10))+'%'} as React.CSSProperties}/></div><b>{m.present}</b></div>)}</div><div className="trend-legend"><span><i/>Present</span><span><i/>Late</span><span><i/>Absent</span></div></section>
+    <section className="card"><div className="card-heading"><div><h2>Leave utilization</h2><p>Approved and pending leave committed this year.</p></div></div><div className="leave-intelligence">{(o?.leave||[]).map(l=><div className="leave-row" key={l.leave_type}><span>{l.leave_type.replaceAll('_',' ')}</span><div><i style={{'--leave':Math.min(100,Number(l.committed)*6)+'%'} as React.CSSProperties}/></div><b>{Number(l.approved||0)} approved</b><small>{Number(l.pending||0)} pending</small></div>)}</div></section>
     <section className="card enterprise-wide"><div className="card-heading"><div><h2>Next 60 days</h2><p>Lifecycle items already visible to HR.</p></div></div><div className="enterprise-attention">
       {(o?.upcomingProbation||[]).slice(0,4).map(p=><button type="button" className="attention-item attention-button" key={p.id} onClick={()=>onOpenPerson?.(p.id)} aria-label={'Open employee record for '+p.full_name}><span className="attention-icon"><CalendarClock size={17}/></span><span className="attention-copy"><b>{p.full_name}</b><small>Probation · {formatDate(p.probation_end_date)}</small></span><ArrowRight size={15}/></button>)}
       {(o?.missingDocuments||[]).slice(0,4).map(p=><button type="button" className="attention-item attention-button" key={'doc-'+p.id} onClick={()=>onOpenPerson?.(p.id)} aria-label={'Open HR documents for '+p.full_name}><span className="attention-icon"><FileText size={17}/></span><span className="attention-copy"><b>{p.full_name}</b><small>HR document coverage gap</small></span><ArrowRight size={15}/></button>)}
