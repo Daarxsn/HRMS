@@ -134,7 +134,11 @@ router.patch('/admin/assets/:id',adminLimiter,asyncRoute(async(req,res)=>{
   const rows=await query('SELECT id,assigned_employee_id FROM company_assets WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]) throw Object.assign(new Error('Asset not found.'),{status:404});
   let assigned=input.assignedEmployeeId===undefined?rows[0].assigned_employee_id:input.assignedEmployeeId;
   if(assigned){const employee=await query("SELECT id FROM employees WHERE id=:id AND status='ACTIVE' AND role='EMPLOYEE' LIMIT 1",{id:assigned}); if(!employee[0]) throw Object.assign(new Error('Assigned employee not found or inactive.'),{status:400});}
-  const status=input.status||(assigned?'ASSIGNED':'AVAILABLE'); const assignedChanged=assigned && !rows[0].assigned_employee_id; const returnedChanged=!assigned && rows[0].assigned_employee_id;
+  const status=input.status||(assigned?'ASSIGNED':'AVAILABLE');
+  if(status==='ASSIGNED'&&!assigned) throw Object.assign(new Error('Assign this asset to an active employee before setting its status to Assigned.'),{status:400});
+  if((status==='REPAIR'||status==='RETIRED')&&assigned) throw Object.assign(new Error('Unassign this asset before moving it to repair or retiring it.'),{status:409});
+  if(status==='AVAILABLE'&&assigned) throw Object.assign(new Error('Unassign this asset before marking it Available.'),{status:409});
+  const assignedChanged=Boolean(assigned && !rows[0].assigned_employee_id); const returnedChanged=Boolean(!assigned && rows[0].assigned_employee_id);
   await query('UPDATE company_assets SET status=:status,assigned_employee_id=:employee,assigned_at=CASE WHEN :assignedChanged=1 THEN UTC_TIMESTAMP() ELSE assigned_at END,returned_at=CASE WHEN :returnedChanged=1 THEN UTC_TIMESTAMP() ELSE returned_at END,notes=COALESCE(:notes,notes) WHERE id=:id',{status,employee:assigned||null,assignedChanged:assignedChanged?1:0,returnedChanged:returnedChanged?1:0,notes:input.notes===undefined?null:input.notes,id:req.params.id});
   await audit({actorId:req.user.id,action:'ASSET_UPDATED',entityType:'company_asset',entityId:req.params.id,details:{status,assigned_employee_id:assigned||null},ipAddress:req.ip});
   if(assigned&&assignedChanged) await notify(assigned,'Company asset assigned','A company asset has been assigned to you.','UPDATE',{type:'asset',id:req.params.id});
