@@ -195,7 +195,7 @@ router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute
 }));
 
 router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ date: dateSchema, startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), reason: z.string().trim().min(8).max(1000), gmailAccessToken: z.string().min(20).max(4096).optional() }), req.body);
+  const input = validate(z.object({ date: dateSchema, startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), reason: z.string().trim().min(8).max(1000) }), req.body);
   if (input.startTime < '09:00' || input.startTime > '10:30') throw Object.assign(new Error('A flex start must be between 9:00 AM and 10:30 AM.'), { status: 400 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
   const holidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date:input.date});
@@ -217,7 +217,6 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
     type:'flex',
     details:['Date: ' + input.date, 'Requested start: ' + input.startTime, 'Reason: ' + input.reason],
     employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email},
-    gmailAccessToken:input.gmailAccessToken
   });
   res.status(201).json({ ok: true, id, emailDelivery });
 }));
