@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
