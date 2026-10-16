@@ -19,6 +19,16 @@ function Modal({ title, children, close }) {
 function Metric({label,value,detail}) { return <div className="enterprise-metric"><span>{label}</span><strong>{value}</strong>{detail&&<small>{detail}</small>}</div>; }
 function Status({value}) { const v=String(value||'—').toLowerCase().replaceAll('_','-'); return <span className={'mini-status mini-'+v}>{String(value||'—').replaceAll('_',' ')}</span>; }
 function today() { return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
+function documentExpiry(value) {
+  if(!value)return {label:'No expiry date',state:'none'};
+  const date=String(value).slice(0,10);
+  const days=Math.ceil((Date.parse(date+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/86400000);
+  if(days<0)return {label:'Expired '+Math.abs(days)+'d ago',state:'expired'};
+  if(days===0)return {label:'Expires today',state:'urgent'};
+  if(days<=30)return {label:'Expires in '+days+'d',state:'urgent'};
+  if(days<=90)return {label:'Expires in '+days+'d',state:'soon'};
+  return {label:'Expires '+formatDate(value),state:'valid'};
+}
 
 export default function EnterpriseHRPage() {
   const [tab,setTab]=useState('overview'), [data,setData]=useState(null), [error,setError]=useState(''), [loading,setLoading]=useState(true), [selectedId,setSelectedId]=useState(''), [lifecycle,setLifecycle]=useState(null), [modal,setModal]=useState(null), [notice,setNotice]=useState('');
@@ -111,7 +121,7 @@ function People({people,selectedId,setSelectedId,lifecycle,openHistory,openConta
       <div className="enterprise-detail-grid">
         <DetailList title="Employment history" rows={lifecycle.history||[]} empty="No lifecycle events recorded." render={r=><><b>{r.event_type.replaceAll('_',' ')}</b><small>{formatDate(r.effective_date)} · {r.title||'—'} {r.department?'· '+r.department:''}</small>{r.notes&&<p>{r.notes}</p>}</>}/>
         <DetailList title="Emergency contacts" rows={lifecycle.contacts||[]} empty="No emergency contacts." render={r=><><b>{r.contact_name} · {r.relationship}</b><small>{r.phone}{r.email?' · '+r.email:''}{r.is_primary?' · Primary':''}</small></>}/>
-        <DetailList title="HR documents" rows={lifecycle.documents||[]} empty="No HR documents uploaded." render={r=><><b>{r.title}</b><small>{r.document_type} · {r.expires_on?'Expires '+formatDate(r.expires_on):'No expiry'}</small>{r.original_filename&&<a href={assetUrl('/enterprise/admin/documents/'+r.id)} target="_blank" rel="noreferrer">Open document</a>}</>}/>
+        <DetailList title="HR documents" rows={lifecycle.documents||[]} empty="No HR documents uploaded." render={r=>{const expiry=documentExpiry(r.expires_on);return <><b>{r.title}</b><small>{r.document_type} · {expiry.label}</small>{expiry.state!=='none'&&<span className={'document-expiry document-expiry-'+expiry.state}>{expiry.state==='expired'?'Expired':expiry.state==='urgent'?'Action needed':expiry.state==='soon'?'Expiring soon':'In date'}</span>}{r.original_filename&&<a href={assetUrl('/enterprise/admin/documents/'+r.id)} target="_blank" rel="noreferrer">Open document</a>}</>}}/>
         <DetailList title="Assigned assets" rows={lifecycle.assets||[]} empty="No assigned assets." render={r=><><b>{r.name}</b><small>{r.asset_tag} · {r.category} · {r.serial_number||'No serial'}</small></>}/>
       </div>
     </section>}
