@@ -217,3 +217,22 @@ See [API contract](docs/API.md) for routes and role access.
 ### TypeScript architecture
 
 The application source is TypeScript throughout: React components use `.tsx`, shared/browser/server utilities use `.ts`, and the backend is compiled to JavaScript for production Node.js execution. The production service worker is also authored as TypeScript and emitted as the required `sw.js` runtime asset during the Vite build.
+
+
+## Automated production backup prerequisites
+
+The scheduled **Production Backup** workflow requires these repository-level Actions variables before it can create a Cloud SQL backup. Configure them under **Settings → Secrets and variables → Actions → Variables**; do not commit cloud identifiers or credentials into source files.
+
+| Variable | Required value |
+| --- | --- |
+| `GCP_PROJECT_ID` | Google Cloud project ID that owns the production Cloud SQL instance |
+| `GCP_REGION` | Region used by the production deployment |
+| `CLOUD_SQL_INSTANCE` | Exact Cloud SQL instance name |
+| `GCP_DEPLOYER_SERVICE_ACCOUNT` | Service-account email used for GitHub Actions workload identity |
+| `GCP_WIF_PROVIDER` | Full Workload Identity Federation provider resource name |
+
+The service account must be trusted by the configured GitHub OIDC/Workload Identity Federation provider and have the minimum Cloud SQL permissions needed to create and list backups for the intended instance. Verify the workload identity trust condition is restricted to this repository and the intended branch/environment.
+
+After configuring the variables and IAM, run **Actions → Production Backup → Run workflow** with a short reason, then confirm the job completes and its summary identifies the expected instance and a successful backup. A workflow run that only passes its configuration check is not proof of a completed or restorable backup.
+
+**Current audit finding:** the latest scheduled backup run failed before authentication because `GCP_PROJECT_ID` was missing. The other required variables must also be verified in repository settings. This is an environment configuration dependency; it cannot be safely fixed by hardcoding infrastructure values in the repository.
