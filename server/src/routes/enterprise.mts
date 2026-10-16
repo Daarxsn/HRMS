@@ -157,10 +157,10 @@ router.post('/admin/policies',adminLimiter,asyncRoute(async(req,res)=>{
 router.patch('/admin/policies/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({title:z.string().trim().min(3).max(180).optional(),category:z.string().trim().min(2).max(80).optional(),version:z.string().trim().min(1).max(40).optional(),body:z.string().trim().min(20).max(20000).optional(),status:z.enum(['DRAFT','PUBLISHED','ARCHIVED']).optional()}),req.body);
   if(!Object.keys(input).length) throw Object.assign(new Error('Make at least one change.'),{status:400});
-  const existing=await query('SELECT status FROM company_policies WHERE id=? LIMIT 1',[req.params.id]);
+  const existing=await query('SELECT p.status,(SELECT COUNT(*) FROM policy_acknowledgements a WHERE a.policy_id=p.id) acknowledgements FROM company_policies p WHERE p.id=? LIMIT 1',[req.params.id]);
   if(!existing[0]) throw Object.assign(new Error('Policy not found.'),{status:404});
   const editsPublishedContent=['title','category','version','body'].some((key)=>input[key]!==undefined);
-  if(existing[0].status==='PUBLISHED'&&editsPublishedContent) throw Object.assign(new Error('Published policies cannot be edited in place. Archive the policy and create a new version to preserve the published content.'),{status:409});
+  if((existing[0].status==='PUBLISHED'||Number(existing[0].acknowledgements)>0)&&editsPublishedContent) throw Object.assign(new Error('Published or acknowledged policy content is immutable. Create a new policy version to preserve the content employees acknowledged.'),{status:409});
   const sets=[]; const values=[]; const fields={title:['title',input.title],category:['category',input.category],version:['version',input.version],body:['body',input.body],status:['status',input.status]};
   for(const [,pair] of Object.entries(fields)){const column=pair[0],value=pair[1]; if(value!==undefined){sets.push(column+'=?');values.push(value);}}
   if(input.status==='PUBLISHED') sets.push('published_at=COALESCE(published_at,UTC_TIMESTAMP())');
