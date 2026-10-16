@@ -4014,3 +4014,18 @@ html[data-theme="dark"] .spinner{border-top-color:var(--fx-gold)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* Employee and admin portal finishing pass */
+.employee-home-hero,.admin-home-hero{border-radius:24px;overflow:hidden}
+.employee-home-hero h1,.admin-home-hero h1{letter-spacing:-.045em;text-wrap:balance}
+.employee-action-item,.review-preview-item{min-height:62px;border-radius:13px;transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.employee-action-item:hover,.review-preview-item:hover{transform:translateY(-1px);background:var(--ui-hover);border-color:rgba(218,175,81,.48)}
+.employee-action-item:focus-visible,.review-preview-item:focus-visible{outline:3px solid var(--ui-focus);outline-offset:2px}
+.admin-data-unavailable,.employee-page-error-inline,.admin-page-error{border-radius:13px;line-height:1.6}
+.admin-page-error button,.employee-page-error-inline button{flex:0 0 auto}
+.admin-review-preview .button,.approval-card .button{min-height:43px}
+@media(max-width:720px){
+ .employee-home-hero,.admin-home-hero{border-radius:18px}
+ .employee-action-item,.review-preview-item{min-height:58px}
+ .admin-review-preview .button,.approval-card .button{width:100%;justify-content:center}
+}
