@@ -41,6 +41,8 @@ assert.match(index,/APP_VERSION/);
 assert.match(index,/BUILD_SHA/);
 assert.match(index,/VERCEL_GIT_COMMIT_SHA/);
 assert.match(admin,/VERCEL_GIT_COMMIT_SHA/);
+assert.match(index,/production-unversioned/);
+assert.match(admin,/production-unversioned/);
 assert.match(index,/X-Request-ID/);
 assert.match(objectStorage, /@vercel/);
 assert.match(objectStorage,/access: 'private'/);
