@@ -20,26 +20,29 @@ async function effectiveAttendance(from, to) {
   if (!dateSchema.safeParse(from).success || !dateSchema.safeParse(to).success || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || from > to || (toDate.getTime() - fromDate.getTime()) / 86400000 > 366) {
     throw Object.assign(new Error('Choose a valid date range of no more than one year.'), { status:400 });
   }
-  const [records, people, leaves, wfh, customHolidays] = await Promise.all([
+  const [records, people, leaves, wfh, customHolidays, scheduleExceptions] = await Promise.all([
     query(`SELECT a.id,a.employee_id,a.attendance_date,a.check_in_at,a.check_out_at,a.check_in_method,a.check_out_method,a.check_in_latitude,a.check_in_longitude,a.check_in_accuracy_m,a.check_in_distance_m,a.status,a.correction_pending,
       e.full_name,e.employee_code,e.user_type,(SELECT COUNT(*) FROM temporary_exits x WHERE x.attendance_id=a.id) AS exit_count
       FROM attendance_records a JOIN employees e ON e.id=a.employee_id WHERE a.attendance_date BETWEEN :from AND :to ORDER BY a.attendance_date DESC,a.check_in_at DESC`, { from, to }),
     query(`SELECT id,full_name,employee_code,user_type,DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on FROM employees WHERE role='EMPLOYEE' AND status='ACTIVE' AND joined_on<=:to ORDER BY full_name`, { to }),
     query(`SELECT employee_id,DATE_FORMAT(start_date,'%Y-%m-%d') AS start_date,DATE_FORMAT(end_date,'%Y-%m-%d') AS end_date FROM leave_requests WHERE status='APPROVED' AND start_date<=:to AND end_date>=:from`, { from, to }),
     query(`SELECT employee_id,DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date FROM wfh_requests WHERE status='APPROVED' AND request_date BETWEEN :from AND :to`, { from, to }),
-    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`, { from, to })
+    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`, { from, to }),
+    query(`SELECT employee_id,DATE_FORMAT(exception_date,'%Y-%m-%d') AS exception_date,TIME_FORMAT(approved_start_time,'%H:%i') AS approved_start_time FROM employee_schedule_exceptions WHERE exception_date BETWEEN :from AND :to`, { from, to })
   ]);
   const holidays = new Set(customHolidays.map((x)=>x.date));
   for (let y=Number(from.slice(0,4));y<=Number(to.slice(0,4));y++) for (const [month,day] of [[1,26],[8,15],[10,2]]) holidays.add(`${y}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`);
   const result=[...records];
-  const present=new Set(records.map((r)=>`${r.employee_id}:${r.attendance_date}`));
+  const present=new Set(records.map((r)=>`${r.employee_id}:${String(r.attendance_date).slice(0,10)}`));
+  const approvedStartByEmployeeDate=new Map(scheduleExceptions.map((x)=>[`${x.employee_id}:${x.exception_date}`,x.approved_start_time]));
   const today=indiaDate();
   const currentTime=indiaTime().slice(0,5);
   for(let d=new Date(fromDate);d<=toDate;d.setUTCDate(d.getUTCDate()+1)){
     const date=d.toISOString().slice(0,10);
     if(date>today||d.getUTCDay()===0||holidays.has(date))continue;
     const isPast=date<today;
-    const absenceCutoff=isPast||currentTime>'10:30';
+    const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||'10:30';
+    const absenceCutoff=isPast||currentTime>scheduledStart;
     for(const person of people){
       if(date<person.joined_on||present.has(`${person.id}:${date}`))continue;
       const onLeave=leaves.some((item)=>item.employee_id===person.id&&item.start_date<=date&&item.end_date>=date);

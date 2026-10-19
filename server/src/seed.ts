@@ -44,7 +44,7 @@ try {
       leave_earned_monthly_accrual:'1', leave_floating_entitlement:'4'
     };
     for (const [key, value] of Object.entries(defaults)) {
-      await connection.execute('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)', [key,value]);
+      await connection.execute('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)', [key,value]);
     }
     const adminId = ids.get('om.admin@example.test');
     for (const [month, day, label] of [[1,26,'Republic Day'],[8,15,'Independence Day'],[10,2,'Gandhi Jayanti']]) {

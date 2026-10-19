@@ -97,6 +97,12 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   const id = crypto.randomUUID();
   await transaction(async(connection)=>{
     await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE',{employee:req.user.id});
+    const [activeRequest] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
+    if (activeRequest[0]) throw Object.assign(new Error('A pending or approved WFH request already exists for this date.'), { status:409 });
+    const [leaveOverlap] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:req.user.id, date:input.date });
+    if (leaveOverlap[0]) throw Object.assign(new Error('A pending or approved leave request already covers this date. Resolve it before requesting WFH.'), { status:409 });
+    const [attendanceExists] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, { employee:req.user.id, date:input.date });
+    if (attendanceExists[0]) throw Object.assign(new Error('Attendance has already been recorded for this date. Contact HR if the record needs correction.'), { status:409 });
     const [count] = await connection.execute(`SELECT COUNT(*) AS count FROM wfh_requests WHERE employee_id=:employee AND request_date BETWEEN :start AND :end AND status IN ('APPROVED','PENDING')`, { employee: req.user.id, start: monthStart, end: monthEnd });
     if (Number(count[0].count) >= cap) throw Object.assign(new Error(`You have reached the usual limit of ${cap} WFH day(s) for this month. Ask a manager to approve an exception.`), { status: 400 });
     await connection.execute(`INSERT INTO wfh_requests (id, employee_id, request_date, request_kind, reason) VALUES (:id, :employee, :date, :kind, :reason)`, {

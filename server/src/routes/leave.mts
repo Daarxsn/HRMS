@@ -74,6 +74,10 @@ async function getLeaveBalances(employee, connection = null) {
   for (const row of requests as any[]) byKey.set(`${row.leave_type}:${row.status}`, Number(row.days));
   const userRows = await execute('SELECT joined_on, probation_end_date FROM employees WHERE id=:employee', { employee });
   const probation = userRows[0]?.probation_end_date;
+  // A NULL probation end date means no probation end date was configured, not
+  // that the employee is permanently ineligible for earned leave. In that case
+  // accrue from the employee's join date using the same completed-month rule.
+  const accrualStart = String(probation || userRows[0]?.joined_on || '').slice(0, 10);
   const currentMonth = Number(today.slice(5, 7));
   const currentDay = Number(today.slice(8, 10));
   const policy = Object.fromEntries((policyRows as any[]).map((row) => [row.setting_key, Number(row.setting_value)]));
@@ -81,10 +85,10 @@ async function getLeaveBalances(employee, connection = null) {
   const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
   const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
   let earnedAccrued = 0;
-  if (probation && probation <= today) {
-    const probationYear = Number(String(probation).slice(0, 4));
-    const probationMonth = Number(String(probation).slice(5, 7));
-    const firstEligibleMonth = probationYear < year ? 1 : probationYear > year ? 13 : probationMonth + 1;
+  if (accrualStart && accrualStart <= today) {
+    const eligibleYear = Number(accrualStart.slice(0, 4));
+    const eligibleMonth = Number(accrualStart.slice(5, 7));
+    const firstEligibleMonth = eligibleYear < year ? 1 : eligibleYear > year ? 13 : eligibleMonth + 1;
     const lastAccrualMonth = currentDay === new Date(year,currentMonth,0).getDate() ? currentMonth : currentMonth - 1;
     earnedAccrued = Math.max(0, Math.min(earnedEntitlement, (lastAccrualMonth - firstEligibleMonth + 1)));
   }
@@ -137,7 +141,15 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
     const [overlap] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:end AND end_date>=:start LIMIT 1`, {
       employee: req.user.id, start: input.startDate, end: input.endDate
     });
-    if (overlap[0]) throw Object.assign(new Error('You already have a pending or approved request during those dates.'), { status: 409 });
+    if (overlap[0]) throw Object.assign(new Error('You already have a pending or approved leave request during those dates.'), { status: 409 });
+    const [wfhOverlap] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1`, {
+      employee: req.user.id, start: input.startDate, end: input.endDate
+    });
+    if (wfhOverlap[0]) throw Object.assign(new Error('A pending or approved WFH request already exists during those dates. Cancel or resolve it before requesting leave.'), { status: 409 });
+    const [attendanceOverlap] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1`, {
+      employee: req.user.id, start: input.startDate, end: input.endDate
+    });
+    if (attendanceOverlap[0]) throw Object.assign(new Error('Attendance has already been recorded during those dates. Submit an attendance correction or contact HR instead.'), { status: 409 });
     const balances = await getLeaveBalances(req.user.id,connection);
     const balanceType = input.type === 'CASUAL' || input.type === 'SICK' ? 'CASUAL' : input.type;
     const balance = balances.find((item) => item.type === balanceType);

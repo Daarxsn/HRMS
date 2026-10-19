@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root=path.resolve(process.cwd());
+// Resolve from this test file, not process.cwd(), so npm test works from the
+// repository root, the server workspace, and CI runners.
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const index=fs.readFileSync(path.join(root,'src/index.mts'),'utf8');
 const docker=fs.readFileSync(path.join(root,'Dockerfile'),'utf8');
 const db=fs.readFileSync(path.join(root,'src/db.mts'),'utf8');
@@ -186,6 +189,21 @@ assert.match(admin,/leave_earned_entitlement/);
 assert.match(admin,/leave_floating_entitlement/);
 assert.match(attendance,/late_threshold/);
 assert.match(admin,/attendanceStatus\(checkIn, schedule\[0\]\?\.approved_start_time \|\| null, String\(settings\.late_threshold/);
+
+const filesSeedForAudit=fs.readFileSync(path.join(root,'src/seed.ts'),'utf8');
+const workflowMigration=fs.readFileSync(path.join(root,'migrations/008_attendance_workflow_integrity.sql'),'utf8');
+
+// Regression checks for the October 2026 forensic audit fixes.
+assert.match(filesSeedForAudit,/setting_value=VALUES\\(setting_value\\)/);
+assert.match(leave,/accrualStart/);
+assert.match(leave,/wfhOverlap/);
+assert.match(attendance,/pending attendance correction already exists/);
+assert.match(attendance,/OFF_PREMISES/);
+assert.match(attendance,/approvedStartByDate/);
+assert.match(admin,/approvedStartByEmployeeDate/);
+assert.match(workplace,/A pending or approved WFH request already exists for this date/);
+assert.match(workflowMigration,/uq_wfh_active_employee_day/);
+assert.match(workflowMigration,/OFF_PREMISES/);
 
 console.log('Production API contracts: PASS');
 

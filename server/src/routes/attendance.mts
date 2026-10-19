@@ -68,7 +68,7 @@ router.get('/', asyncRoute(async (req, res) => {
   const date = String(req.query.from || indiaDate());
   const to = String(req.query.to || date);
   if (!dateSchema.safeParse(date).success || !dateSchema.safeParse(to).success || date>to || (new Date(`${to}T12:00:00Z`).getTime()-new Date(`${date}T12:00:00Z`).getTime())/86400000>366) throw Object.assign(new Error('Choose a valid date range of no more than one year.'),{status:400});
-  const [rows, leaves, remoteDays, holidays, person] = await Promise.all([
+  const [rows, leaves, remoteDays, holidays, person, scheduleExceptions] = await Promise.all([
     query(`SELECT id, attendance_date, check_in_at, check_out_at, check_in_method, check_out_method, status, approved_start_time, correction_pending
     FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :from AND :to ORDER BY attendance_date DESC`, {
     employee: req.user.id, from: date, to
@@ -76,15 +76,18 @@ router.get('/', asyncRoute(async (req, res) => {
     query(`SELECT DATE_FORMAT(start_date,'%Y-%m-%d') AS start_date,DATE_FORMAT(end_date,'%Y-%m-%d') AS end_date FROM leave_requests WHERE employee_id=:employee AND status='APPROVED' AND start_date<=:to AND end_date>=:from`,{employee:req.user.id,from:date,to}),
     query(`SELECT DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date FROM wfh_requests WHERE employee_id=:employee AND status='APPROVED' AND request_date BETWEEN :from AND :to`,{employee:req.user.id,from:date,to}),
     query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`,{from:date,to}),
-    query(`SELECT DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on FROM employees WHERE id=:employee`,{employee:req.user.id})
+    query(`SELECT DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on FROM employees WHERE id=:employee`,{employee:req.user.id}),
+    query(`SELECT DATE_FORMAT(exception_date,'%Y-%m-%d') AS exception_date,TIME_FORMAT(approved_start_time,'%H:%i') AS approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date BETWEEN :from AND :to`,{employee:req.user.id,from:date,to})
   ]);
   const holidaySet=new Set(holidays.map((x)=>x.date));
   for(let year=Number(date.slice(0,4));year<=Number(to.slice(0,4));year++)for(const [month,day] of [[1,26],[8,15],[10,2]])holidaySet.add(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`);
-  const display=[...rows];const existing=new Set(rows.map((x)=>x.attendance_date));const today=indiaDate();const currentTime=indiaTime().slice(0,5);
+  const display=[...rows];const existing=new Set(rows.map((x)=>String(x.attendance_date).slice(0,10)));const today=indiaDate();const currentTime=indiaTime().slice(0,5);
+  const approvedStartByDate=new Map(scheduleExceptions.map((x)=>[x.exception_date,x.approved_start_time]));
   for(let d=new Date(`${date}T12:00:00Z`),end=new Date(`${to}T12:00:00Z`);d<=end;d.setUTCDate(d.getUTCDate()+1)){
     const day=d.toISOString().slice(0,10);if(day>today||d.getUTCDay()===0||holidaySet.has(day)||day<(person[0]?.joined_on||'' )||existing.has(day))continue;
     const onLeave=leaves.some((x)=>x.start_date<=day&&x.end_date>=day);const wfh=remoteDays.some((x)=>x.request_date===day);
-    const absent=day<today||currentTime>'10:30';const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
+    const absenceCutoff=approvedStartByDate.get(day)||'10:30';
+    const absent=day<today||currentTime>absenceCutoff;const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
     if(status)display.push({id:`${req.user.id}-${day}`,attendance_date:day,check_in_at:null,check_out_at:null,check_in_method:status==='WFH'?'WFH':null,check_out_method:null,status,approved_start_time:null,correction_pending:false});
   }
   const lunchRows = await query('SELECT setting_value FROM system_settings WHERE setting_key=\'fixed_lunch_minutes\'');
@@ -184,8 +187,10 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     if (!gpsVerified) {
       try { verifyOfficeNetwork(req); method = 'WIFI'; distance = null; }
       catch {
-        if (!gpsProvided) throw Object.assign(new Error('Location could not be verified. Allow browser location or connect to the approved office Wi-Fi, then retry.'), { status: 422 });
-        throw Object.assign(new Error('GPS accuracy is too low or you are outside the office radius, and this network is not on the approved office Wi-Fi list.'), { status: 422 });
+        // Check-out closes an existing shift; unlike check-in, it must not
+        // require the employee to still be inside the office geofence.
+        method = 'OFF_PREMISES';
+        distance = null;
       }
     }
   } else if (method === 'WIFI') {
@@ -209,9 +214,13 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
 router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, requestedCheckIn: z.string().datetime().optional(), requestedCheckOut: z.string().datetime().optional(), reason: z.string().trim().min(8).max(1000) }).refine((v) => v.requestedCheckIn || v.requestedCheckOut, 'Add the missing check-in or check-out time.'), req.body);
   if (input.date > indiaDate()) throw Object.assign(new Error('Choose today or an earlier date for an attendance correction.'), { status: 400 });
-  const matching = await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', { employee: req.user.id, date: input.date });
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
+    // Lock the employee row to serialize simultaneous correction submissions
+    // even when no attendance row exists yet for the requested date.
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', { employee:req.user.id });
+    const [pending] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
+    if (pending[0]) throw Object.assign(new Error('A pending attendance correction already exists for this date.'), { status:409 });
     const [locked] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee:req.user.id, date:input.date });
     const attendanceId = locked[0]?.id || null;
     await connection.execute(`INSERT INTO attendance_correction_requests (id, employee_id, attendance_id, attendance_date, requested_check_in_at, requested_check_out_at, reason)
