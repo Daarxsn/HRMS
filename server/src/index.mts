@@ -25,7 +25,9 @@ const logProcessFailure = (type: string, error: unknown) => {
 process.on('uncaughtException', (error) => logProcessFailure('uncaught_exception', error));
 process.on('unhandledRejection', (error) => logProcessFailure('unhandled_rejection', error));
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+// Trust the forwarded client IP only on Vercel, which overwrites X-Forwarded-For at its edge.
+// Local/direct deployments must not let a client-supplied forwarding header choose req.ip.
+app.set('trust proxy', process.env.VERCEL === '1' ? 1 : false);
 if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');}
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 app.use((req,res,next)=>{
