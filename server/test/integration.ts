@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { query } from '../src/db.mts';
+import { pool, query } from '../src/db.mts';
 
 const port = 8090;
 const baseUrl = `http://127.0.0.1:${port}/api`;
@@ -355,4 +355,5 @@ try {
       resolve();
     });
   });
+  await pool.end();
 }
