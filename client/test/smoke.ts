@@ -114,7 +114,7 @@ assert.ok(css.includes('.employee-policy-error'), 'Policy errors must remain vis
 
 console.log('Frontend smoke contracts: PASS');
 
-assert.ok(app.includes('GPS geofencing and office-network verification are alternatives'), 'Attendance settings must explain that GPS and office-network checks are alternatives');
+assert.ok(app.includes('GPS check-in requires both an in-office GPS fix and a matching approved office public egress IP'), 'Attendance settings must explain the dual-signal anti-spoof policy');
 assert.ok(app.includes('office public egress IP'), 'Office network diagnostics must explain the public IP used for network fallback');
 assert.ok(app.includes('If that IP changes'), 'Office network diagnostics must explain how to recover from a changed public IP');
 
