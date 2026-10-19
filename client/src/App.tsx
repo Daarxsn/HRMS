@@ -1228,7 +1228,7 @@ function SettingsPage(){
             <div><small>Public IP match</small><b>{network.matchedCurrentRequest?'Matches allow-list':'No allow-list match'}</b></div>
             <div><small>IP seen by API</small><b>{network.currentClientIp||'—'}</b></div>
             <div><small>Allow-listed IPs</small><b>{network.configuredIpCount}</b></div>
-            <div><small>Attendance gate</small><b>{network.configured?'Location + Wi-Fi':'Configuration required'}</b></div>
+            <div><small>Attendance gate</small><b>{network.configured?'GPS or Wi-Fi':'GPS geofence · Wi-Fi fallback needs setup'}</b></div>
             <div><small>Tracking</small><b>One-time check only</b></div>
           </div>:<InlineError>{healthError || 'Network verification status is unavailable.'}</InlineError>}
           <div className="privacy-promise"><ShieldCheck size={16}/><span>GPS geofencing and office-network verification are alternatives: either a valid office location or a matching office public egress IP is sufficient. Browsers cannot expose the Wi-Fi name, so network fallback requires the office public IP in OFFICE_NETWORK_IPS. If that IP changes, update the production environment and redeploy. Never add a home or hotspot IP to bypass verification.</span></div>
