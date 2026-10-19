@@ -1213,7 +1213,7 @@ function SettingsPage(){
     {loading?<Card className="settings-loading"><Spinner/></Card>:!settingsAvailable?<div className="admin-empty-recovery"><CircleAlert size={18}/><b>Office settings unavailable</b><span>Settings were not changed. Retry the request before editing attendance or WFH configuration.</span><Button variant="soft" size="small" onClick={()=>void load()}>Retry settings</Button></div>:<div className="settings-layout">
       <div className="settings-main">
         <Card className="settings-card">
-          <CardHeading title="Pune HQ attendance" subtitle="Office attendance is verified by either the geofence or approved office network."/>
+          <CardHeading title="Pune HQ attendance" subtitle="GPS check-in requires both the office geofence and approved office network; the network can also serve as the fallback when GPS is inaccurate."/>
           <form className="form-stack" onSubmit={save}>
             <label className="form-field"><span>Office name</span><input value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label>
             <div className="form-two"><label className="form-field"><span>Latitude</span><input type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div>
