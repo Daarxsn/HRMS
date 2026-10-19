@@ -179,6 +179,13 @@ try {
     assert.equal(createWfh.response.status, 201, 'Employee must be able to request same-day WFH in the isolated integration database: ' + JSON.stringify(createWfh.data));
     assert.ok(createWfh.data?.id);
 
+    const duplicateActiveWfh = await request('/wfh', {
+      method: 'POST',
+      headers: { Cookie: employeeSession.cookie },
+      body: JSON.stringify({ date: wfhDate, kind: 'EMERGENCY', reason: 'CI regression: duplicate active request must be blocked' })
+    });
+    assert.equal(duplicateActiveWfh.response.status, 409, 'A second pending/approved WFH request for the same employee and date must be rejected.');
+
     const approvalQueue = await request('/admin/approvals', {
       headers: { Cookie: adminSession.cookie }
     });
