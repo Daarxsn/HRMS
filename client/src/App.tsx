@@ -11,7 +11,7 @@ import {
   PanelLeftClose, UserRound, XCircle
 } from 'lucide-react';
 import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
-import EnterpriseHRPage, { EmployeePoliciesPage } from './EnterpriseHRPage';
+import EnterpriseHRPage, { EmployeeDocumentsPage, EmployeePoliciesPage } from './EnterpriseHRPage';
 
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
@@ -84,7 +84,7 @@ function EmptyState({ icon:Icon=FileText, title, body, action }) { return <div c
 function Card({ children, className='', ...props }) { return <section {...props} className={`card ${className}`}>{children}</section>; }
 function CardHeading({ title, subtitle, action }) { return <div className="card-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>{action}</div>; }
 
-function App({ requestGmailAccess = null }) {
+function App() {
   const [user,setUser]=useState(null);
   const [loading,setLoading]=useState(true);
   const [toast,setToast]=useState(null);
@@ -122,8 +122,7 @@ function App({ requestGmailAccess = null }) {
     window.addEventListener('hrms:session-expired',onSessionExpired);
     return ()=>window.removeEventListener('hrms:session-expired',onSessionExpired);
   },[]);
-  const gmailRequest = requestGmailAccess || (async () => { throw new Error('Google Gmail access is not configured for this deployment.'); });
-  const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme,requestGmailAccess:gmailRequest}),[user,notifications,theme,requestGmailAccess]);
+  const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme}),[user,notifications,theme]);
   const retryBoot=()=>{setBootError('');setLoading(true);window.location.reload();};
   return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><div className="boot-brand"><IconLogo/><div><b>FALCHION XENIAA</b><span>PEOPLE PORTAL</span></div></div><div className="boot-loader"><div className="boot-line"><i/></div><span>Preparing your workspace</span></div></div>:bootError?<div className="loading-screen" role="alert"><IconLogo/><div className="card" style={{maxWidth:520,margin:'24px',textAlign:'center'}}><div className="eyebrow">CONNECTION ISSUE</div><h1>We could not reach the portal.</h1><p>{bootError}</p><button className="button button-primary" onClick={retryBoot}>Try again</button></div></div>:user?<Shell/>:<LoginScreen/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
 }
@@ -183,6 +182,7 @@ const employeeNav=[
   {to:'/wfh',label:'Work from home',icon:House},
   {to:'/out',label:'Out of office',icon:ArrowUpRight},
   {to:'/notifications',label:'Notifications',icon:Bell},
+  {to:'/documents',label:'My documents',icon:FileText},
   {to:'/calendar',label:'Holiday calendar',icon:Calendar},
   {to:'/policies',label:'Policy center',icon:FileText}
 ];
@@ -228,7 +228,7 @@ function Shell(){
     </aside>
     <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Open command menu"><Command size={15}/><span>Search</span><kbd>⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</Link></div></header>
       <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
-        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/>
+        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/>
         <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/>
         <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div>
       <footer className="app-footer"><span>Falchion Xeniaa · People portal</span><span>Built on trust <span className="footer-dot">·</span> {new Date().getFullYear()}</span></footer>
