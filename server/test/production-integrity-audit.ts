@@ -216,9 +216,13 @@ async function main() {
   await zeroCount('Invalid leave ranges/duration',
     'SELECT COUNT(*) AS count FROM leave_requests WHERE start_date > end_date OR days <= 0',
     ['leave_requests']);
-  await zeroCount('Duplicate active WFH requests',
-    'SELECT COUNT(*) AS count FROM (SELECT employee_id, active_request_date FROM wfh_requests WHERE active_request_date IS NOT NULL GROUP BY employee_id, active_request_date HAVING COUNT(*) > 1) AS duplicate_wfh',
-    ['wfh_requests']);
+  if (columnMap.has('wfh_requests.active_request_date')) {
+    await zeroCount('Duplicate active WFH requests',
+      'SELECT COUNT(*) AS count FROM (SELECT employee_id, active_request_date FROM wfh_requests WHERE active_request_date IS NOT NULL GROUP BY employee_id, active_request_date HAVING COUNT(*) > 1) AS duplicate_wfh',
+      ['wfh_requests']);
+  } else {
+    report('SKIP', 'Duplicate active WFH requests', 'Requires migration 008 active_request_date; the schema finding above must be resolved before this check can run.');
+  }
   await zeroCount('Active WFH overlapping pending/approved leave',
     'SELECT COUNT(*) AS count FROM wfh_requests w JOIN leave_requests l ON l.employee_id = w.employee_id AND l.start_date <= w.request_date AND l.end_date >= w.request_date WHERE w.status IN (\'PENDING\',\'APPROVED\') AND l.status IN (\'PENDING\',\'APPROVED\')',
     ['wfh_requests','leave_requests'], true);
