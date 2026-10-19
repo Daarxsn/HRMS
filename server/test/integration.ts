@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { query } from '../src/db.mts';
 
 const port = 8090;
 const baseUrl = `http://127.0.0.1:${port}/api`;
@@ -295,6 +297,29 @@ try {
     body: JSON.stringify({})
   });
   assert.equal(adminAttendanceValidation.response.status, 400);
+
+  // Regression: checkout must close an open shift from the previous India-local
+  // date instead of looking only for a row dated today.
+  const todayIndia = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+  }).format(new Date());
+  const previousDateObject = new Date(todayIndia+'T12:00:00Z');
+  previousDateObject.setUTCDate(previousDateObject.getUTCDate()-1);
+  const previousIndiaDate = previousDateObject.toISOString().slice(0,10);
+  await query('DELETE FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date',{employee:adminSession.user.id,date:previousIndiaDate});
+  await query(`INSERT INTO attendance_records (id,employee_id,attendance_date,check_in_at,check_in_method,status)
+    VALUES (:id,:employee,:date,:checkIn,'GPS','ON_TIME')`,{
+    id:crypto.randomUUID(),employee:adminSession.user.id,date:previousIndiaDate,
+    checkIn:new Date(previousIndiaDate+'T18:20:00.000Z')
+  });
+  const overnightCheckout = await request('/attendance/check-out',{
+    method:'POST',
+    headers:{Cookie:adminSession.cookie},
+    body:JSON.stringify({method:'GPS'})
+  });
+  assert.equal(overnightCheckout.response.status,200,'An open shift from yesterday must be closable today.');
+  const closedOvernight = await query('SELECT check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date',{employee:adminSession.user.id,date:previousIndiaDate});
+  assert.ok(closedOvernight[0]?.check_out_at,'Overnight checkout must persist a checkout timestamp.');
 
   const adminLeaveAttempt = await request('/leave', {
     headers: { Cookie: adminSession.cookie }
