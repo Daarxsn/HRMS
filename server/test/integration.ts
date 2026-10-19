@@ -139,6 +139,7 @@ try {
     headers: { Cookie: employeeSession.cookie }
   });
   assert.equal(wfhState.response.status, 200);
+  assert.equal(wfhState.data.enabled, true, 'Authenticated user lookup must preserve the employee WFH eligibility flag.');
   const wfhDate = String(wfhState.data.today);
   const calendarForWfh = await request('/calendar?year=' + wfhDate.slice(0,4), {
     headers: { Cookie: employeeSession.cookie }
@@ -157,7 +158,7 @@ try {
       headers: { Cookie: employeeSession.cookie },
       body: JSON.stringify({ date: wfhDate, kind: 'EMERGENCY', reason: 'CI regression: approved WFH must not require GPS' })
     });
-    assert.equal(createWfh.response.status, 201, 'Employee must be able to request same-day WFH in the isolated integration database.');
+    assert.equal(createWfh.response.status, 201, 'Employee must be able to request same-day WFH in the isolated integration database: ' + JSON.stringify(createWfh.data));
     assert.ok(createWfh.data?.id);
 
     const approvalQueue = await request('/admin/approvals', {
