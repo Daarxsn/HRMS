@@ -4029,3 +4029,99 @@ html[data-theme="dark"] .spinner{border-top-color:var(--fx-gold)}
  .employee-action-item,.review-preview-item{min-height:58px}
  .admin-review-preview .button,.approval-card .button{width:100%;justify-content:center}
 }
+
+
+/* Theme consistency pass: remove legacy fixed-light surfaces from HR operations and policy center. */
+html[data-theme] .enterprise-page,
+html[data-theme] .employee-policy-page {
+  color: var(--ui-text);
+}
+html[data-theme] .enterprise-page .card,
+html[data-theme] .employee-policies-panel,
+html[data-theme] .employee-policy-card,
+html[data-theme] .employee-policy-summary > div,
+html[data-theme] .employee-policy-card .policy-body,
+html[data-theme] .employee-policy-error,
+html[data-theme] .employee-policy-inline-error,
+html[data-theme] .employee-policy-inline-success {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+html[data-theme] .enterprise-page .card,
+html[data-theme] .employee-policies-panel {
+  background: var(--ui-surface);
+}
+html[data-theme] .employee-policy-summary > div,
+html[data-theme] .employee-policy-card .policy-body {
+  background: var(--ui-surface-muted);
+}
+html[data-theme] .employee-policy-card h2,
+html[data-theme] .employee-policy-panel-head h2,
+html[data-theme] .enterprise-page h2,
+html[data-theme] .enterprise-page h3,
+html[data-theme] .enterprise-page label,
+html[data-theme] .enterprise-page .enterprise-row,
+html[data-theme] .enterprise-page .enterprise-tr {
+  color: var(--ui-text);
+}
+html[data-theme] .employee-policy-panel-head p,
+html[data-theme] .employee-policy-summary span,
+html[data-theme] .employee-policy-summary small,
+html[data-theme] .employee-policy-published,
+html[data-theme] .employee-policy-card .policy-body,
+html[data-theme] .enterprise-page .enterprise-metric span,
+html[data-theme] .enterprise-page .enterprise-metric small,
+html[data-theme] .enterprise-page .enterprise-heading-actions,
+html[data-theme] .enterprise-page .enterprise-hero p,
+html[data-theme] .enterprise-page .enterprise-hero-meta small {
+  color: var(--ui-text-muted);
+}
+html[data-theme] .enterprise-page .input,
+html[data-theme] .enterprise-page input,
+html[data-theme] .enterprise-page select,
+html[data-theme] .enterprise-page textarea,
+html[data-theme] .employee-policies-panel input,
+html[data-theme] .employee-policies-panel select,
+html[data-theme] .employee-policies-panel textarea {
+  background-color: var(--ui-field);
+  color: var(--ui-field-text);
+  border-color: var(--ui-border);
+}
+html[data-theme] .enterprise-page .enterprise-tabs {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+html[data-theme] .enterprise-page .enterprise-tabs button {
+  color: var(--ui-text-muted);
+}
+html[data-theme] .enterprise-page .enterprise-tabs button.active {
+  background: var(--fx-gold);
+  color: var(--fx-charcoal);
+}
+html[data-theme] .enterprise-page .enterprise-table,
+html[data-theme] .enterprise-page .enterprise-tr,
+html[data-theme] .enterprise-page .policy-row,
+html[data-theme] .enterprise-page .readiness-list > div {
+  border-color: var(--ui-border);
+}
+html[data-theme] .enterprise-page .enterprise-row:hover,
+html[data-theme] .enterprise-page .policy-row:hover {
+  background: var(--ui-hover);
+}
+html[data-theme] .enterprise-page .enterprise-toast {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+}
+html[data-theme="dark"] .employee-policy-hero {
+  background: radial-gradient(circle at 92% 50%,rgba(218,175,81,.12),transparent 24%), linear-gradient(115deg,rgba(147,19,20,.16),rgba(218,175,81,.08)),var(--ui-surface);
+}
+html[data-theme="dark"] .employee-policy-inline-error {
+  color: #ffd8d8;
+  background: rgba(147,19,20,.18);
+}
+html[data-theme="dark"] .employee-policy-inline-success {
+  color: #f4e7c4;
+  background: rgba(218,175,81,.10);
+}
