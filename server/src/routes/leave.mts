@@ -153,7 +153,8 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
     const balances = await getLeaveBalances(req.user.id,connection);
     const balanceType = input.type === 'CASUAL' || input.type === 'SICK' ? 'CASUAL' : input.type;
     const balance = balances.find((item) => item.type === balanceType);
-    if (!balance || days > balance.remaining) throw Object.assign(new Error(`This request exceeds your available ${balance?.label || 'leave'} balance (${balance?.remaining || 0} day(s)).`), { status: 400 });
+    const balanceLabel = input.type === 'SICK' ? 'Sick leave' : balance?.label || 'leave';
+    if (!balance || days > balance.remaining) throw Object.assign(new Error(`This request exceeds your available ${balanceLabel} balance (${balance?.remaining || 0} day(s)).`), { status: 400 });
     await connection.execute(`INSERT INTO leave_requests (id, employee_id, leave_type, start_date, end_date, days, reason, attachment_id)
       VALUES (:id, :employee, :type, :start, :end, :days, :reason, :attachment)`, {
       id, employee: req.user.id, type: input.type, start: input.startDate, end: input.endDate, days, reason: input.reason, attachment: input.attachmentId || null
