@@ -99,6 +99,7 @@ jobs:
         run: |
           npm run db:seed
           npm run db:verify --workspace server
+          HRMS_DB_AUDIT_TARGET=ci npm run db:audit --workspace server
 
   api-integration:
     name: API integration smoke
