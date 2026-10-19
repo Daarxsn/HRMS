@@ -27,6 +27,22 @@ const signatureOk = (buffer,contentType) => {
 const safeFilename = (value) => value.replace(/[^A-Za-z0-9._-]+/g,'-').slice(0,180) || 'document';
 const progress = (tasks) => { const total=tasks.length; const completed=tasks.filter((t)=>t.status==='COMPLETED').length; return {total,completed,percent:total?Math.round(completed*100/total):0}; };
 
+router.get('/employee/documents', asyncRoute(async(req,res)=>{
+  const rows=await query(`SELECT id,document_type,title,description,original_filename,content_type,size_bytes,issued_on,expires_on,status,created_at FROM employee_documents WHERE employee_id=:employee AND status<>'ARCHIVED' ORDER BY COALESCE(expires_on,'9999-12-31') ASC,created_at DESC`,{employee:req.user.id});
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({documents:rows});
+}));
+router.get('/employee/documents/:id', asyncRoute(async(req,res)=>{
+  const rows=await query(`SELECT object_key,original_filename,content_type FROM employee_documents WHERE id=:id AND employee_id=:employee AND status<>'ARCHIVED' LIMIT 1`,{id:req.params.id,employee:req.user.id});
+  if(!rows[0]?.object_key) throw Object.assign(new Error('Document not found.'),{status:404});
+  const file=await readObject(rows[0].object_key);
+  res.setHeader('Content-Type',rows[0].content_type||file.contentType||'application/octet-stream');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(rows[0].original_filename||'document')}`);
+  res.setHeader('Cache-Control','private, no-store');
+  if(file.kind==='buffer') res.send(file.buffer); else file.stream.pipe(res);
+}));
+
 router.get('/policies', asyncRoute(async(req,res)=>{
   const rows=await query(`SELECT p.id,p.title,p.category,p.version,p.body,p.status,p.published_at,CASE WHEN a.id IS NULL THEN 0 ELSE 1 END acknowledged FROM company_policies p LEFT JOIN policy_acknowledgements a ON a.policy_id=p.id AND a.employee_id=:employee WHERE p.status='PUBLISHED' ORDER BY p.published_at DESC,p.created_at DESC`,{employee:req.user.id});
   res.json({policies:rows});
