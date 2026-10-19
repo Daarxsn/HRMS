@@ -108,12 +108,28 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   const settings = await getSettings();
   let method = input.method;
   let distance = null;
+  let locationAccuracy = null;
   if (method === 'GPS') {
-    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again.'), { status: 400 });
-    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area and try again.'), { status: 422 });
-    distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
-    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error(`You are about ${Math.round(distance)} m from the office, outside the ${settings.geofence_meters || POLICY.geofenceMeters} m check-in radius.`), { status: 422 });
-    verifyOfficeNetwork(req);
+    const gpsProvided = input.latitude !== undefined && input.longitude !== undefined && input.accuracy !== undefined;
+    if (gpsProvided && input.accuracy <= Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) {
+      distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
+      if (distance <= Number(settings.geofence_meters || POLICY.geofenceMeters)) {
+        // Either valid office geofence OR approved office Wi-Fi is sufficient.
+        method = 'GPS';
+        locationAccuracy = input.accuracy;
+      } else {
+        try { verifyOfficeNetwork(req); method = 'WIFI'; distance = null; }
+        catch { throw Object.assign(new Error(`You are about ${Math.round(distance)} m from the office, outside the ${settings.geofence_meters || POLICY.geofenceMeters} m radius. Connect to the approved office Wi-Fi or check in from inside the office.`), { status: 422 }); }
+      }
+    } else {
+      // Laptop location can be inaccurate or unavailable. Do not block staff if
+      // their public IP is on the administrator-approved office network list.
+      try { verifyOfficeNetwork(req); method = 'WIFI'; distance = null; }
+      catch {
+        if (!gpsProvided) throw Object.assign(new Error('Location could not be verified. Allow browser location or connect to the approved office Wi-Fi, then retry.'), { status: 422 });
+        throw Object.assign(new Error('GPS accuracy is too low and this network is not on the approved office Wi-Fi list. Connect to office Wi-Fi or retry location access.'), { status: 422 });
+      }
+    }
   }
   if (method === 'WFH') {
     if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
@@ -130,7 +146,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
       VALUES (:id, :employee, :date, UTC_TIMESTAMP(), :method, :lat, :lon, :accuracy, :distance, :status, :approvedStart)`, {
       id, employee: req.user.id, date, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null,
-      accuracy: method === 'GPS' ? input.accuracy : null, distance: method === 'GPS' ? distance : null, status, approvedStart
+      accuracy: method === 'GPS' ? locationAccuracy : null, distance: method === 'GPS' ? distance : null, status, approvedStart
     });
   });
   await audit({ actorId: req.user.id, action: 'ATTENDANCE_CHECK_IN', entityType: 'attendance', entityId: id, details: { method, date, distance_m: distance === null ? null : Math.round(distance) }, ipAddress: req.ip });
