@@ -106,7 +106,14 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   const dateHolidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date});
   if(!isScheduledWorkday(date,new Set(dateHolidays.map((x)=>x.date)))) throw Object.assign(new Error('Attendance check-in is available Monday–Saturday, excluding company holidays.'),{status:403});
   const settings = await getSettings();
-  let method = input.method;
+  // The approved employee/date WFH request is the source of truth. A stale
+  // browser build may still submit method=GPS; do not make WFH staff depend on
+  // the browser correctly inferring the approved mode before checking in.
+  const approvedWfhToday = await query(
+    `SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`,
+    { employee: req.user.id, date }
+  );
+  let method = approvedWfhToday[0] ? 'WFH' : input.method;
   let distance = null;
   let locationAccuracy = null;
   if (method === 'GPS') {
@@ -132,10 +139,13 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     }
   }
   if (method === 'WIFI') verifyOfficeNetwork(req);
-  if (method === 'WFH') {
-    if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
-    const approved = await query(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`, { employee: req.user.id, date });
-    if (!approved[0]) throw Object.assign(new Error('An approved WFH request is required for today.'), { status: 403 });
+  if (method === 'WFH' && !approvedWfhToday[0]) {
+    // Only a request explicitly submitted as WFH must pass this check.
+    // Approved WFH above is allowed even if the client sent the old GPS mode.
+    if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) {
+      throw Object.assign(new Error('WFH has not been enabled for this employee and no approved WFH request was found for today.'), { status: 403 });
+    }
+    throw Object.assign(new Error('An approved WFH request is required for today.'), { status: 403 });
   }
   const approved = await query(`SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date LIMIT 1`, { employee: req.user.id, date });
   const approvedStart = approved[0]?.approved_start_time || null;
@@ -158,7 +168,11 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
   const input = validate(z.object({ method: z.enum(['GPS','WIFI','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
   const date = indiaDate();
   const settings = await getSettings();
-  let method = input.method;
+  const priorAttendance = await query(
+    `SELECT check_in_method, check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`,
+    { employee: req.user.id, date }
+  );
+  let method = priorAttendance[0]?.check_in_method === 'WFH' ? 'WFH' : input.method;
   let distance = null;
   if (method === 'GPS') {
     const gpsProvided = input.latitude !== undefined && input.longitude !== undefined && input.accuracy !== undefined;
@@ -182,7 +196,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     const [rows] = await connection.execute(`SELECT id, check_in_method, check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE`, { employee: req.user.id, date });
     if (!rows[0]) throw Object.assign(new Error('Check in first to finish today’s attendance.'), { status: 409 });
     if (rows[0].check_out_at) throw Object.assign(new Error('You have already checked out today.'), { status: 409 });
-    if (input.method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
+    if (method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
       id: rows[0].id, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null, accuracy: method === 'GPS' ? input.accuracy : null
     });
