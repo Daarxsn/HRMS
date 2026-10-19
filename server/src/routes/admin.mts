@@ -314,8 +314,9 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       });
     }
   });
-  await notify(employeeId, `${kind === 'correction' ? 'Attendance correction' : kind === 'flex' ? 'Flex-start request' : kind === 'wfh' ? 'WFH request' : 'Leave request'} ${input.decision === 'APPROVED' ? 'approved' : 'reviewed'}`,
-    input.decision === 'APPROVED' ? 'Your request has been approved.' : `Your request was not approved.${input.note ? ` Note: ${input.note}` : ''}`, 'APPROVAL', { type:kind, id:req.params.id });
+  const requestLabel = kind === 'correction' ? 'Attendance correction' : kind === 'flex' ? 'Flex-start request' : kind === 'wfh' ? 'WFH request' : 'Leave request';
+  await notify(employeeId, `${requestLabel} ${input.decision === 'APPROVED' ? 'approved' : 'declined'}`,
+    input.decision === 'APPROVED' ? 'Your request has been approved.' : `Your request was declined.${input.note ? ` Note: ${input.note}` : ''}`, 'APPROVAL', { type:kind, id:req.params.id, decision:input.decision });
   await audit({ actorId:req.user.id, action:`${kind.toUpperCase()}_${input.decision}`, entityType:`${kind}_request`, entityId:req.params.id, details:{ decision:input.decision, date:recordDate }, ipAddress:req.ip });
   res.json({ ok:true });
 }));
