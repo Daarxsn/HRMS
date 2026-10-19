@@ -121,6 +121,23 @@ async function main() {
     }
   }
 
+  if (!missingTables.has('employees')) {
+    try {
+      const activeAdminRows = await rows("SELECT COUNT(*) AS count FROM employees WHERE role='ADMIN' AND status='ACTIVE'");
+      const activeAdminCount = Number(activeAdminRows[0]?.count || 0);
+      report(activeAdminCount > 0 ? 'PASS' : 'FAIL', 'Migration 006 backfill prerequisite',
+        activeAdminCount > 0 ? 'At least one active administrator exists for employment-history backfill.' : 'No active administrator exists; migration 006 backfill would fail its required created_by value.');
+    } catch {
+      report('FAIL', 'Migration 006 backfill prerequisite', 'Could not verify an active administrator using a read-only count query.');
+    }
+  } else {
+    report('SKIP', 'Migration 006 backfill prerequisite', 'Employees table is missing; cannot check the required backfill actor.');
+  }
+
+  await zeroCount('Migration 008 preflight: duplicate active WFH dates',
+    'SELECT COUNT(*) AS count FROM (SELECT employee_id, request_date FROM wfh_requests WHERE status IN (\'PENDING\',\'APPROVED\') GROUP BY employee_id, request_date HAVING COUNT(*) > 1) AS active_request_duplicates',
+    ['wfh_requests']);
+
   const columns = await rows('SELECT TABLE_NAME AS tableName, COLUMN_NAME AS columnName, COLUMN_TYPE AS columnType, EXTRA AS extra, GENERATION_EXPRESSION AS generationExpression FROM information_schema.columns WHERE table_schema = DATABASE()');
   const columnMap = new Map<string, any>();
   for (const item of columns) columnMap.set(String(item.tableName).toLowerCase() + '.' + String(item.columnName).toLowerCase(), item);
