@@ -264,7 +264,7 @@ function NoAccess(){return <div className="no-access"><ShieldCheck size={30}/><h
 function weekDaysFor(date){const base=new Date(`${date}T12:00:00Z`);const weekday=base.getUTCDay();const mondayOffset=weekday===0?6:weekday-1;base.setUTCDate(base.getUTCDate()-mondayOffset);return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setUTCDate(base.getUTCDate()+i);return {date:d.toISOString().slice(0,10),label:['M','T','W','T','F','S','S'][i],working:i<6};});}
 
 function EmployeeHome(){
-  const {user,notifications,notify}=useApp();const [todayRow,setTodayRow]=useState(null);const [balance,setBalance]=useState([]);const [history,setHistory]=useState([]);const [weekRecords,setWeekRecords]=useState([]);const [holiday,setHoliday]=useState(null);const [calendarHolidays,setCalendarHolidays]=useState([]);const [leaveRequests,setLeaveRequests]=useState([]);const [wfhData,setWfhData]=useState({enabled:false,monthlyCap:4,requests:[]});const [time,setTime]=useState(new Date());const [todayOpen,setTodayOpen]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [dashboardRetry,setDashboardRetry]=useState(0);const homeRequest=useRef(0);
+  const {user,notifications,notify}=useApp();const [todayRow,setTodayRow]=useState(null);const [balance,setBalance]=useState([]);const [history,setHistory]=useState([]);const [weekRecords,setWeekRecords]=useState([]);const [holiday,setHoliday]=useState(null);const [calendarHolidays,setCalendarHolidays]=useState([]);const [leaveRequests,setLeaveRequests]=useState([]);const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',monthlyCap:4,requests:[]});const [time,setTime]=useState(new Date());const [todayOpen,setTodayOpen]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [dashboardRetry,setDashboardRetry]=useState(0);const homeRequest=useRef(0);
   useEffect(()=>{const timer=setInterval(()=>setTime(new Date()),30000);return()=>clearInterval(timer);},[]);
   const loadDashboard=async()=>{
     const requestId=++homeRequest.current;setLoading(true);
@@ -280,7 +280,7 @@ function EmployeeHome(){
     if(historyRows.status==='fulfilled'){setWeekRecords(historyRows.value.records||[]);setHistory((historyRows.value.records||[]).filter((row)=>row.attendance_date!==today).slice(0,5));}else unavailable.push('attendance history');
     if(calendar.status==='fulfilled'){setHoliday((calendar.value.holidays||[]).find((item)=>item.date===today)||null);setCalendarHolidays(calendar.value.holidays||[]);}else unavailable.push('holiday calendar');
     if(leave.status==='fulfilled')setLeaveRequests(leave.value.requests||[]);else unavailable.push('leave requests');
-    if(wfh.status==='fulfilled')setWfhData({enabled:Boolean(wfh.value.enabled),monthlyCap:Number(wfh.value.monthlyCap||4),requests:wfh.value.requests||[]});else unavailable.push('WFH summary');
+    if(wfh.status==='fulfilled')setWfhData({enabled:Boolean(wfh.value.enabled),approvedToday:wfh.value.approvedToday===true,today:String(wfh.value.today||today).slice(0,10),monthlyCap:Number(wfh.value.monthlyCap||4),requests:wfh.value.requests||[]});else unavailable.push('WFH summary');
     setError(unavailable.length?`Some overview details could not be refreshed: ${unavailable.join(', ')}. Retry to try again.`:'');setLoading(false);
   };
   useEffect(()=>{void loadDashboard();return()=>{homeRequest.current+=1;};},[dashboardRetry]);
@@ -289,7 +289,7 @@ function EmployeeHome(){
   const name=user.full_name.split(' ')[0];
   const earned=balance.find((b)=>b.type==='EARNED');
   const week=weekDaysFor(today);const holidayMap=new Map(calendarHolidays.map((item)=>[item.date,item.name]));const weekProgress=week.map((day)=>{const row=weekRecords.find((record)=>record.attendance_date===day.date);const holidayName=holidayMap.get(day.date);return {...day,row,holidayName,working:day.working&&!holidayName,completed:Boolean(row?.check_in_at&&row?.check_out_at),isCurrent:day.date===today};});
-  const completedDays=weekProgress.filter((day)=>day.completed).length;const remainingDays=weekProgress.filter((day)=>day.working&&day.date>=today&&!day.completed).length;const shared=balance.find((b)=>b.type==='CASUAL');const floating=balance.find((b)=>b.type==='FLOATING');const pendingLeave=leaveRequests.filter((item)=>item.status==='PENDING').length;const pendingWfh=wfhData.requests.filter((item)=>item.status==='PENDING').length;const approvedWfhThisMonth=wfhData.requests.filter((item)=>item.status==='APPROVED'&&String(item.request_date).slice(0,7)===today.slice(0,7)).length;const nextHoliday=calendarHolidays.find((item)=>item.date>today);const unread=Number(notifications?.unread||0);const latestAnnouncement=notifications?.notifications?.find((item)=>item.kind==='ANNOUNCEMENT')||null;const [punchBusy,setPunchBusy]=useState(false);const [punchError,setPunchError]=useState('');const approvedWfhToday=wfhData.enabled&&wfhData.requests.some((item)=>item.request_date===today&&item.status==='APPROVED');
+  const completedDays=weekProgress.filter((day)=>day.completed).length;const remainingDays=weekProgress.filter((day)=>day.working&&day.date>=today&&!day.completed).length;const shared=balance.find((b)=>b.type==='CASUAL');const floating=balance.find((b)=>b.type==='FLOATING');const pendingLeave=leaveRequests.filter((item)=>item.status==='PENDING').length;const pendingWfh=wfhData.requests.filter((item)=>item.status==='PENDING').length;const approvedWfhThisMonth=wfhData.requests.filter((item)=>item.status==='APPROVED'&&String(item.request_date).slice(0,7)===today.slice(0,7)).length;const nextHoliday=calendarHolidays.find((item)=>item.date>today);const unread=Number(notifications?.unread||0);const latestAnnouncement=notifications?.notifications?.find((item)=>item.kind==='ANNOUNCEMENT')||null;const [punchBusy,setPunchBusy]=useState(false);const [punchError,setPunchError]=useState('');const approvedWfhToday=wfhData.enabled&&(wfhData.approvedToday===true||wfhData.requests.some((item)=>String(item.request_date||'').slice(0,10)===String(wfhData.today||today).slice(0,10)&&String(item.status||'').toUpperCase()==='APPROVED'));
   const quickLocation=()=>new Promise((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
     let best=null;let watchId=null;let timeoutId=null;let settled=false;
@@ -529,7 +529,7 @@ function TodayDrawer({row,holiday,close}){
 }
 function AttendancePage(){
   const {user,notify,refresh}=useApp();
-  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [attendanceAvailable,setAttendanceAvailable]=useState(false);const attendanceRequest=useRef(0);const attendanceLoaded=useRef(false);const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [actionBusy,setActionBusy]=useState(false);const [actionError,setActionError]=useState('');const [wfhData,setWfhData]=useState({enabled:false,requests:[]});
+  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [attendanceAvailable,setAttendanceAvailable]=useState(false);const attendanceRequest=useRef(0);const attendanceLoaded=useRef(false);const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [actionBusy,setActionBusy]=useState(false);const [actionError,setActionError]=useState('');const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',requests:[]});
   const load=async()=>{
     const requestId=++attendanceRequest.current;
     if(!attendanceLoaded.current)setLoading(true);
@@ -541,7 +541,7 @@ function AttendancePage(){
     const [attendance,calendar,wfh]=results;const unavailable=[];
     if(attendance.status==='fulfilled'){setRows(attendance.value.records||[]);setAttendanceAvailable(true);}else unavailable.push('attendance history');
     if(calendar.status==='fulfilled')setTodayHoliday((calendar.value.holidays||[]).find((h)=>h.date===today)||null);else unavailable.push('holiday calendar');
-    if(user?.role!=='ADMIN'){if(wfh?.status==='fulfilled')setWfhData({enabled:Boolean(wfh.value.enabled),requests:wfh.value.requests||[]});else unavailable.push('WFH eligibility');}
+    if(user?.role!=='ADMIN'){if(wfh?.status==='fulfilled')setWfhData({enabled:Boolean(wfh.value.enabled),approvedToday:wfh.value.approvedToday===true,today:String(wfh.value.today||today).slice(0,10),requests:wfh.value.requests||[]});else unavailable.push('WFH eligibility');}
     setError(unavailable.length?`Could not refresh ${unavailable.join(' and ')}. Existing records are retained; retry when the connection is available.`:'');
     attendanceLoaded.current=true;setLoading(false);
   };
@@ -553,7 +553,7 @@ function AttendancePage(){
     return()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',refreshWhenVisible);attendanceRequest.current+=1;};
   },[user?.role]);
   const current=rows.find((r)=>r.attendance_date===today);
-  const approvedWfhToday=user?.role!=='ADMIN'&&wfhData.enabled&&wfhData.requests.some((r)=>r.request_date===today&&r.status==='APPROVED');
+  const approvedWfhToday=user?.role!=='ADMIN'&&wfhData.enabled&&(wfhData.approvedToday===true||wfhData.requests.some((r)=>String(r.request_date||'').slice(0,10)===String(wfhData.today||today).slice(0,10)&&String(r.status||'').toUpperCase()==='APPROVED'));
   const requestLocation=()=>new Promise((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
     let best=null;let settled=false;let watchId=null;let timeoutId=null;
