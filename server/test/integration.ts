@@ -115,6 +115,15 @@ try {
   });
   assert.equal(attendanceValidation.response.status, 400);
 
+  // A client can forge GPS coordinates, so a home/remote public IP must not
+  // pass office check-in merely by submitting the HQ coordinates.
+  const spoofedGpsAttempt = await request('/attendance/check-in', {
+    method:'POST',
+    headers:{ Cookie:employeeSession.cookie, 'X-Forwarded-For':'203.0.113.77' },
+    body:JSON.stringify({method:'GPS',latitude:18.506633,longitude:73.857692,accuracy:10})
+  });
+  assert.equal(spoofedGpsAttempt.response.status,403,'GPS coordinates without the approved office network must be rejected.');
+
   const adminSession = await signIn(admin.email);
   const adminMe = await request('/auth/me', {
     headers: { Cookie: adminSession.cookie }
