@@ -204,6 +204,11 @@ test('approved WFH check-in from employee overview does not request laptop or mo
     contentType: 'application/json',
     body: JSON.stringify({ enabled: true, approvedToday: true, today: '2026-10-19', monthlyCap: 4, requests: [] })
   }));
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ records: [] })
+  }));
   let attendancePostBody: Record<string, unknown> | null = null;
   await page.route('**/api/attendance/check-in', async (route) => {
     attendancePostBody = route.request().postDataJSON();
