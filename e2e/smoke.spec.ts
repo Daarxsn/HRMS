@@ -268,6 +268,14 @@ test('approved WFH check-in from the Attendance page bypasses office location ch
   await expect(page.getByText('Remote check-in recorded.')).toBeVisible();
 });
 
+test('employee documents page uses the real authenticated API', async ({ page }) => {
+  await signInDev(page, 'employee');
+  await openSidebarLink(page, 'My documents');
+  await expect(page.getByRole('heading', { name: 'My documents', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal documents', exact: true })).toBeVisible();
+  await expect(page.getByText('No documents available yet')).toBeVisible();
+});
+
 test('administrator operational pages load and keep the main actions accessible', async ({ page }) => {
   await signInDev(page, 'admin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
