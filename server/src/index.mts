@@ -17,7 +17,7 @@ import enterpriseRoutes from './routes/enterprise.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
-const BUILD_SHA = process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'development';
+const BUILD_SHA = process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || (process.env.NODE_ENV === 'production' ? 'production-unversioned' : 'development');
 const startedAt = Date.now();
 const logProcessFailure = (type: string, error: unknown) => {
   console.error(JSON.stringify({ type, error: String((error as any)?.stack || (error as any)?.message || error) }));
