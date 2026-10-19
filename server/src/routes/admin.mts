@@ -290,6 +290,18 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
     const item = rows[0];
     employeeId = item.employee_id;
     recordDate = item.start_date || item.request_date || item.attendance_date;
+    if (input.decision === 'APPROVED' && kind === 'leave') {
+      const [wfhConflict] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1`, { employee:item.employee_id, start:item.start_date, end:item.end_date });
+      if (wfhConflict[0]) throw Object.assign(new Error('This leave overlaps a pending or approved WFH request. Resolve the WFH request before approving leave.'), {status:409});
+      const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1`, { employee:item.employee_id, start:item.start_date, end:item.end_date });
+      if (attendanceConflict[0]) throw Object.assign(new Error('Attendance already exists during this leave period. Review the attendance record before approving leave.'), {status:409});
+    }
+    if (input.decision === 'APPROVED' && kind === 'wfh') {
+      const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:item.employee_id, date:item.request_date });
+      if (leaveConflict[0]) throw Object.assign(new Error('This WFH request overlaps a pending or approved leave request. Resolve the leave request before approving WFH.'), {status:409});
+      const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, { employee:item.employee_id, date:item.request_date });
+      if (attendanceConflict[0]) throw Object.assign(new Error('Attendance already exists for this date. Review the attendance record before approving WFH.'), {status:409});
+    }
     if (kind === 'correction' && input.decision === 'APPROVED') {
       const [existing] = await connection.execute('SELECT * FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: item.employee_id, date: item.attendance_date });
       const checkIn = item.requested_check_in_at || existing[0]?.check_in_at;
