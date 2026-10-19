@@ -82,6 +82,12 @@ assert.match(workplace,/res\.setHeader\('Cache-Control', 'private, no-store'\)/)
 assert.match(workplace,/req\.user\.wfh_enabled === true \|\| Number\(req\.user\.wfh_enabled\) === 1/);
 assert.match(attendance,/req\.user\.wfh_enabled === true \|\| Number\(req\.user\.wfh_enabled\) === 1/);
 assert.match(attendance,/An approved WFH request is required for today/);
+assert.match(attendance,/const approvedWfhToday = await query/);
+assert.match(attendance,/let method = approvedWfhToday\[0\] \? 'WFH' : input\.method/);
+assert.match(attendance,/const priorAttendance = await query/);
+assert.match(attendance,/priorAttendance\[0\]\?\.check_in_method === 'WFH' \? 'WFH' : input\.method/);
+assert.match(integration,/Server must promote an old GPS-mode request to WFH/);
+assert.match(integration,/WFH check-out must not require office geolocation/);
 assert.match(app,/wfhData\.approvedToday===true/);
 assert.match(app,/Your WFH is approved for today/);
 assert.match(e2e,/approved WFH check-in from employee overview does not request laptop or mobile GPS/);
