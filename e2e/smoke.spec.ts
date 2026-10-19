@@ -276,6 +276,35 @@ test('employee documents page uses the real authenticated API', async ({ page })
   await expect(page.getByText('No documents available yet')).toBeVisible();
 });
 
+test('employee check-in and checkout exercise the real attendance API', async ({ page }) => {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude:18.506633, longitude:73.857692, accuracy:10 });
+  await signInDev(page, 'employee');
+  const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:3001/api';
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Kolkata', year:'numeric', month:'2-digit', day:'2-digit'
+  }).format(new Date());
+  const readToday = async () => {
+    const response = await page.request.get(`${apiBase}/attendance?from=${date}&to=${date}`);
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    return (data.records||[]).find((row:any)=>row.attendance_date===date);
+  };
+  let record = await readToday();
+  if (!record?.check_in_at) {
+    await page.getByRole('button', { name:/Check in/i }).first().click();
+    await expect(page.getByText('Check-in recorded.')).toBeVisible();
+    record = await readToday();
+  }
+  expect(record?.check_in_at).toBeTruthy();
+  if (!record?.check_out_at) {
+    await page.getByRole('button', { name:/Check out/i }).first().click();
+    await expect(page.getByText('Check-out recorded.')).toBeVisible();
+    record = await readToday();
+  }
+  expect(record?.check_out_at).toBeTruthy();
+});
+
 test('administrator operational pages load and keep the main actions accessible', async ({ page }) => {
   await signInDev(page, 'admin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
