@@ -98,6 +98,12 @@ try {
   assert.equal(employeeMe.data.user.platform, 'PEOPLE');
   assert.equal(employeeMe.data.user.landingPath, '/');
 
+  const employeeDocuments = await request('/enterprise/employee/documents', {
+    headers:{ Cookie:employeeSession.cookie }
+  });
+  assert.equal(employeeDocuments.response.status,200,'Employees must be able to list their own HR documents.');
+  assert.ok(Array.isArray(employeeDocuments.data.documents));
+
   const employeeAdminAttempt = await request('/admin/system-health', {
     headers: { Cookie: employeeSession.cookie }
   });
