@@ -135,6 +135,7 @@ assert.match(rollback,/gcloud artifacts docker images describe/);
 assert.match(rollback,/gcloud run deploy/);
 assert.match(rollback,/Database migrations: not run during rollback/);
 assert.match(security,/session_version/);
+assert.match(security,/profile_photo_key, wfh_enabled, joined_on/);
 assert.match(security,/Your session has been revoked/);
 assert.match(security,/platformFor/);
 assert.match(security,/requirePeople/);
