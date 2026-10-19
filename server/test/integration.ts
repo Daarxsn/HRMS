@@ -11,6 +11,7 @@ const env = {
   PORT: String(port),
   APP_ORIGIN: `http://127.0.0.1:${port}`,
   DEMO_AUTH_ENABLED: 'true',
+  OFFICE_NETWORK_IPS: '198.51.100.10',
   JWT_SECRET: 'ci-integration-secret-0123456789-abcdefghijklmnopqrstuvwxyz'
 };
 
