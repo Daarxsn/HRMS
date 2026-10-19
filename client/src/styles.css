@@ -4185,3 +4185,29 @@ html[data-theme="dark"] .admin-hero {
   background: radial-gradient(circle at 80% 10%,rgba(218,175,81,.13),transparent 13rem),
     linear-gradient(135deg,rgba(147,19,20,.22),rgba(218,175,81,.08)),var(--ui-surface);
 }
+
+
+/* Approved remote-day state: keep the primary remote action clear on desktop and mobile. */
+.wfh-approved-today,
+.wfh-not-approved-today {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.wfh-approved-today > span,
+.wfh-not-approved-today > span {
+  flex: 1 1 230px;
+  min-width: 0;
+}
+.wfh-approved-today .button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+html[data-theme="dark"] .wfh-approved-today {
+  background: rgba(218,175,81,.11);
+  color: var(--ui-text);
+  border-color: rgba(218,175,81,.45);
+}
+@media(max-width:600px) {
+  .wfh-approved-today .button { flex: 1 1 100%; width: 100%; justify-content: center; }
+}
