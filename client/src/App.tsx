@@ -439,7 +439,7 @@ function AdminSelfAttendanceCard(){
       ? row.check_out_at
         ? {label:'Complete',title:'Your workday is complete.',body:`Checked in at ${formatTime(row.check_in_at)} · checked out at ${formatTime(row.check_out_at)}.`}
         : {label:'In progress',title:`Checked in at ${formatTime(row.check_in_at)}.`,body:'Your workday is underway. Check out when you leave the office.'}
-      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. Either office geofencing or the approved office network verifies attendance once per action.'};
+      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. GPS check-in requires office geofencing and the approved office network; if GPS is inaccurate, the approved office network can verify the check-in.'};
   return <Card className="admin-self-attendance-card">
     <div className="admin-self-attendance-copy">
       <div className="admin-self-attendance-kicker"><span className="pulse-dot"/><span>YOUR ATTENDANCE</span><small>{new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(time)} IST</small></div>
@@ -1233,7 +1233,7 @@ function SettingsPage(){
             <div><small>Attendance gate</small><b>{network.configured?'GPS or Wi-Fi':'GPS geofence · Wi-Fi fallback needs setup'}</b></div>
             <div><small>Tracking</small><b>One-time check only</b></div>
           </div>:<InlineError>{healthError || 'Network verification status is unavailable.'}</InlineError>}
-          <div className="privacy-promise"><ShieldCheck size={16}/><span>GPS geofencing and office-network verification are alternatives: either a valid office location or a matching office public egress IP is sufficient. Browsers cannot expose the Wi-Fi name, so network fallback requires the office public IP in OFFICE_NETWORK_IPS. If that IP changes, update the production environment and redeploy. Never add a home or hotspot IP to bypass verification.</span></div>
+          <div className="privacy-promise"><ShieldCheck size={16}/><span>For anti-spoof protection, GPS check-in requires both an in-office GPS fix and a matching approved office public egress IP. If GPS is inaccurate, HRMS can fall back to the same approved office network. Browsers cannot expose the Wi-Fi name; if the office public IP changes, update OFFICE_NETWORK_IPS in the production environment and redeploy. Never add a home or hotspot IP to bypass verification.</span></div>
         </Card>
 
         <Card className="settings-card">
