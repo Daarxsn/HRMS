@@ -67,9 +67,16 @@ router.get('/files/:id', asyncRoute(async (req, res) => {
 }));
 
 router.get('/wfh', requirePeople, asyncRoute(async (req, res) => {
-  const requests = await query(`SELECT id, request_date, request_kind, reason, status, reviewer_note, created_at FROM wfh_requests WHERE employee_id=:employee ORDER BY request_date DESC LIMIT 100`, { employee: req.user.id });
+  const employee = req.user.id;
+  const today = indiaDate();
+  // Serialize MySQL DATE values as a stable yyyy-mm-dd key rather than relying
+  // on browser or driver timezone parsing for daily approval detection.
+  const requests = await query(`SELECT id, DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date, request_kind, reason, status, reviewer_note, created_at FROM wfh_requests WHERE employee_id=:employee ORDER BY request_date DESC LIMIT 100`, { employee });
+  const todayApproval = await query(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`, { employee, date: today });
   const setting = await query(`SELECT setting_value FROM system_settings WHERE setting_key='wfh_monthly_cap'`);
-  res.json({ enabled: Boolean(req.user.wfh_enabled), monthlyCap: Number(setting[0]?.setting_value || 4), requests });
+  const enabled = req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1;
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ enabled, today, approvedToday: Boolean(todayApproval[0]), monthlyCap: Number(setting[0]?.setting_value || 4), requests });
 }));
 router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, kind: z.enum(['PLANNED','EMERGENCY']), reason: z.string().trim().min(8).max(1000) }), req.body);
