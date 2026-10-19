@@ -186,6 +186,14 @@ async function main() {
     ? 'Old all-status index uq_wfh_employee_day remains.' : 'Old all-status WFH index is absent.');
 
   const foreignKeys = await rows('SELECT TABLE_NAME AS tableName, CONSTRAINT_NAME AS constraintName FROM information_schema.table_constraints WHERE constraint_schema = DATABASE() AND constraint_type = \'FOREIGN KEY\'');
+  const legacyWfhUnique = indexes.some((item) => String(item.tableName).toLowerCase() === 'wfh_requests' && item.indexName === 'uq_wfh_employee_day');
+  const legacyWfhForeignKey = foreignKeys.some((item) => String(item.tableName).toLowerCase() === 'wfh_requests' && item.constraintName === 'fk_wfh_employee');
+  if (legacyWfhUnique) {
+    report(legacyWfhForeignKey ? 'PASS' : 'FAIL', 'Migration 008 legacy WFH prerequisite',
+      legacyWfhForeignKey ? 'Legacy WFH employee foreign key exists for the 008 replacement ALTER.' : 'Legacy unique index exists but fk_wfh_employee is missing; do not run migration 008 until this schema drift is reviewed.');
+  } else {
+    report('SKIP', 'Migration 008 legacy WFH prerequisite', 'Legacy unique index is already absent; inspect active WFH index/foreign-key state before running an unrecorded migration.');
+  }
   const expectedFks = [
     ['attendance_records','fk_attendance_employee'],
     ['leave_requests','fk_leave_employee'],
