@@ -309,12 +309,12 @@ function EmployeeHome(){
           :locationFailureMessage(geoError,'office check-in')));
       }
     };
-    watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+    watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
     timeoutId=globalThis.setTimeout(()=>{
       if(best&&best.accuracy<=100)finish(null,best);
       else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'));
       else finish(new Error(locationFailureMessage({code:3},'office check-in')));
-    },10000);
+    },5000);
   });
   const quickPunch=async(type)=>{
     if(punchBusy||holiday)return;
@@ -420,7 +420,7 @@ function AdminSelfAttendanceCard(){
     navigator.geolocation.getCurrentPosition(
       ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
       (geoError)=>reject(new Error(locationFailureMessage(geoError,'office attendance'))),
-      {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+      {enableHighAccuracy:true,timeout:5000,maximumAge:0}
     );
   });
   const punch=async(type)=>{
