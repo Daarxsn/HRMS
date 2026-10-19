@@ -367,7 +367,7 @@ function EmployeeHome(){
       <Card className="action-center-card">
         <CardHeading title="What needs your attention" subtitle={(pendingLeave||pendingWfh||unread||(!holiday&&!todayRow?.check_in_at)||Boolean(todayRow?.check_in_at&&!todayRow?.check_out_at))?"A few useful next steps for today.":"You’re all caught up."}/>
         <div className="employee-action-grid">
-          <Link className={`employee-action-item${!holiday&&!todayRow?.check_in_at?" action-item-primary":""}`} to="/attendance"><span className="employee-action-icon"><Clock3 size={17}/></span><span><b>{holiday?"Holiday today":todayRow?.check_in_at?(todayRow.check_out_at?"Review today":"Check out when you leave"):"Check in when you arrive"}</b><small>{holiday?"Attendance is not expected.":todayRow?.check_in_at?(todayRow.check_out_at?"Your attendance record is complete.":"Location is checked once at check-out."):"Location + office network are verified only when you press the attendance action."}</small></span><ArrowRight size={15}/></Link>
+          <Link className={`employee-action-item${!holiday&&!todayRow?.check_in_at?" action-item-primary":""}`} to="/attendance"><span className="employee-action-icon"><Clock3 size={17}/></span><span><b>{holiday?"Holiday today":todayRow?.check_in_at?(todayRow.check_out_at?"Review today":"Check out when you leave"):"Check in when you arrive"}</b><small>{holiday?"Attendance is not expected.":todayRow?.check_in_at?(todayRow.check_out_at?"Your attendance record is complete.":"Location is checked once at check-out."):"Either the office geofence or approved office network can verify attendance; laptop GPS can fall back to office Wi-Fi."}</small></span><ArrowRight size={15}/></Link>
           <Link className="employee-action-item" to="/leave"><span className="employee-action-icon"><CalendarDays size={17}/></span><span><b>{pendingLeave?pendingLeave+" pending leave request"+(pendingLeave===1?"":"s"):"Leave balances ready"}</b><small>{shared?.remaining??0} shared casual/sick · {earned?.remaining??0} earned · {floating?.remaining??0} floating</small></span><ArrowRight size={15}/></Link>
           {wfhData.enabled&&<Link className="employee-action-item" to="/wfh"><span className="employee-action-icon"><House size={17}/></span><span><b>{pendingWfh?pendingWfh+" pending WFH request"+(pendingWfh===1?"":"s"):"WFH available by approval"}</b><small>{approvedWfhThisMonth+"/"+wfhData.monthlyCap+" approved this month"}</small></span><ArrowRight size={15}/></Link>}
           <Link className="employee-action-item employee-action-button" to="/notifications"><span className="employee-action-icon"><Bell size={17}/></span><span><b>{unread?unread+" unread notification"+(unread===1?"":"s"):"No unread notifications"}</b><small>{unread?"Review approvals and updates from your team.":"You’re all caught up on updates."}</small></span><ArrowRight size={15}/></Link>
@@ -439,7 +439,7 @@ function AdminSelfAttendanceCard(){
       ? row.check_out_at
         ? {label:'Complete',title:'Your workday is complete.',body:`Checked in at ${formatTime(row.check_in_at)} · checked out at ${formatTime(row.check_out_at)}.`}
         : {label:'In progress',title:`Checked in at ${formatTime(row.check_in_at)}.`,body:'Your workday is underway. Check out when you leave the office.'}
-      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. Location is verified once for the attendance action.'};
+      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. Either office geofencing or the approved office network verifies attendance once per action.'};
   return <Card className="admin-self-attendance-card">
     <div className="admin-self-attendance-copy">
       <div className="admin-self-attendance-kicker"><span className="pulse-dot"/><span>YOUR ATTENDANCE</span><small>{new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(time)} IST</small></div>
@@ -1211,7 +1211,7 @@ function SettingsPage(){
     {loading?<Card className="settings-loading"><Spinner/></Card>:!settingsAvailable?<div className="admin-empty-recovery"><CircleAlert size={18}/><b>Office settings unavailable</b><span>Settings were not changed. Retry the request before editing attendance or WFH configuration.</span><Button variant="soft" size="small" onClick={()=>void load()}>Retry settings</Button></div>:<div className="settings-layout">
       <div className="settings-main">
         <Card className="settings-card">
-          <CardHeading title="Pune HQ attendance" subtitle="Office attendance requires a one-time location check and the configured office network."/>
+          <CardHeading title="Pune HQ attendance" subtitle="Office attendance is verified by either the geofence or approved office network."/>
           <form className="form-stack" onSubmit={save}>
             <label className="form-field"><span>Office name</span><input value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label>
             <div className="form-two"><label className="form-field"><span>Latitude</span><input type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div>
@@ -1222,7 +1222,7 @@ function SettingsPage(){
         </Card>
 
         <Card className="settings-card">
-          <CardHeading title="Office network verification" subtitle="GPS attendance checks the public IP seen by the API against the OFFICE_NETWORK_IPS allow-list—not the Wi-Fi name or connection icon."/>
+          <CardHeading title="Office network verification" subtitle="When GPS is inaccurate, HRMS falls back to the public IP seen by the API and checks it against OFFICE_NETWORK_IPS—not the Wi-Fi name or connection icon."/>
           {healthLoading?<div className="settings-loading"><Spinner/></div>:network?<div className="settings-health-grid">
             <div><small>Configuration</small><b>{network.configured?'Ready':'Not configured'}</b></div>
             <div><small>Public IP match</small><b>{network.matchedCurrentRequest?'Matches allow-list':'No allow-list match'}</b></div>
@@ -1231,7 +1231,7 @@ function SettingsPage(){
             <div><small>Attendance gate</small><b>{network.configured?'Location + Wi-Fi':'Configuration required'}</b></div>
             <div><small>Tracking</small><b>One-time check only</b></div>
           </div>:<InlineError>{healthError || 'Network verification status is unavailable.'}</InlineError>}
-          <div className="privacy-promise"><ShieldCheck size={16}/><span>Wi-Fi can show “Connected” while this check does not match. When on the actual office Wi-Fi, compare the IP seen by the API with the configured office public egress IPs. If the office internet IP changed, update OFFICE_NETWORK_IPS in the production environment and redeploy. Do not add a home or hotspot IP just to bypass the office check.</span></div>
+          <div className="privacy-promise"><ShieldCheck size={16}/><span>GPS geofencing and office-network verification are alternatives: either a valid office location or a matching office public egress IP is sufficient. Browsers cannot expose the Wi-Fi name, so network fallback requires the office public IP in OFFICE_NETWORK_IPS. If that IP changes, update the production environment and redeploy. Never add a home or hotspot IP to bypass verification.</span></div>
         </Card>
 
         <Card className="settings-card">
