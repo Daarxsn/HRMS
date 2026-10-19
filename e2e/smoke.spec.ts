@@ -184,6 +184,85 @@ test('GPS check-in falls back to approved office Wi-Fi when laptop location is u
 });
 
 
+
+test('approved WFH check-in from employee overview does not request laptop or mobile GPS', async ({ page }) => {
+  await page.addInitScript(() => {
+    const geolocation = {
+      watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 0);
+        return 1;
+      },
+      clearWatch() {},
+      getCurrentPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 0);
+      }
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+  await page.route('**/api/wfh', async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ enabled: true, approvedToday: true, today: '2026-10-19', monthlyCap: 4, requests: [] })
+  }));
+  let attendancePostBody: Record<string, unknown> | null = null;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'WFH', attendanceId: 'e2e-approved-wfh-home' })
+    });
+  });
+  await signInDev(page, 'employee');
+  await expect(page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in remotely' })).toBeVisible();
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in remotely' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method).toBe('WFH');
+  await expect(page.getByText('Remote check-in recorded.')).toBeVisible();
+});
+
+test('approved WFH check-in from the Attendance page bypasses office location checks', async ({ page }) => {
+  await page.addInitScript(() => {
+    const geolocation = {
+      watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 0);
+        return 1;
+      },
+      clearWatch() {},
+      getCurrentPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        window.setTimeout(() => error({ code: 2, message: 'Position unavailable' }), 0);
+      }
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+  await page.route('**/api/wfh', async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ enabled: true, approvedToday: true, today: '2026-10-19', monthlyCap: 4, requests: [] })
+  }));
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ records: [] })
+  }));
+  let attendancePostBody: Record<string, unknown> | null = null;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'WFH', attendanceId: 'e2e-approved-wfh-attendance' })
+    });
+  });
+  await signInDev(page, 'employee');
+  await page.goto('/attendance');
+  await expect(page.locator('.attendance-overview-card').getByRole('button', { name: 'Check in remotely' })).toBeVisible();
+  await page.locator('.attendance-overview-card').getByRole('button', { name: 'Check in remotely' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method).toBe('WFH');
+  await expect(page.getByText('Remote check-in recorded.')).toBeVisible();
+});
+
 test('administrator operational pages load and keep the main actions accessible', async ({ page }) => {
   await signInDev(page, 'admin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
