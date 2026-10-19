@@ -5,7 +5,7 @@ import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
-import { audit, requireAuth, requirePeople, notifyAdmins } from '../security.mts';
+import { audit, requireAuth, requireAdmin, requirePeople, notifyAdmins } from '../security.mts';
 import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, isScheduledWorkday } from '../policy.mts';
@@ -149,8 +149,7 @@ router.get('/calendar', asyncRoute(async (req, res) => {
   for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, {name,kind:'FIXED'});
   res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,item]) => ({ date, name:item.name, kind:item.kind })) });
 }));
-router.post('/calendar', asyncRoute(async (req, res) => {
-  if (req.user.role !== 'ADMIN') throw Object.assign(new Error('Administrator access is required.'), { status: 403 });
+router.post('/calendar', requireAdmin, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, name: z.string().trim().min(2).max(160), kind: z.enum(['FIXED','FLOATING']).default('FLOATING') }), req.body);
   await query(`INSERT INTO company_holidays (holiday_date, name, holiday_kind, created_by) VALUES (:date, :name, :kind, :actor)
     ON DUPLICATE KEY UPDATE name=VALUES(name), holiday_kind=VALUES(holiday_kind), created_by=VALUES(created_by)`, { date: input.date, name: input.name, kind: input.kind, actor: req.user.id });
