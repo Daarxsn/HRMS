@@ -200,6 +200,8 @@ assert.match(leave,/input\.type === 'SICK' \? 'Sick leave'/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);
 assert.match(attendance,/OFF_PREMISES/);
+assert.match(attendance,/Browser coordinates are client-controlled/);
+assert.match(attendance,/verifyOfficeNetwork\(req\);\s*method = 'GPS'/);
 assert.match(attendance,/approvedStartByDate/);
 assert.match(admin,/approvedStartByEmployeeDate/);
 assert.match(workplace,/A pending or approved WFH request already exists for this date/);
