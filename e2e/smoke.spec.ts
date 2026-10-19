@@ -150,7 +150,7 @@ test('WFH access outage offers retry instead of claiming access is disabled', as
 });
 
 
-test('GPS check-in distinguishes unavailable location from denied permission', async ({ page }) => {
+test('GPS check-in falls back to approved office Wi-Fi when laptop location is unavailable', async ({ page }) => {
   await page.addInitScript(() => {
     const geolocation = {
       watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
@@ -165,16 +165,22 @@ test('GPS check-in distinguishes unavailable location from denied permission', a
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
   });
 
-  let attendancePostAttempted = false;
+  let attendancePostBody: Record<string, unknown> | null = null;
   await page.route('**/api/attendance/check-in', async (route) => {
-    attendancePostAttempted = true;
-    await route.continue();
+    attendancePostBody = route.request().postDataJSON();
+    // Keep this as a client fallback test and avoid mutating the shared E2E attendance record.
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'WIFI', attendanceId: 'e2e-wifi-fallback' })
+    });
   });
   await signInDev(page, 'employee');
-  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' }).click();
-  await expect(page.getByText(/Chrome could not determine your Mac’s location for office check-in/i)).toBeVisible();
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method).toBe('WIFI');
+  await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
   await expect(page.getByText(/open Site settings.*set Location to Allow/i)).toHaveCount(0);
-  expect(attendancePostAttempted).toBe(false);
 });
 
 
