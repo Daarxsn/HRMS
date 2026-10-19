@@ -321,9 +321,10 @@ function EmployeeHome(){
     setPunchBusy(true);setPunchError('');
     const method=type==='check-out'&&todayRow?.check_in_method==='WFH'?'WFH':approvedWfhToday&&type==='check-in'?'WFH':'GPS';
     try{
-      const geo=method==='GPS'?await quickLocation():{};
-      await post(`/attendance/${type}`,{method,...geo});
-      notify(type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.'));
+      let geo={};let verifiedMethod=method;
+      if(method==='GPS'){try{geo=await quickLocation();}catch(locationError){verifiedMethod='WIFI';}}
+      await post(`/attendance/${type}`,{method:verifiedMethod,...geo});
+      notify(type==='check-in'?(verifiedMethod==='WFH'?'Remote check-in recorded.':verifiedMethod==='WIFI'?'Check-in recorded using approved office Wi-Fi.':'Check-in recorded.'):(verifiedMethod==='WFH'?'Remote check-out recorded.':verifiedMethod==='WIFI'?'Check-out recorded using approved office Wi-Fi.':'Check-out recorded.'));
       try{const a=await get(`/attendance?from=${today}&to=${today}`);setTodayRow(a.records?.[0]||null);setWeekRecords((prev)=>[...prev.filter((row)=>row.attendance_date!==today),...(a.records||[])]);}
       catch{setError('Your attendance action was recorded, but the latest status could not be refreshed. Retry the overview to confirm it.');}
     }catch(e){setPunchError(e.message||'The attendance action could not be completed.');}
@@ -425,10 +426,11 @@ function AdminSelfAttendanceCard(){
   const punch=async(type)=>{
     setBusy(true);setError('');
     try{
-      const geo=await getLocation();
-      await post(`/attendance/${type}`,{method:'GPS',...geo});
+      let geo={};let method='GPS';
+      try{geo=await getLocation();}catch(locationError){method='WIFI';}
+      await post(`/attendance/${type}`,{method,...geo});
       await load();
-      notify(type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.');
+      notify(method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.');
     }catch(e){setError(e.message);}finally{setBusy(false);}
   };
   const state=holiday
@@ -572,11 +574,12 @@ function AttendancePage(){
   const punch=async(type)=>{
     setActionBusy(true);setActionError('');
     try{
-      const method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
-      const geo=method==='GPS'?await requestLocation():{};
+      let method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
+      let geo={};
+      if(method==='GPS'){try{geo=await requestLocation();}catch(locationError){method='WIFI';}}
       await post(`/attendance/${type}`,{method,...geo});
       await load();
-      notify(type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.'));
+      notify(method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.'));
     }catch(e){setActionError(e.message);}
     finally{setActionBusy(false);}
   };const statusLabel=todayHoliday?'Holiday':!attendanceAvailable?(loading?'Loading':'Unavailable'):current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';
