@@ -116,7 +116,7 @@ console.log('Frontend smoke contracts: PASS');
 
 assert.ok(app.includes('GPS check-in requires both an in-office GPS fix and a matching approved office public egress IP'), 'Attendance settings must explain the dual-signal anti-spoof policy');
 assert.ok(app.includes('office public egress IP'), 'Office network diagnostics must explain the public IP used for network fallback');
-assert.ok(app.includes('If that IP changes'), 'Office network diagnostics must explain how to recover from a changed public IP');
+assert.ok(app.includes('if the office public IP changes'), 'Office network diagnostics must explain how to recover from a changed public IP');
 
 assert.ok(app.includes('function locationFailureMessage(error, action='), 'Geolocation errors need a shared, code-specific explanation');
 assert.ok(app.includes('Chrome could not determine your Mac’s location'), 'Unavailable position must not be misreported as denied permission');
