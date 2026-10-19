@@ -171,8 +171,11 @@ assert.match(app,/All HR request emails are sent to one designated HR mailbox/);
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/leave/);
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/workplace\/wfh/);
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await post\('\/attendance\/(corrections|flex-requests)/);
-assert.match(main,/gmailSendScope/);
-assert.match(main,/GmailAccessBridge/);
+assert.doesNotMatch(main,/gmail\.send|GmailAccessBridge|useGoogleLogin/);
+assert.match(index,/Permissions-Policy/);
+assert.match(workplace,/router\.post\('\/calendar', requireAdmin/);
+assert.match(enterprise,/router\.get\('\/employee\/documents'/);
+assert.match(enterprise,/employee_documents WHERE id=:id AND employee_id=:employee/);
 
 
 assert.match(admin,/router\.get\('\/reports\.csv'/);
@@ -196,6 +199,7 @@ const workflowMigration=fs.readFileSync(path.join(root,'migrations/008_attendanc
 // Regression checks for the October 2026 forensic audit fixes.
 assert.match(filesSeedForAudit,/setting_value=VALUES\(setting_value\)/);
 assert.match(leave,/accrualStart/);
+assert.match(leave,/input\.type === 'SICK' \? 'Sick leave'/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);
 assert.match(attendance,/OFF_PREMISES/);
