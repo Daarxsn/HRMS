@@ -96,7 +96,7 @@ router.get('/', asyncRoute(async (req, res) => {
 
 router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const schema = z.object({
-    method: z.enum(['GPS','WFH']),
+    method: z.enum(['GPS','WIFI','WFH']),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
     accuracy: z.number().min(0).optional(),
@@ -131,6 +131,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
       }
     }
   }
+  if (method === 'WIFI') verifyOfficeNetwork(req);
   if (method === 'WFH') {
     if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
     const approved = await query(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`, { employee: req.user.id, date });
@@ -154,15 +155,26 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
 }));
 
 router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ method: z.enum(['GPS','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
+  const input = validate(z.object({ method: z.enum(['GPS','WIFI','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
   const date = indiaDate();
   const settings = await getSettings();
+  let method = input.method;
   let distance = null;
-  if (input.method === 'GPS') {
-    if (input.latitude === undefined || input.longitude === undefined || input.accuracy === undefined) throw Object.assign(new Error('Allow location access and try again.'), { status: 400 });
-    if (input.accuracy > Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) throw Object.assign(new Error('Location accuracy is too low. Move to an open area and try again.'), { status: 422 });
-    distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
-    if (distance > Number(settings.geofence_meters || POLICY.geofenceMeters)) throw Object.assign(new Error('You are outside the office radius.'), { status: 422 });
+  if (method === 'GPS') {
+    const gpsProvided = input.latitude !== undefined && input.longitude !== undefined && input.accuracy !== undefined;
+    let gpsVerified = false;
+    if (gpsProvided && input.accuracy <= Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) {
+      distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
+      gpsVerified = distance <= Number(settings.geofence_meters || POLICY.geofenceMeters);
+    }
+    if (!gpsVerified) {
+      try { verifyOfficeNetwork(req); method = 'WIFI'; distance = null; }
+      catch {
+        if (!gpsProvided) throw Object.assign(new Error('Location could not be verified. Allow browser location or connect to the approved office Wi-Fi, then retry.'), { status: 422 });
+        throw Object.assign(new Error('GPS accuracy is too low or you are outside the office radius, and this network is not on the approved office Wi-Fi list.'), { status: 422 });
+      }
+    }
+  } else if (method === 'WIFI') {
     verifyOfficeNetwork(req);
   }
   let result;
@@ -171,7 +183,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     if (!rows[0]) throw Object.assign(new Error('Check in first to finish today’s attendance.'), { status: 409 });
     if (rows[0].check_out_at) throw Object.assign(new Error('You have already checked out today.'), { status: 409 });
     if (input.method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
-    const method = input.method;
+    const checkoutMethod = method;
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
       id: rows[0].id, method, lat: input.method === 'GPS' ? input.latitude : null, lon: input.method === 'GPS' ? input.longitude : null, accuracy: input.method === 'GPS' ? input.accuracy : null
     });
