@@ -131,7 +131,7 @@ try {
     headers:{ Cookie:employeeSession.cookie, 'X-Forwarded-For':'198.51.100.10' },
     body:JSON.stringify({method:'GPS',latitude:18.506633,longitude:73.857692,accuracy:10})
   });
-  assert.equal(spoofedGpsAttempt.response.status,422,'Client-supplied X-Forwarded-For and GPS coordinates must not bypass the office IP allow-list.');
+  assert.equal(spoofedGpsAttempt.response.status,403,'Client-supplied X-Forwarded-For and GPS coordinates must not bypass the office IP allow-list.');
 
   const adminSession = await signIn(admin.email);
   const adminMe = await request('/auth/me', {
