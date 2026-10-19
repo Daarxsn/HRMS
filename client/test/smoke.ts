@@ -61,7 +61,7 @@ assert.ok(!/\balert\s*\(/.test(app), 'Browser alert() should not be used in the 
 assert.ok(!/\balert\s*\(/.test(enterprise), 'Enterprise HR actions must not use blocking browser alerts');
 assert.ok(sw.includes("url.pathname.startsWith('/api/')"), 'Service worker must exclude API responses');
 assert.ok(manifest.includes('"display": "standalone"'), 'PWA standalone display contract missing');
-assert.ok(index.includes('Permissions-Policy'), 'Browser Permissions-Policy contract missing');
+assert.ok(!index.includes('http-equiv="Permissions-Policy"'), 'Permissions-Policy must be delivered as an HTTP response header, not an HTML meta tag');
 assert.ok(index.includes('strict-origin-when-cross-origin'), 'Referrer policy contract missing');
 
 for (const secretName of ['JWT_SECRET', 'DB_PASSWORD', 'GCS_PRIVATE_KEY']) {
