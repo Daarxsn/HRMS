@@ -96,8 +96,12 @@ router.get('/admin/employees/:id/lifecycle',adminLimiter,asyncRoute(async(req,re
 router.post('/admin/employees/:id/onboarding',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({title:z.string().trim().min(2).max(180),category:z.string().trim().min(2).max(80).default('GENERAL'),dueDate:dateSchema.nullable().optional(),notes:z.string().trim().max(1000).nullable().optional()}),req.body);
   const employee=await query('SELECT id FROM employees WHERE id=:id LIMIT 1',{id:req.params.id}); if(!employee[0]) throw Object.assign(new Error('Employee not found.'),{status:404});
-  const id=crypto.randomUUID(); await query('INSERT INTO onboarding_tasks (id,employee_id,title,category,due_date,notes,created_by) VALUES (:id,:employee,:title,:category,:dueDate,:notes,:admin)',{id,employee:req.params.id,title:input.title,category:input.category,dueDate:input.dueDate||null,notes:input.notes||null,admin:req.user.id});
-  await audit({actorId:req.user.id,action:'ONBOARDING_TASK_CREATED',entityType:'onboarding_task',entityId:id,details:{employee_id:req.params.id,title:input.title},ipAddress:req.ip}); res.status(201).json({ok:true,id});
+  const id=crypto.randomUUID();
+  await transaction(async(connection)=>{
+    await connection.execute('INSERT INTO onboarding_tasks (id,employee_id,title,category,due_date,notes,created_by) VALUES (:id,:employee,:title,:category,:dueDate,:notes,:admin)',{id,employee:req.params.id,title:input.title,category:input.category,dueDate:input.dueDate||null,notes:input.notes||null,admin:req.user.id});
+    await connection.execute(`INSERT INTO audit_logs (id,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at) VALUES (:id,:actor,:action,:entity,:entityId,:details,:ip,UTC_TIMESTAMP())`,{id:crypto.randomUUID(),actor:req.user.id,action:'ONBOARDING_TASK_CREATED',entity:'onboarding_task',entityId:id,details:JSON.stringify({employee_id:req.params.id,title:input.title}),ip:req.ip});
+  });
+  res.status(201).json({ok:true,id});
 }));
 router.patch('/admin/onboarding/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({status:z.enum(['PENDING','IN_PROGRESS','COMPLETED','BLOCKED']),notes:z.string().trim().max(1000).nullable().optional()}),req.body);
