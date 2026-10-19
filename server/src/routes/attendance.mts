@@ -155,6 +155,10 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   const status = attendanceStatus(new Date(), approvedStart, String(settings.late_threshold || POLICY.lateThreshold));
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
+    // Serialize check-in against leave/WFH request creation and approval.
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', { employee:req.user.id });
+    const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:req.user.id, date });
+    if (leaveConflict[0]) throw Object.assign(new Error('You have a pending or approved leave request for today. Resolve it with HR before recording attendance.'), { status:409 });
     const [existing] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: req.user.id, date });
     if (existing[0]) throw Object.assign(new Error('Today’s attendance is already started.'), { status: 409 });
     await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
