@@ -1,5 +1,5 @@
--- Allow a new WFH request after a previous request is rejected or cancelled,
--- while still enforcing one pending/approved request per employee and date.
+-- Allow a new WFH request after a previous request is rejected or cancelled.
+-- Still enforce one pending/approved request per employee and date.
 ALTER TABLE wfh_requests DROP INDEX uq_wfh_employee_day;
 ALTER TABLE wfh_requests
   ADD COLUMN active_request_date DATE GENERATED ALWAYS AS (

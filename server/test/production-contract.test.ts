@@ -194,7 +194,7 @@ const filesSeedForAudit=fs.readFileSync(path.join(root,'src/seed.ts'),'utf8');
 const workflowMigration=fs.readFileSync(path.join(root,'migrations/008_attendance_workflow_integrity.sql'),'utf8');
 
 // Regression checks for the October 2026 forensic audit fixes.
-assert.match(filesSeedForAudit,/setting_value=VALUES\\(setting_value\\)/);
+assert.match(filesSeedForAudit,/setting_value=VALUES\(setting_value\)/);
 assert.match(leave,/accrualStart/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);

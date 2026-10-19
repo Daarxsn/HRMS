@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { query, transaction } from '../db.mts';
@@ -7,6 +8,8 @@ import { requireAuth } from '../security.mts';
 import { asyncRoute } from '../validate.mts';
 
 const router = Router();
+// Keep login attempts stricter than authenticated session-management requests.
+const googleLoginLimiter = rateLimit({ windowMs:15*60*1000, limit:10, standardHeaders:true, legacyHeaders:false });
 const googleClient = new OAuth2Client();
 const userSelect = `id, employee_code, full_name, email, role, user_type, status, title, phone, branch, department, position, profile_photo_key, wfh_enabled, joined_on, probation_end_date, session_version`;
 
@@ -26,7 +29,7 @@ router.post('/demo', asyncRoute(async (req, res) => {
   await audit({ actorId: user.id, action: 'AUTH_DEMO_SIGN_IN', entityType: 'employee', entityId: user.id, ipAddress: req.ip });
 }));
 
-router.post('/google', asyncRoute(async (req, res) => {
+router.post('/google', googleLoginLimiter, asyncRoute(async (req, res) => {
   const credential = req.body?.credential;
   if (typeof credential !== 'string' || credential.length > 5000) return res.status(400).json({ error: 'Google sign-in token is missing.' });
   if (!process.env.GOOGLE_CLIENT_ID) return res.status(503).json({ error: 'Google Sign-In is not configured yet.' });

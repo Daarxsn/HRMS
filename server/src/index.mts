@@ -77,7 +77,7 @@ const requestedE2EAuthLimit = Number(process.env.HRMS_E2E_AUTH_RATE_LIMIT || 0);
 const authRequestLimit = isolatedE2E && Number.isSafeInteger(requestedE2EAuthLimit)
   && requestedE2EAuthLimit >= 40 && requestedE2EAuthLimit <= 300
   ? requestedE2EAuthLimit
-  : 10;
+  : 40;
 app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:authRequestLimit,standardHeaders:true,legacyHeaders:false}));
 const healthPayload=(res,payload,status=200)=>{res.setHeader('Cache-Control','no-store');res.status(status).json(payload);};
 app.get('/api/health/live',(req,res)=>healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}));
