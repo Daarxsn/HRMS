@@ -14,6 +14,7 @@ const workplace=fs.readFileSync(path.join(root,'src/routes/workplace.mts'),'utf8
 const admin=fs.readFileSync(path.join(root,'src/routes/admin.mts'),'utf8');
 const enterprise=fs.readFileSync(path.join(root,'src/routes/enterprise.mts'),'utf8');
 const enterpriseMigration=fs.readFileSync(path.join(root,'migrations/006_enterprise_hr.sql'),'utf8');
+const wifiAttendanceMigration=fs.readFileSync(path.join(root,'migrations/007_wifi_attendance_method.sql'),'utf8');
 const validate=fs.readFileSync(path.join(root,'src/validate.mts'),'utf8');
 const dbTest=fs.readFileSync(path.join(root,'test/database-smoke.ts'),'utf8');
 const rollback=fs.readFileSync(path.join(root,'../.github/workflows/rollback-production.yml'),'utf8');
