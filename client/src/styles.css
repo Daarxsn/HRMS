@@ -4125,3 +4125,63 @@ html[data-theme="dark"] .employee-policy-inline-success {
   color: #f4e7c4;
   background: rgba(218,175,81,.10);
 }
+
+
+/* Final legacy-dashboard theme overrides. Older dashboard rules used fixed white/green
+   surfaces and were winning over the shared tokens on admin and employee screens. */
+html[data-theme] :is(.admin-intro,.admin-pulse-metrics>div,.table-toolbar,.employee-home-hero,
+  .employee-action-item,.employee-quick-card,.employee-summary-card,.admin-pulse-card,
+  .admin-review-preview,.team-presence,.approval-card,.announcement-card,.activity-card,
+  .system-health-card,.admin-attendance-card,.report-filter-card,.report-trend-card,
+  .report-leave-card,.audit-table-card,.people-table-card,.settings-card) {
+  background-color: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+html[data-theme] .admin-pulse-metrics>div,
+html[data-theme] .table-toolbar,
+html[data-theme] .employee-action-item {
+  background-image: none;
+}
+html[data-theme] .admin-hero {
+  color: var(--ui-text);
+  background: radial-gradient(circle at 80% 10%,rgba(218,175,81,.18),transparent 13rem),
+    linear-gradient(135deg,rgba(147,19,20,.09),rgba(218,175,81,.12)),var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+}
+html[data-theme] .admin-hero :is(h1,h2,p,span,small,b,strong) { color: inherit; }
+html[data-theme] .admin-pulse-metrics>div {
+  border-color: var(--ui-border);
+  box-shadow: none;
+}
+html[data-theme] .table-toolbar { border-bottom-color: var(--ui-border); }
+html[data-theme] .review-preview-item:hover,
+html[data-theme] .employee-action-item:hover { background: var(--ui-hover); }
+html[data-theme] .button-light {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+html[data-theme] .nav-active {
+  background: var(--ui-selected)!important;
+  color: var(--ui-text)!important;
+  border-color: rgba(218,175,81,.45);
+}
+html[data-theme] .nav-link { color: var(--ui-text-muted); }
+html[data-theme] .nav-link:hover { background: var(--ui-hover); color: var(--ui-text); }
+html[data-theme] .presence-donut:before { background: var(--ui-surface); }
+html[data-theme] .presence-donut {
+  background: conic-gradient(var(--fx-gold) var(--progress),var(--ui-border) 0);
+}
+html[data-theme] .admin-pulse-metrics>div :is(span,small),
+html[data-theme] .admin-attendance-foot,
+html[data-theme] .admin-pulse-foot,
+html[data-theme] .activity-item small,
+html[data-theme] .health-grid small {
+  color: var(--ui-text-muted);
+}
+html[data-theme="dark"] .admin-hero {
+  background: radial-gradient(circle at 80% 10%,rgba(218,175,81,.13),transparent 13rem),
+    linear-gradient(135deg,rgba(147,19,20,.22),rgba(218,175,81,.08)),var(--ui-surface);
+}
