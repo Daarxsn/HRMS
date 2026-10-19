@@ -173,11 +173,13 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
 
 router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ method: z.enum(['GPS','WIFI','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
-  const date = indiaDate();
+  const today = indiaDate();
   const settings = await getSettings();
+  // Find the most recent open shift, not only a row dated today. This allows
+  // employees to close a legitimate overnight shift after midnight.
   const priorAttendance = await query(
-    `SELECT check_in_method, check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`,
-    { employee: req.user.id, date }
+    `SELECT id,DATE_FORMAT(attendance_date,'%Y-%m-%d') AS attendance_date,check_in_method,check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date<=:today AND check_out_at IS NULL ORDER BY attendance_date DESC LIMIT 1`,
+    { employee:req.user.id, today }
   );
   let method = priorAttendance[0]?.check_in_method === 'WFH' ? 'WFH' : input.method;
   let distance = null;
@@ -202,16 +204,16 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
   }
   let result;
   await transaction(async (connection) => {
-    const [rows] = await connection.execute(`SELECT id, check_in_method, check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE`, { employee: req.user.id, date });
-    if (!rows[0]) throw Object.assign(new Error('Check in first to finish today’s attendance.'), { status: 409 });
-    if (rows[0].check_out_at) throw Object.assign(new Error('You have already checked out today.'), { status: 409 });
-    if (method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE',{employee:req.user.id});
+    const [rows] = await connection.execute(`SELECT id,attendance_date,check_in_method,check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date<=:today AND check_out_at IS NULL ORDER BY attendance_date DESC LIMIT 1 FOR UPDATE`, { employee:req.user.id, today });
+    if (!rows[0]) throw Object.assign(new Error('No open attendance shift was found. Check in first or contact HR if a previous shift needs correction.'), { status:409 });
+    if (method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status:403 });
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
-      id: rows[0].id, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null, accuracy: method === 'GPS' ? input.accuracy : null
+      id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
     });
-    result = { id: rows[0].id, method };
+    result = { id:rows[0].id, method, date:String(rows[0].attendance_date).slice(0,10) };
   });
-  await audit({ actorId: req.user.id, action: 'ATTENDANCE_CHECK_OUT', entityType: 'attendance', entityId: result.id, details: { method: result.method, date, distance_m: distance === null ? null : Math.round(distance) }, ipAddress: req.ip });
+  await audit({ actorId:req.user.id, action:'ATTENDANCE_CHECK_OUT', entityType:'attendance', entityId:result.id, details:{method:result.method,date:result.date,distance_m:distance===null?null:Math.round(distance)}, ipAddress:req.ip });
   res.json({ ok: true, method: result.method });
 }));
 
