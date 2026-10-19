@@ -133,7 +133,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   }
   if (method === 'WIFI') verifyOfficeNetwork(req);
   if (method === 'WFH') {
-    if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
+    if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) throw Object.assign(new Error('WFH is not enabled for this employee. Request approval or contact an administrator.'), { status: 403 });
     const approved = await query(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`, { employee: req.user.id, date });
     if (!approved[0]) throw Object.assign(new Error('An approved WFH request is required for today.'), { status: 403 });
   }
