@@ -17,6 +17,7 @@ const requiredRoutes = [
   'path="/leave"',
   'path="/wfh"',
   'path="/out"',
+  'path="/documents"',
   'path="/calendar"',
   'path="/profile"',
   'path="/team"',
