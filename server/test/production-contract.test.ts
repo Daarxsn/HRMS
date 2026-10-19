@@ -47,6 +47,8 @@ assert.match(objectStorage,/access: 'private'/);
 assert.match(workplace,/saveObject/);
 assert.match(workplace,/readObject/);
 assert.match(index,/APP_ORIGIN/);
+assert.match(index,/process\.env\.VERCEL === '1' \? 1 : false/);
+assert.match(index,/overwrites X-Forwarded-For at its edge/);
 assert.match(docker,/USER node/);
 assert.match(docker,/STOPSIGNAL SIGTERM/);
 assert.match(db,/connectTimeout: 10000/);
