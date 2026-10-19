@@ -13,6 +13,7 @@
     "test": "npm run test --workspace server",
     "db:migrate": "npm run migrate --workspace server",
     "db:seed": "npm run seed --workspace server",
+    "db:audit": "npm run db:audit --workspace server",
     "typecheck": "npm run typecheck --workspace client && npm run typecheck --workspace server"
   },
   "overrides": {
