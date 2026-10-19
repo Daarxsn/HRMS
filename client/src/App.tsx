@@ -568,8 +568,8 @@ function AttendancePage(){
           :locationFailureMessage(geoError,'office attendance')));
       }
     };
-    watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:10000,maximumAge:0});
-    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),10000);
+    watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),5000);
   });
   const punch=async(type)=>{
     setActionBusy(true);setActionError('');
