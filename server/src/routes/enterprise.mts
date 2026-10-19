@@ -101,10 +101,18 @@ router.post('/admin/employees/:id/onboarding',adminLimiter,asyncRoute(async(req,
 }));
 router.patch('/admin/onboarding/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const input=validate(z.object({status:z.enum(['PENDING','IN_PROGRESS','COMPLETED','BLOCKED']),notes:z.string().trim().max(1000).nullable().optional()}),req.body);
-  const rows=await query('SELECT id FROM onboarding_tasks WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]) throw Object.assign(new Error('Onboarding task not found.'),{status:404});
-  if(input.status==='COMPLETED') await query('UPDATE onboarding_tasks SET status=:status,notes=:notes,completed_at=UTC_TIMESTAMP(),completed_by=:admin WHERE id=:id',{status:input.status,notes:input.notes||null,admin:req.user.id,id:req.params.id});
-  else await query('UPDATE onboarding_tasks SET status=:status,notes=:notes,completed_at=NULL,completed_by=NULL WHERE id=:id',{status:input.status,notes:input.notes||null,id:req.params.id});
-  await audit({actorId:req.user.id,action:'ONBOARDING_TASK_UPDATED',entityType:'onboarding_task',entityId:req.params.id,details:{status:input.status},ipAddress:req.ip}); res.json({ok:true});
+  await transaction(async(connection)=>{
+    const [rows]=await connection.execute('SELECT id FROM onboarding_tasks WHERE id=:id LIMIT 1 FOR UPDATE',{id:req.params.id});
+    if(!rows[0]) throw Object.assign(new Error('Onboarding task not found.'),{status:404});
+    if(input.status==='COMPLETED') await connection.execute('UPDATE onboarding_tasks SET status=:status,notes=:notes,completed_at=UTC_TIMESTAMP(),completed_by=:admin WHERE id=:id',{status:input.status,notes:input.notes||null,admin:req.user.id,id:req.params.id});
+    else await connection.execute('UPDATE onboarding_tasks SET status=:status,notes=:notes,completed_at=NULL,completed_by=NULL WHERE id=:id',{status:input.status,notes:input.notes||null,id:req.params.id});
+    await connection.execute(`INSERT INTO audit_logs (id,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at)
+      VALUES (:id,:actor,:action,:entity,:entityId,:details,:ip,UTC_TIMESTAMP())`,{
+      id:crypto.randomUUID(),actor:req.user.id,action:'ONBOARDING_TASK_UPDATED',entity:'onboarding_task',entityId:req.params.id,
+      details:JSON.stringify({status:input.status}),ip:req.ip
+    });
+  });
+  res.json({ok:true});
 }));
 
 router.post('/admin/employees/:id/history',adminLimiter,asyncRoute(async(req,res)=>{
