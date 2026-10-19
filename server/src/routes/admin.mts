@@ -147,7 +147,7 @@ router.get('/system-health', asyncRoute(async (req, res) => {
     status: 'ok',
     service: 'falchion-xeniaa-api',
     version: process.env.APP_VERSION || '1.0.0',
-    build: process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'development',
+    build: process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || (process.env.NODE_ENV === 'production' ? 'production-unversioned' : 'development'),
     uptimeSeconds: Math.floor(process.uptime()),
     nodeVersion: process.version,
     mysqlVersion: rows[0]?.mysql_version || null,
