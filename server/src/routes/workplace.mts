@@ -80,7 +80,7 @@ router.get('/wfh', requirePeople, asyncRoute(async (req, res) => {
 }));
 router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, kind: z.enum(['PLANNED','EMERGENCY']), reason: z.string().trim().min(8).max(1000) }), req.body);
-  if (!req.user.wfh_enabled) throw Object.assign(new Error('WFH has not been enabled for this employee. Ask an administrator if your eligibility needs to change.'), { status: 403 });
+  if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) throw Object.assign(new Error('WFH has not been enabled for this employee. Ask an administrator if your eligibility needs to change.'), { status: 403 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
   if (input.kind === 'EMERGENCY' && input.date !== indiaDate()) throw Object.assign(new Error('Emergency WFH is for an unexpected same-day need. Use a planned request for a future date.'), { status:400 });
   const holidayRows=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date:input.date});
