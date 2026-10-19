@@ -211,6 +211,28 @@ function DocumentModal({save,close}) {
   return <Modal title="Upload HR document" close={close}><div className="form-stack"><label className="enterprise-field-label">Document title<input className="input" placeholder="e.g. Employment agreement" maxLength={180} value={title} onChange={e=>setTitle(e.target.value)}/></label><label className="enterprise-field-label">Document type<select className="input" value={type} onChange={e=>setType(e.target.value)}><option value="ID_PROOF">Identity proof</option><option value="CONTRACT">Employment contract</option><option value="OFFER_LETTER">Offer letter</option><option value="CERTIFICATE">Certificate</option><option value="OTHER">Other</option></select></label><div className="enterprise-form-pair"><label className="enterprise-field-label">Issue date<input className="input" type="date" max={expires||undefined} value={issued} onChange={e=>setIssued(e.target.value)}/></label><label className="enterprise-field-label">Expiry date<input className="input" type="date" min={issued||undefined} value={expires} onChange={e=>setExpires(e.target.value)}/></label></div>{invalidDates&&<p className="form-error" role="alert">Expiry date cannot be earlier than the issue date.</p>}<label className="enterprise-field-label">File (PDF, JPG, PNG or WebP; max 10 MB)<input className="input" type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/>{file&&<small>{file.name} · {(file.size/1024/1024).toFixed(2)} MB</small>}</label><button className="button button-primary" disabled={!file||!title.trim()||invalidDates||file.size>10*1024*1024} onClick={submit}>Upload securely</button></div></Modal>;
 }
 
+
+export function EmployeeDocumentsPage() {
+  const [documents,setDocuments]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const load=async()=>{
+    setLoading(true);
+    try { const result=await get('/enterprise/employee/documents'); setDocuments(result.documents||[]); setError(''); }
+    catch (err) { setError(err?.message||'Your documents could not be loaded. Please try again.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(()=>{void load();},[]);
+  return <div className="enterprise-page">
+    <div className="page-title"><div><div className="eyebrow">YOUR HR RECORDS</div><h1>My documents</h1><p>View and download employment documents HR has shared with your profile.</p></div><div className="page-title-action"><button className="button button-soft" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/>{loading?' Refreshing…':' Refresh'}</button></div></div>
+    {error&&<div className="inline-error" role="alert">{error}</div>}
+    <section className="card">
+      <div className="card-heading"><div><h2>Personal documents</h2><p>Only documents assigned to your employee profile are shown here.</p></div><span className="mini-status">{documents.length} document{documents.length===1?'':'s'}</span></div>
+      {loading?<div className="empty-state"><p>Loading your documents…</p></div>:documents.length===0?<div className="empty-state"><span className="empty-icon"><FileText size={21}/></span><h3>No documents available yet</h3><p>Documents shared by HR will appear here. Contact HR if you need a copy of a contract or payslip.</p></div>:<div className="table-scroll"><table><thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Issued</th><th>Expires</th><th>Access</th></tr></thead><tbody>{documents.map((doc)=><tr key={doc.id}><td><b>{doc.title}</b>{doc.description&&<div className="table-subline">{doc.description}</div>}</td><td>{String(doc.document_type||'OTHER').replaceAll('_',' ')}</td><td><Status value={doc.status}/></td><td>{doc.issued_on?formatDate(doc.issued_on):'—'}</td><td>{doc.expires_on?formatDate(doc.expires_on):'—'}</td><td><a className="button button-soft" href={assetUrl('/enterprise/employee/documents/'+encodeURIComponent(doc.id))} target="_blank" rel="noreferrer">Download</a></td></tr>)}</tbody></table></div>}
+    </section>
+  </div>;
+}
+
 export function EmployeePoliciesPage() {
   const [policies,setPolicies]=useState([]);
   const [loading,setLoading]=useState(true);
