@@ -113,9 +113,9 @@ assert.ok(css.includes('.employee-policy-error'), 'Policy errors must remain vis
 
 console.log('Frontend smoke contracts: PASS');
 
-assert.ok(app.includes('OFFICE_NETWORK_IPS allow-list—not the Wi-Fi name'), 'Office network settings must explain that Wi-Fi connectivity is not the public-IP allow-list check');
-assert.ok(app.includes('IP seen by API'), 'Office network diagnostics must label the IP the API observes');
-assert.ok(app.includes('If the office internet IP changed'), 'Office network diagnostics must explain how to recover from a changed public IP');
+assert.ok(app.includes('GPS geofencing and office-network verification are alternatives'), 'Attendance settings must explain that GPS and office-network checks are alternatives');
+assert.ok(app.includes('office public egress IP'), 'Office network diagnostics must explain the public IP used for network fallback');
+assert.ok(app.includes('If that IP changes'), 'Office network diagnostics must explain how to recover from a changed public IP');
 
 assert.ok(app.includes('function locationFailureMessage(error, action='), 'Geolocation errors need a shared, code-specific explanation');
 assert.ok(app.includes('Chrome could not determine your Mac’s location'), 'Unavailable position must not be misreported as denied permission');
