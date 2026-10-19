@@ -183,9 +183,8 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     if (!rows[0]) throw Object.assign(new Error('Check in first to finish today’s attendance.'), { status: 409 });
     if (rows[0].check_out_at) throw Object.assign(new Error('You have already checked out today.'), { status: 409 });
     if (input.method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status: 403 });
-    const checkoutMethod = method;
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
-      id: rows[0].id, method, lat: input.method === 'GPS' ? input.latitude : null, lon: input.method === 'GPS' ? input.longitude : null, accuracy: input.method === 'GPS' ? input.accuracy : null
+      id: rows[0].id, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null, accuracy: method === 'GPS' ? input.accuracy : null
     });
     result = { id: rows[0].id, method };
   });
