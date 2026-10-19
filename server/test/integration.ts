@@ -125,6 +125,82 @@ try {
   assert.equal(adminMe.data.user.platform, 'ADMIN');
   assert.equal(adminMe.data.user.landingPath, '/admin');
 
+  // Regression: approved WFH must override the stale client mode "GPS" on the
+  // server. This simulates the production browser build still asking for GPS,
+  // so a laptop/phone with unavailable or inaccurate location can check in.
+  const enableWfh = await request('/admin/users/' + employeeSession.user.id, {
+    method: 'PATCH',
+    headers: { Cookie: adminSession.cookie },
+    body: JSON.stringify({ wfhEnabled: true })
+  });
+  assert.equal(enableWfh.response.status, 200, 'Administrator must be able to enable WFH for the integration employee.');
+
+  const wfhState = await request('/wfh', {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(wfhState.response.status, 200);
+  const wfhDate = String(wfhState.data.today);
+  const calendarForWfh = await request('/calendar?year=' + wfhDate.slice(0,4), {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(calendarForWfh.response.status, 200);
+  const dayNumber = new Date(wfhDate + 'T12:00:00Z').getUTCDay();
+  const holidayToday = (calendarForWfh.data.holidays || []).some((item) => item.date === wfhDate);
+  const existingTodayAttendance = await request('/attendance?from=' + wfhDate + '&to=' + wfhDate, {
+    headers: { Cookie: employeeSession.cookie }
+  });
+  assert.equal(existingTodayAttendance.response.status, 200);
+  const alreadyCheckedIn = (existingTodayAttendance.data.records || []).some((item) => item.attendance_date === wfhDate && item.check_in_at);
+  if (dayNumber !== 0 && !holidayToday && !alreadyCheckedIn) {
+    const createWfh = await request('/wfh', {
+      method: 'POST',
+      headers: { Cookie: employeeSession.cookie },
+      body: JSON.stringify({ date: wfhDate, kind: 'EMERGENCY', reason: 'CI regression: approved WFH must not require GPS' })
+    });
+    assert.equal(createWfh.response.status, 201, 'Employee must be able to request same-day WFH in the isolated integration database.');
+    assert.ok(createWfh.data?.id);
+
+    const approvalQueue = await request('/admin/approvals', {
+      headers: { Cookie: adminSession.cookie }
+    });
+    assert.equal(approvalQueue.response.status, 200);
+    const wfhQueueItem = (approvalQueue.data.approvals || []).find((item) => item.type === 'wfh' && item.id === createWfh.data.id);
+    assert.ok(wfhQueueItem, 'Submitted WFH request must appear in the administrator approval queue.');
+
+    const approveWfh = await request('/admin/approvals/wfh/' + createWfh.data.id, {
+      method: 'POST',
+      headers: { Cookie: adminSession.cookie },
+      body: JSON.stringify({ decision: 'APPROVED', note: 'Approved by integration regression test' })
+    });
+    assert.equal(approveWfh.response.status, 200, 'Administrator must be able to approve the WFH request.');
+
+    const approvedWfhState = await request('/wfh', {
+      headers: { Cookie: employeeSession.cookie }
+    });
+    assert.equal(approvedWfhState.response.status, 200);
+    assert.equal(approvedWfhState.data.approvedToday, true, 'Approved WFH must be reflected by the employee WFH endpoint.');
+
+    // Deliberately omit coordinates and submit GPS, as a stale frontend can do.
+    const remoteCheckIn = await request('/attendance/check-in', {
+      method: 'POST',
+      headers: { Cookie: employeeSession.cookie },
+      body: JSON.stringify({ method: 'GPS' })
+    });
+    assert.equal(remoteCheckIn.response.status, 201, 'Approved WFH check-in must bypass office GPS and network checks.');
+    assert.equal(remoteCheckIn.data.method, 'WFH', 'Server must promote an old GPS-mode request to WFH when today is approved.');
+
+    // Check-out must follow the saved WFH mode even when an older client submits GPS.
+    const remoteCheckOut = await request('/attendance/check-out', {
+      method: 'POST',
+      headers: { Cookie: employeeSession.cookie },
+      body: JSON.stringify({ method: 'GPS' })
+    });
+    assert.equal(remoteCheckOut.response.status, 200, 'WFH check-out must not require office geolocation.');
+    assert.equal(remoteCheckOut.data.method, 'WFH');
+  } else {
+    console.log('WFH GPS-fallback integration scenario skipped: today is a non-working day, company holiday, or attendance already exists.');
+  }
+
   const employeePolicies = await request('/enterprise/policies', {
     headers: { Cookie: employeeSession.cookie }
   });
