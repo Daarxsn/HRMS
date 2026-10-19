@@ -41,10 +41,10 @@ async function effectiveAttendance(from, to) {
     const date=d.toISOString().slice(0,10);
     if(date>today||d.getUTCDay()===0||holidays.has(date))continue;
     const isPast=date<today;
-    const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||'10:30';
-    const absenceCutoff=isPast||currentTime>scheduledStart;
     for(const person of people){
       if(date<person.joined_on||present.has(`${person.id}:${date}`))continue;
+      const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||'10:30';
+      const absenceCutoff=isPast||currentTime>scheduledStart;
       const onLeave=leaves.some((item)=>item.employee_id===person.id&&item.start_date<=date&&item.end_date>=date);
       const remote=wfh.some((item)=>item.employee_id===person.id&&item.request_date===date);
       const status=onLeave?'ON_LEAVE':remote?'WFH':absenceCutoff?'ABSENT':null;
