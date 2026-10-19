@@ -249,11 +249,24 @@ async function main() {
 
 try {
   await main();
-} catch {
-  console.error('[FAIL] Database audit could not complete. Check connectivity and read-only SELECT privileges; no database changes were attempted.');
+} catch (error: unknown) {
+  // Emit only non-secret error metadata. Avoid printing the full error message,
+  // SQL query text, connection string, or any environment variable values.
+  const diagnostic = error && typeof error === 'object' ? error as {
+    code?: unknown; errno?: unknown; sqlState?: unknown; syscall?: unknown;
+  } : {};
+  const safeCode = typeof diagnostic.code === 'string' && /^[A-Z0-9_]+$/i.test(diagnostic.code)
+    ? diagnostic.code : 'UNKNOWN';
+  const safeErrno = typeof diagnostic.errno === 'number' ? diagnostic.errno : 'n/a';
+  const safeSqlState = typeof diagnostic.sqlState === 'string' && /^[A-Z0-9]{5}$/i.test(diagnostic.sqlState)
+    ? diagnostic.sqlState : 'n/a';
+  const safeSyscall = typeof diagnostic.syscall === 'string' && /^[a-z0-9_ -]+$/i.test(diagnostic.syscall)
+    ? diagnostic.syscall : 'n/a';
+  const detail = 'code=' + safeCode + '; errno=' + safeErrno + '; sqlState=' + safeSqlState + '; syscall=' + safeSyscall;
+  console.error('[FAIL] Database audit could not complete (' + detail + '). Check host/port/database, TLS settings and read-only SELECT privileges. No database changes were attempted.');
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY,
-      '\n## HRMS database audit\n\n**FAIL** — Connection/metadata query error. No database changes were attempted. Never put credentials in logs.\n', 'utf8');
+      '\n## HRMS database audit\n\n**FAIL** — ' + detail + '. No database changes were attempted. Connection secrets and query text were not logged.\n', 'utf8');
   }
   process.exitCode = 1;
 } finally {
