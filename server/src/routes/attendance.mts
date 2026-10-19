@@ -161,6 +161,8 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     if (leaveConflict[0]) throw Object.assign(new Error('You have a pending or approved leave request for today. Resolve it with HR before recording attendance.'), { status:409 });
     const [existing] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: req.user.id, date });
     if (existing[0]) throw Object.assign(new Error('Today’s attendance is already started.'), { status: 409 });
+    const [previousOpen] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date<:date AND check_out_at IS NULL LIMIT 1 FOR UPDATE', { employee:req.user.id, date });
+    if (previousOpen[0]) throw Object.assign(new Error('You have an unfinished shift from a previous date. Check out of that shift before starting today’s attendance.'), { status:409 });
     await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
       VALUES (:id, :employee, :date, UTC_TIMESTAMP(), :method, :lat, :lon, :accuracy, :distance, :status, :approvedStart)`, {
       id, employee: req.user.id, date, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null,
