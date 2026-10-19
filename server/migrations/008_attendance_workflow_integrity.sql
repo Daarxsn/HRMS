@@ -7,7 +7,7 @@ SET @hrms_wfh_old_unique = (
 );
 SET @hrms_wfh_alter = IF(
   @hrms_wfh_old_unique > 0,
-  'ALTER TABLE wfh_requests DROP FOREIGN KEY fk_wfh_employee, DROP INDEX uq_wfh_employee_day, ADD COLUMN active_request_date DATE GENERATED ALWAYS AS (CASE WHEN status IN (''PENDING'',''APPROVED'') THEN request_date ELSE NULL END) STORED, ADD INDEX idx_wfh_employee_request_date (employee_id, request_date), ADD UNIQUE KEY uq_wfh_active_employee_day (employee_id, active_request_date), ADD CONSTRAINT fk_wfh_employee FOREIGN KEY (employee_id) REFERENCES employees(id)',
+  'ALTER TABLE wfh_requests DROP FOREIGN KEY fk_wfh_employee, DROP INDEX uq_wfh_employee_day, ADD COLUMN active_request_date DATE GENERATED ALWAYS AS (CASE WHEN status IN (''PENDING'',''APPROVED'') THEN request_date ELSE NULL END) STORED, ADD INDEX idx_wfh_employee_request_date (employee_id, request_date), ADD UNIQUE KEY uq_wfh_active_employee_day (employee_id, active_request_date), ADD CONSTRAINT fk_wfh_employee_active FOREIGN KEY (employee_id) REFERENCES employees(id)',
   'SELECT 1'
 );
 PREPARE hrms_wfh_stmt FROM @hrms_wfh_alter;
