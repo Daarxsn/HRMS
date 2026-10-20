@@ -22,7 +22,6 @@ jobs:
     environment: production
     timeout-minutes: 15
     env:
-      AIVEN_API_TOKEN: ${{ secrets.AIVEN_API_TOKEN }}
       AIVEN_PROJECT: ${{ vars.AIVEN_PROJECT }}
       AIVEN_SERVICE: ${{ vars.AIVEN_SERVICE }}
       AIVEN_ADMIN_DB_USER: ${{ vars.AIVEN_ADMIN_DB_USER }}
@@ -32,23 +31,25 @@ jobs:
       AIVEN_DB_HOST: ${{ vars.AIVEN_DB_HOST }}
       AIVEN_DB_PORT: ${{ vars.AIVEN_DB_PORT }}
       AIVEN_DB_NAME: ${{ vars.AIVEN_DB_NAME }}
-      AIVEN_DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
-      AIVEN_AUDIT_DB_PASSWORD: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      BASELINE_AGE_RECIPIENT: ${{ vars.BASELINE_AGE_RECIPIENT }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
     steps:
       - name: Validate required protected configuration
         shell: bash
+        env:
+          AIVEN_API_TOKEN_PRESENT: ${{ secrets.AIVEN_API_TOKEN != '' }}
+          AIVEN_DB_SSL_CA_PRESENT: ${{ secrets.AIVEN_DB_SSL_CA != '' }}
+          AIVEN_AUDIT_PASSWORD_PRESENT: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD != '' }}
+          AIVEN_MIGRATION_PASSWORD_PRESENT: ${{ secrets.AIVEN_MIGRATION_DB_PASSWORD != '' }}
+          VERCEL_TOKEN_PRESENT: ${{ secrets.VERCEL_TOKEN != '' }}
         run: |
           set -euo pipefail
           required=(
-            AIVEN_API_TOKEN AIVEN_PROJECT AIVEN_SERVICE
-            AIVEN_ADMIN_DB_USER AIVEN_RUNTIME_DB_USER
-            AIVEN_MIGRATION_DB_USER AIVEN_AUDIT_DB_USER
-            AIVEN_DB_HOST AIVEN_DB_PORT AIVEN_DB_NAME
-            AIVEN_DB_SSL_CA AIVEN_AUDIT_DB_PASSWORD
-            VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID
+            AIVEN_PROJECT AIVEN_SERVICE AIVEN_ADMIN_DB_USER
+            AIVEN_RUNTIME_DB_USER AIVEN_MIGRATION_DB_USER AIVEN_AUDIT_DB_USER
+            AIVEN_DB_HOST AIVEN_DB_PORT AIVEN_DB_NAME BASELINE_AGE_RECIPIENT
+            VERCEL_PROJECT_ID VERCEL_TEAM_ID
           )
           for name in "${required[@]}"; do
             if [[ -z "${!name:-}" ]]; then
@@ -59,6 +60,12 @@ jobs:
           [[ "${AIVEN_DB_PORT}" =~ ^[0-9]+$ ]]
           [[ "${AIVEN_DB_PORT}" -ge 1 && "${AIVEN_DB_PORT}" -le 65535 ]]
           [[ "${AIVEN_PROJECT}" != *"/"* && "${AIVEN_SERVICE}" != *"/"* ]]
+          for flag in AIVEN_API_TOKEN_PRESENT AIVEN_DB_SSL_CA_PRESENT AIVEN_AUDIT_PASSWORD_PRESENT AIVEN_MIGRATION_PASSWORD_PRESENT VERCEL_TOKEN_PRESENT; do
+            if [[ "${!flag}" != "true" ]]; then
+              echo "::error::Missing required production secret (presence check): ${flag%_PRESENT}"
+              exit 1
+            fi
+          done
 
           if [[ "${AIVEN_ADMIN_DB_USER}" == "${AIVEN_RUNTIME_DB_USER}" ||
                 "${AIVEN_ADMIN_DB_USER}" == "${AIVEN_MIGRATION_DB_USER}" ||
@@ -70,9 +77,32 @@ jobs:
             exit 1
           fi
 
+      - name: Install age encryption utility
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes age
+
+      - name: Checkout reviewed main source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install repository dependencies without production credentials
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
       - name: Verify Aiven service, service users, and backup metadata
         id: aiven
         shell: bash
+        env:
+          AIVEN_API_TOKEN: ${{ secrets.AIVEN_API_TOKEN }}
         run: |
           set -euo pipefail
           set +x
@@ -80,6 +110,7 @@ jobs:
           service_json="$RUNNER_TEMP/aiven-service.json"
           users_json="$RUNNER_TEMP/aiven-users.json"
           backups_json="$RUNNER_TEMP/aiven-backups.json"
+          trap 'rm -f "$service_json" "$users_json" "$backups_json" "$RUNNER_TEMP/aiven-usernames.txt"' EXIT
 
           if ! curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer ${AIVEN_API_TOKEN}" \
@@ -153,11 +184,15 @@ jobs:
       - name: Verify Vercel production deployment uses the runtime account
         id: vercel
         shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          AIVEN_DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
         run: |
           set -euo pipefail
           set +x
           env_json="$RUNNER_TEMP/vercel-env.json"
           deployments_json="$RUNNER_TEMP/vercel-deployments.json"
+          trap 'rm -f "$env_json" "$deployments_json"' EXIT
           env_url="https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_TEAM_ID}&target=production&decrypt=true"
           if ! curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer ${VERCEL_TOKEN}" \
@@ -174,6 +209,27 @@ jobs:
             echo "::error::The live Vercel production DB_USER does not match the designated non-admin runtime account."
             exit 1
           fi
+          deployed_db_password="$(jq -r '[.envs[]? | select(.key == "DB_PASSWORD") | select((.target // []) | index("production")) | .value // empty][0] // empty' "$env_json")"
+          if [[ -z "$deployed_db_password" ]]; then
+            echo "::error::Vercel production database password could not be verified; refusing to infer runtime grants."
+            exit 1
+          fi
+          DB_USER="$deployed_db_user" DB_PASSWORD="$deployed_db_password" node --input-type=module <<'NODE'
+          import mysql from 'mysql2/promise';
+          const connection = await mysql.createConnection({
+            host:process.env.AIVEN_DB_HOST, port:Number(process.env.AIVEN_DB_PORT),
+            database:process.env.AIVEN_DB_NAME, user:process.env.DB_USER, password:process.env.DB_PASSWORD,
+            ssl:{ca:process.env.AIVEN_DB_SSL_CA,rejectUnauthorized:true,minVersion:'TLSv1.2'}, connectTimeout:10000
+          });
+          try {
+            const [grantRows] = await connection.query('SHOW GRANTS');
+            const grants = grantRows.map(row => String(Object.values(row)[0] ?? '')).join('\n').toUpperCase();
+            const forbidden = /\b(ALL PRIVILEGES|CREATE USER|ROLE_ADMIN|GRANT OPTION|CREATE|ALTER|DROP|INDEX|REFERENCES|TRIGGER|EVENT|EXECUTE|LOCK TABLES|RELOAD|PROCESS|SUPER|FILE|REPLICATION)\b/;
+            if (!/\bSELECT\b/.test(grants) || forbidden.test(grants)) throw new Error('runtime account grant policy failed');
+            console.log('Vercel runtime account grant policy: PASS');
+          } finally { await connection.end(); }
+          NODE
+          unset deployed_db_password
 
           deploy_url="https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1"
           if ! curl --fail --silent --show-error --max-time 30 \
@@ -197,14 +253,39 @@ jobs:
             exit 1
           fi
           echo "deployment_ok=true" >> "$GITHUB_OUTPUT"
+          echo "live_sha=$live_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install repository dependencies
-        run: npm ci
+      - name: Verify migration account has schema-only privileges
+        shell: bash
+        env:
+          DB_HOST: ${{ vars.AIVEN_DB_HOST }}
+          DB_PORT: ${{ vars.AIVEN_DB_PORT }}
+          DB_NAME: ${{ vars.AIVEN_DB_NAME }}
+          DB_USER: ${{ vars.AIVEN_MIGRATION_DB_USER }}
+          DB_PASSWORD: ${{ secrets.AIVEN_MIGRATION_DB_PASSWORD }}
+          DB_SSL_MODE: VERIFY_CA
+          DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
+        run: |
+          set -euo pipefail
+          set +x
+          node --input-type=module <<'NODE'
+          import mysql from 'mysql2/promise';
+          const connection = await mysql.createConnection({
+            host:process.env.DB_HOST, port:Number(process.env.DB_PORT), database:process.env.DB_NAME,
+            user:process.env.DB_USER, password:process.env.DB_PASSWORD,
+            ssl:{ca:process.env.DB_SSL_CA,rejectUnauthorized:true,minVersion:'TLSv1.2'}, connectTimeout:10000
+          });
+          try {
+            const [identity] = await connection.query('SELECT CURRENT_USER() AS account');
+            const [rows] = await connection.query('SHOW GRANTS');
+            const grants = rows.map(row => String(Object.values(row)[0] ?? '')).join('\n').toUpperCase();
+            const needed = ['SELECT','INSERT','UPDATE','DELETE','CREATE','ALTER','DROP','INDEX','REFERENCES'];
+            const missing = needed.filter(p => !new RegExp('\\b' + p + '\\b').test(grants));
+            const forbidden = /\b(ALL PRIVILEGES|CREATE USER|ROLE_ADMIN|GRANT OPTION|SUPER|FILE|RELOAD|PROCESS|REPLICATION)\b/;
+            if (missing.length || forbidden.test(grants)) throw new Error('migration account grant policy failed');
+            console.log('Migration account identity and bounded DDL/DML grants: PASS');
+          } finally { await connection.end(); }
+          NODE
 
       - name: Verify audit account is genuinely read-only
         shell: bash
@@ -237,7 +318,7 @@ jobs:
             const [identity] = await connection.query('SELECT VERSION() AS server_version, DATABASE() AS database_name');
             const [grantRows] = await connection.query('SHOW GRANTS');
             const grants = grantRows.map(row => String(Object.values(row)[0] ?? '')).join('\n').toUpperCase();
-            const forbidden = /\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|INDEX|REFERENCES|TRIGGER|EVENT|EXECUTE|GRANT OPTION|CREATE USER|LOCK TABLES|RELOAD|PROCESS|SUPER|FILE|REPLICATION)\b/;
+            const forbidden = /\b(ALL PRIVILEGES|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|INDEX|REFERENCES|TRIGGER|EVENT|EXECUTE|GRANT OPTION|CREATE USER|ROLE_ADMIN|LOCK TABLES|RELOAD|PROCESS|SUPER|FILE|REPLICATION)\b/;
             if (!/\bSELECT\b/.test(grants) || forbidden.test(grants)) {
               throw new Error('audit account grants are not read-only');
             }
@@ -268,6 +349,10 @@ jobs:
           set -euo pipefail
           set +x
           log="$RUNNER_TEMP/hrms-production-audit.log"
+          private_summary="$RUNNER_TEMP/hrms-production-audit-summary.md"
+          : > "$private_summary"
+          : > "$log"
+          export GITHUB_STEP_SUMMARY="$private_summary"
           set +e
           node --experimental-strip-types server/test/production-integrity-audit.ts >"$log" 2>&1
           audit_rc=$?
@@ -277,12 +362,119 @@ jobs:
             echo "::error::The production integrity audit did not produce a summary. Detailed output is suppressed because this repository is public."
             exit 1
           fi
-          echo "Database audit aggregate: ${summary#*: }" >> "$GITHUB_STEP_SUMMARY"
+          echo "audit_summary=${summary#*: }" >> "$GITHUB_OUTPUT"
           echo "audit_exit=$audit_rc" >> "$GITHUB_OUTPUT"
           if (( audit_rc != 0 )); then
             echo "::error::Production integrity audit reported failures. Detailed schema and data findings were withheld from public logs."
             exit 1
           fi
+
+      - name: Capture exact schema, migration, and row-count baseline
+        id: baseline
+        if: always()
+        shell: bash
+        env:
+          DB_HOST: ${{ vars.AIVEN_DB_HOST }}
+          DB_PORT: ${{ vars.AIVEN_DB_PORT }}
+          DB_NAME: ${{ vars.AIVEN_DB_NAME }}
+          DB_USER: ${{ vars.AIVEN_AUDIT_DB_USER }}
+          DB_PASSWORD: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD }}
+          DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
+          DB_CONNECTION_LIMIT: "2"
+          DB_MAX_IDLE: "1"
+          DB_TRANSACTION_RETRIES: "0"
+          BASELINE_AGE_RECIPIENT: ${{ vars.BASELINE_AGE_RECIPIENT }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          DEPLOYED_COMMIT: ${{ steps.vercel.outputs.live_sha }}
+          BACKUP_COUNT: ${{ steps.aiven.outputs.backup_count }}
+          BACKUP_AGE_HOURS: ${{ steps.aiven.outputs.backup_age_hours }}
+          AUDIT_RESULT: ${{ steps.audit.outputs.audit_exit }}
+          AUDIT_SUMMARY: ${{ steps.audit.outputs.audit_summary }}
+        run: |
+          set -euo pipefail
+          set +x
+          baseline="$RUNNER_TEMP/hrms-production-baseline.json"
+          private_summary="$RUNNER_TEMP/hrms-production-audit-summary.md"
+          raw_log="$RUNNER_TEMP/hrms-production-audit.log"
+          archive="$RUNNER_TEMP/hrms-production-baseline.tar"
+          encrypted="$RUNNER_TEMP/hrms-production-baseline.tar.age"
+          touch "$private_summary" "$raw_log"
+          [[ "$BASELINE_AGE_RECIPIENT" =~ ^age1[[:alnum:]]+$ ]] || {
+            echo "::error::BASELINE_AGE_RECIPIENT must be a valid age public recipient."
+            exit 1
+          }
+          node --input-type=module <<'NODE' > "$baseline"
+          import fs from 'node:fs/promises';
+          import crypto from 'node:crypto';
+          import mysql from 'mysql2/promise';
+          const requiredTables = [
+            'employees','system_settings','attendance_records','leave_requests','wfh_requests',
+            'attendance_correction_requests','flex_start_requests','notifications','audit_logs',
+            'company_holidays','attachments','qr_challenges','qr_challenge_uses','temporary_exits',
+            'employee_schedule_exceptions','employee_emergency_contacts','employment_history','onboarding_tasks',
+            'employee_documents','company_assets','company_policies','policy_acknowledgements','separation_cases',
+            'schema_migrations'
+          ];
+          const connection = await mysql.createConnection({
+            host:process.env.DB_HOST, port:Number(process.env.DB_PORT), database:process.env.DB_NAME,
+            user:process.env.DB_USER, password:process.env.DB_PASSWORD,
+            ssl:{ca:process.env.DB_SSL_CA,rejectUnauthorized:true,minVersion:'TLSv1.2'},
+            connectTimeout:10000
+          });
+          try {
+            const [identityRows] = await connection.query('SELECT DATABASE() AS databaseName, VERSION() AS serverVersion, UTC_TIMESTAMP() AS databaseUtcTime');
+            const identity = identityRows[0];
+            if (identity.databaseName !== process.env.DB_NAME) throw new Error('Connected database did not match the configured target.');
+            const [tables] = await connection.query("SELECT TABLE_NAME AS tableName, ENGINE AS engine FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE' ORDER BY TABLE_NAME");
+            const [columns] = await connection.query("SELECT TABLE_NAME AS tableName, COLUMN_NAME AS columnName, COLUMN_TYPE AS columnType, IS_NULLABLE AS isNullable, EXTRA AS extra, GENERATION_EXPRESSION AS generationExpression FROM information_schema.columns WHERE table_schema=DATABASE() ORDER BY TABLE_NAME,COLUMN_NAME");
+            const [indexes] = await connection.query("SELECT TABLE_NAME AS tableName, INDEX_NAME AS indexName, NON_UNIQUE AS nonUnique, SEQ_IN_INDEX AS sequence, COLUMN_NAME AS columnName FROM information_schema.statistics WHERE table_schema=DATABASE() ORDER BY TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX");
+            const tableSet = new Set(tables.map(row => String(row.tableName).toLowerCase()));
+            const migrationColumns = new Set(columns.filter(row => String(row.tableName).toLowerCase() === 'schema_migrations').map(row => String(row.columnName).toLowerCase()));
+            let ledger = [];
+            if (tableSet.has('schema_migrations') && migrationColumns.has('version')) {
+              const checksum = migrationColumns.has('checksum') ? 'checksum' : 'NULL AS checksum';
+              const appliedAt = migrationColumns.has('applied_at') ? 'applied_at AS appliedAt' : 'NULL AS appliedAt';
+              ledger = (await connection.query('SELECT version, ' + checksum + ', ' + appliedAt + ' FROM schema_migrations ORDER BY version'))[0];
+            }
+            const rowCounts = {};
+            for (const name of requiredTables) {
+              if (!tableSet.has(name.toLowerCase())) { rowCounts[name] = null; continue; }
+              const quoted = '`' + name.replaceAll('`','``') + '`';
+              const [countRows] = await connection.query('SELECT COUNT(*) AS rowCount FROM ' + quoted);
+              rowCounts[name] = Number(countRows[0].rowCount);
+            }
+            const schemaMaterial = JSON.stringify({tables,columns,indexes});
+            const schemaFingerprint = crypto.createHash('sha256').update(schemaMaterial).digest('hex');
+            const report = {
+              capturedAtUTC:new Date().toISOString(),
+              sourceCommit:process.env.SOURCE_COMMIT,
+              deployedCommit:process.env.DEPLOYED_COMMIT || null,
+              backup:{count:Number(process.env.BACKUP_COUNT || 0),latestAgeHours:process.env.BACKUP_AGE_HOURS || null},
+              database:{databaseName:identity.databaseName,serverVersion:identity.serverVersion,databaseUtcTime:identity.databaseUtcTime},
+              schema:{fingerprintSha256:schemaFingerprint,tables},
+              migrationLedger:ledger,
+              exactRowCounts:rowCounts,
+              audit:{exitCode:process.env.AUDIT_RESULT || null,summary:process.env.AUDIT_SUMMARY || null},
+              note:'Encrypted baseline: production metadata, migration ledger and exact counts. Store the age private key offline.'
+            };
+            process.stdout.write(JSON.stringify(report,null,2));
+          } finally { await connection.end(); }
+          NODE
+          test -f "$baseline"
+          tar -C "$RUNNER_TEMP" -cf "$archive"             "$(basename "$baseline")"             "$(basename "$private_summary")"             "$(basename "$raw_log")"
+          age --encrypt --recipient "$BASELINE_AGE_RECIPIENT" --output "$encrypted" "$archive"
+          shred -u "$archive" "$baseline" "$private_summary" "$raw_log"
+          echo "encrypted=true" >> "$GITHUB_OUTPUT"
+          echo "Encrypted production baseline created; contents withheld from public logs." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload encrypted production baseline
+        if: always() && steps.baseline.outputs.encrypted == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hrms-production-baseline-${{ github.sha }}
+          path: ${{ runner.temp }}/hrms-production-baseline.tar.age
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Record sanitized production security baseline
         if: always()

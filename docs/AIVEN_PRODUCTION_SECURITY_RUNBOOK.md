@@ -1,91 +1,98 @@
 # Aiven Production Security Runbook
 
-## Safety boundary
+## Status and safety boundaries
 
-This repository is public. Do not place production credentials, raw database snapshots, employee-level records, connection strings, SQL dumps, or detailed production audit output in tracked files, issue comments, workflow logs, or public artifacts. Store secrets in the protected `production` environment. The automated preflight intentionally emits only sanitized status and aggregate audit counts.
+The audited production database is Aiven MySQL, while the older `.github/workflows/backup-production.yml` and `docs/PHASE21_BACKUP_DISASTER_RECOVERY.md` describe Google Cloud SQL. Those Cloud SQL workflows are not evidence of an Aiven backup or a successful Aiven restore.
 
-The existing `backup-production.yml` and `PHASE21_BACKUP_DISASTER_RECOVERY.md` describe a Google Cloud SQL path. They are **not evidence** that an Aiven MySQL database has a recent backup or a tested restore. The Aiven database observed during the HRMS audit must be verified separately.
+This repository is public. Never commit passwords, tokens, connection strings, raw database dumps, employee-level data, or unencrypted production audit output. The Aiven production baseline produced by the preflight workflow is encrypted with age before upload. Keep the matching age private key outside GitHub and outside this repository.
 
-## Automated readiness gate
+The prior terminal audit on 2026-10-20 reported 36 passing checks and one failure: multiple employees had multiple historical open attendance shifts. This is a historical result, not a current verified production result. Do not invent checkout times or update attendance data automatically to make the audit pass.
 
-Run **Aiven Production Security Preflight** from GitHub Actions only after its protected environment variables and secrets are configured. The workflow fails closed unless it can verify:
-- Aiven's configured service is MySQL and is running.
-- Admin, application-runtime, migration, and read-only-audit usernames are distinct and exist on the service.
-- Aiven returns at least one backup and the newest backup timestamp is within 48 hours.
-- The Vercel production environment uses the designated non-admin runtime identity.
-- The latest Vercel production deployment corresponds to the workflow's source commit and the deployed readiness endpoint responds successfully.
-- The database audit identity can connect over certificate-verified TLS and its effective grants are read-only.
-- The repository's read-only production integrity audit completes with no failures.
+## Required protected GitHub environment configuration
 
-Detailed audit output is redirected to a temporary runner file and is not uploaded or printed because repository Actions logs can be visible to people who can read this public repository.
+Create/verify the GitHub environment named `production`. Restrict deployments to `main` and configure required reviewer approval before allowing secret-bearing workflows.
 
-## Required protected production environment configuration
+### Environment variables (non-secret)
 
-Create these non-secret **environment variables** on the GitHub `production` environment:
-- `AIVEN_PROJECT`
-- `AIVEN_SERVICE`
-- `AIVEN_ADMIN_DB_USER`
-- `AIVEN_RUNTIME_DB_USER`
-- `AIVEN_MIGRATION_DB_USER`
-- `AIVEN_AUDIT_DB_USER`
-- `AIVEN_DB_HOST`
-- `AIVEN_DB_PORT`
-- `AIVEN_DB_NAME`
-- `VERCEL_PROJECT_ID`
-- `VERCEL_TEAM_ID`
+- `AIVEN_PROJECT` — Aiven project name.
+- `AIVEN_SERVICE` — exact Aiven MySQL service name.
+- `AIVEN_ADMIN_DB_USER` — exposed administrative username (usually `avnadmin`).
+- `AIVEN_RUNTIME_DB_USER` — least-privilege account actually used by the deployed HRMS.
+- `AIVEN_MIGRATION_DB_USER` — separate migration identity.
+- `AIVEN_AUDIT_DB_USER` — separate read-only audit identity.
+- `AIVEN_DB_HOST`, `AIVEN_DB_PORT`, `AIVEN_DB_NAME` — actual production MySQL endpoint.
+- `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` — exact production Vercel target.
+- `BASELINE_AGE_RECIPIENT` — public age encryption recipient (starts with `age1`). The matching private key must be stored securely outside GitHub.
 
-Create these **environment secrets**:
-- `AIVEN_API_TOKEN` — a short-lived Aiven token with the minimum service/project read permissions needed for metadata checks.
-- `AIVEN_AUDIT_DB_PASSWORD` — password for the dedicated read-only database user.
-- `AIVEN_DB_SSL_CA` — the Aiven MySQL CA certificate used for certificate-verified TLS.
-- `VERCEL_TOKEN` — a Vercel token with access to inspect the target project and production environment.
+All four database usernames must be different. The preflight also verifies that the current production Vercel `DB_USER` equals the designated runtime account and is not the administrator.
 
-The audit user must be created with SELECT-only privileges. Do not reuse the application's runtime credentials or an administrator user for the audit. The workflow tests the actual grants with `SHOW GRANTS`; it rejects any grant including data writes, DDL, privilege delegation, or other administrative privileges.
+### Protected production environment secrets
 
-## Credential rotation sequence
+- `AIVEN_API_TOKEN` — Aiven token with the minimum service/user/backup-read permissions required for checks.
+- `AIVEN_DB_SSL_CA` — Aiven MySQL CA certificate used for certificate-verified TLS.
+- `AIVEN_ADMIN_DB_PASSWORD` — current exposed administrator credential before rotation; the rotation workflow overwrites this same environment secret with its generated replacement once the database change succeeds.
+- `AIVEN_MIGRATION_DB_PASSWORD` — migration account password.
+- `AIVEN_AUDIT_DB_PASSWORD` — read-only audit account password.
+- `VERCEL_TOKEN` — minimum access needed to inspect the target project's production environment and latest deployment.
+- `ACTIONS_SECRETS_WRITE_TOKEN` — narrowly scoped GitHub token that can update only the `production` environment secret needed by the rotation workflow. It is used only in the final rotation step and is never printed.
 
-1. Confirm the Vercel production `DB_USER` is the dedicated runtime account and is not the administrator. The preflight enforces this before a subsequent rotation workflow should be allowed.
-2. Rotate the exposed Aiven administrator service-user credential in Aiven's service **Connect → Users** panel (or the service-user credential-reset API). Do not reset all service credentials if only one user is exposed.
-3. Do not put the new administrator password in application environment variables. The application must keep using the non-admin runtime identity.
-4. Verify the old administrator password is rejected, using a controlled credential test. Do not paste either password into the terminal transcript, GitHub logs, or chat.
-5. Verify the deployed runtime identity still connects and `/api/health/ready` passes. Redeploy only if the application's own environment values actually changed.
+Do not share any of these secret values in chat, terminal transcripts, workflow inputs, issues, or source control. If the GitHub token cannot update environment secrets, the rotation step fails closed before changing the database password.
 
-Aiven's service-user API can create users with restricted `mysql_grants`; omitting that field grants admin-level privileges. Restrict service-user grants at creation. See [Aiven's MySQL service-user documentation](https://aiven.io/docs/products/mysql/howto/manage-service-users).
+## Step 1 — rotate the exposed administrator credential
 
-## Access separation
+Run **Rotate Exposed Aiven Admin Credential** from Actions and enter the exact confirmation string `ROTATE-EXPOSED-AIVEN-ADMIN`.
 
-- **Administrator:** break-glass platform/database administration only. Never use for routine app requests or audits.
-- **Runtime user:** DML required by the HRMS at runtime; no schema-management or user-administration privileges.
-- **Migration user:** used only by an approved migration operation; has only the DDL and data permissions required by the repository migrations; not configured as the app's runtime user.
-- **Integrity-audit user:** SELECT-only; TLS certificate verification required; connection pool capped at two.
+Before changing the password, the workflow checks:
+- the target is a running Aiven MySQL service;
+- admin, runtime, migration, and audit usernames exist and are distinct;
+- Aiven reports a recent backup (within the 48-hour check window);
+- the latest Vercel production deployment matches the workflow commit, the readiness endpoint is healthy, and production `DB_USER` is the separate non-admin runtime identity.
 
-The preflight requires four distinct identities. Review the grant set for the runtime and migration users as part of the controlled account-change record before locking production.
+It then generates a random replacement, writes it directly into the protected `AIVEN_ADMIN_DB_PASSWORD` environment secret without printing it, applies the password change over certificate-verified TLS, verifies the replacement works, and verifies the previous credential is rejected. The HRMS application should not need redeployment because this workflow refuses to proceed unless Vercel is already using the separate runtime account. If any precondition fails, no credential change is attempted. If a post-change connection test fails, the workflow attempts a compensating rollback and reports the resulting state without exposing either password.
 
-## Backup and restore evidence
+If the live application is using the admin account, the rotation action intentionally stops instead of risking production downtime. First migrate the application to a distinct runtime identity and verify readiness.
 
-Aiven for MySQL documents automatic full backups daily and continuous binary-log recording for point-in-time recovery; retention depends on the service plan. This is provider capability, not proof that this specific service has a recent usable backup. See [Aiven's backup documentation](https://aiven.io/docs/products/mysql/concepts/mysql-backups).
+## Step 2 — separate and verify database access
 
-Before production can be locked:
-- The automated gate must verify a recent service backup.
-- A restore/fork must be performed into a separate recovery service, never over production.
-- Verify service starts, TLS connectivity, schema/migration checksums, aggregate row-count parity, and HRMS health checks against the recovery target.
-- Record restore start/end times and measured RTO/RPO in a **private** change record; do not commit the detailed record to this public repository.
+Run **Aiven Production Security Preflight** with confirmation `RUN-READ-ONLY-PRODUCTION-PREFLIGHT`.
 
-## Baseline record
+The workflow verifies:
+- all purpose-specific service users exist and are distinct;
+- runtime account effective grants contain no schema-change or administrator privileges;
+- migration account has the required schema/data-change privileges for migrations but no user-administration, grant-option, or platform-administrator privileges;
+- audit account has SELECT-only access;
+- database access uses certificate-verified TLS;
+- the actual Vercel production DB account is the non-admin runtime identity;
+- current application deployment, recent backup metadata, migration ledger/checksums, schema metadata, exact row counts, and integrity-audit results are captured.
 
-The database migrations 006–008 were applied to the audited Aiven database on 2026-10-20. The subsequent terminal audit reported that all eight migration records/checksums matched the repository and that required schema/index/foreign-key/enum checks passed; one remaining integrity failure was multiple open attendance shifts. This describes the supplied terminal output and is not a newly executed check from this workflow.
+The workflow suppresses detailed audit output from the public job summary and puts the full report, exact counts, schema fingerprint, migration ledger, deployed/source commit, and audit results into an age-encrypted artifact. Decrypt it only in an approved environment using the private key kept offline.
 
-Use the automated preflight to capture current deployment and database gate results. Keep exact project/service identifiers, backup timestamps, row counts, employee-level exceptions, account names, and full integrity output in a private incident/change record.
+Aiven's MySQL service-user API supports restrictive `mysql_grants`; omitting that field grants admin-level privileges. The documented allow-list is at [Aiven MySQL service users](https://aiven.io/docs/products/mysql/howto/manage-service-users).
+
+## Step 3 — backup and restore evidence
+
+Aiven for MySQL documents daily full backups and continuous binary-log recording for point-in-time recovery; retention depends on the service plan. See [Aiven MySQL backups](https://aiven.io/docs/products/mysql/concepts/mysql-backups).
+
+The automated preflight only proves that Aiven reports a recent backup. It does **not** prove restoration is recoverable. Before locking production:
+1. Fork/restore into a separate recovery service, never over production.
+2. Wait for the recovery service to become healthy.
+3. Verify TLS connectivity, migration ledger/checksums, schema fingerprint, exact row-count comparison for the key HRMS tables, and read-only integrity audit.
+4. Record recovery start/end time and observed RTO/RPO in a private change record.
+5. Delete or power off the recovery service after review to control ongoing cost, while preserving the private evidence report.
+
+Creating a recovery fork creates a separate Aiven service and may incur additional cost; this repository workflow does not create that billable service automatically without a specifically approved recovery target.
 
 ## Lock criteria
 
-Production is not locked until every item below is evidenced:
-- [ ] Administrator credential rotated; old password tested and rejected.
-- [ ] Runtime, migration, administrator, and audit users are distinct; grants were verified.
-- [ ] Vercel production DB user matches the designated non-admin runtime identity.
-- [ ] Recent Aiven backup verified and a separate restore drill passed.
-- [ ] App deployment commit and database baseline recorded for the same change window.
-- [ ] Read-only production integrity audit has zero failures.
-- [ ] Live readiness and authorized employee/admin smoke tests pass.
+Do **not** mark Step 1 complete or lock production until each item is evidenced:
 
-Do not mark this runbook complete merely because the migration command succeeded or the preflight workflow file exists.
+- [ ] Administrator password rotation succeeded and the old password was rejected.
+- [ ] The HRMS production runtime account is distinct from the admin identity and has no DDL/admin privileges.
+- [ ] The migration account is distinct and has only the required migration grants.
+- [ ] The audit account is distinct, SELECT-only, and connects over certificate-verified TLS.
+- [ ] The actual current Aiven backup was verified and a separate restore drill passed.
+- [ ] The current deployed commit, migration ledger/checksums, schema fingerprint, exact row counts, and audit result were captured in the encrypted baseline.
+- [ ] A fresh production integrity audit has zero failures.
+- [ ] Production API readiness and authorized employee/admin smoke tests pass.
+
+The preflight workflow file existing in Git is not proof that a workflow has run successfully. Never report Step 1 as complete until the action results and restore evidence prove every required control.
