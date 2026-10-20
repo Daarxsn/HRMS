@@ -298,8 +298,11 @@ async function main() {
   }
   if (!missingTables.has('employment_history') && !missingTables.has('employees')) {
     await zeroCount('Employees missing JOINED history backfill',
-      `SELECT COUNT(*) AS count FROM employees e WHERE NOT EXISTS (SELECT 1 FROM employment_history h WHERE h.employee_id=e.id AND h.event_type='JOINED' AND h.effective_date=e.joined_on)`,
-      ['employees','employment_history']);
+      `SELECT COUNT(*) AS count FROM employees e
+       JOIN schema_migrations m ON m.version='006_enterprise_hr.sql'
+       WHERE e.created_at <= m.applied_at
+         AND NOT EXISTS (SELECT 1 FROM employment_history h WHERE h.employee_id=e.id AND h.event_type='JOINED' AND h.effective_date=e.joined_on)`,
+      ['employees','employment_history','schema_migrations']);
   }
 
   for (const name of ['attendance_records.check_in_method','attendance_records.check_out_method']) {
