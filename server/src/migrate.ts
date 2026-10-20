@@ -75,7 +75,7 @@ async function preflightPendingMigration(file, connection) {
     for (const name of ['attendance_records.check_in_method','attendance_records.check_out_method']) {
       const column = schema.columns.get(name);
       if (!column) throw new Error('Migration preflight blocked 007: missing ' + name + '.');
-      if (String(column.columnType).includes('OFF_PREMISES')) {
+      if (String((column as any).columnType).includes('OFF_PREMISES')) {
         throw new Error('Migration preflight blocked 007: OFF_PREMISES already exists while 007 is unrecorded; schema may contain part of 008.');
       }
     }
@@ -98,7 +98,7 @@ async function preflightPendingMigration(file, connection) {
       String(row.tableName).toLowerCase()==='wfh_requests' && row.constraintName==='fk_wfh_employee_active'
     );
     const attendanceEnumsReady = ['attendance_records.check_in_method','attendance_records.check_out_method'].every((name) => {
-      const value = String(schema.columns.get(name)?.columnType || '');
+      const value = String((schema.columns.get(name) as any)?.columnType || '');
       return value.includes('WIFI') && value.includes('OFF_PREMISES');
     });
     const cleanPre008 = oldUnique && oldFk && !activeColumn && !activeUnique && !supportIndex && !newFk && !attendanceEnumsReady;
