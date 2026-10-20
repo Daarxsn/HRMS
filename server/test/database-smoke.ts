@@ -22,7 +22,12 @@ try {
   assert.ok(migrationRows.some((row) => row.version === '006_enterprise_hr.sql'), 'Enterprise HR/policy center migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '007_wifi_attendance_method.sql'), 'Wi-Fi attendance method migration is not recorded');
   assert.ok(migrationRows.some((row) => row.version === '008_attendance_workflow_integrity.sql'), 'Attendance workflow integrity migration is not recorded');
+  assert.ok(migrationRows.some((row) => row.version === '009_enterprise_history_nullable_creator.sql'), 'Enterprise history creator hardening migration is not recorded');
   assert.ok(migrationRows.every((row) => /^[a-f0-9]{64}$/.test(String(row.checksum || ''))), 'Every applied migration must have a SHA-256 checksum');
+
+  const [historyCreator] = await pool.query(`SELECT IS_NULLABLE AS is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='employment_history' AND column_name='created_by'`);
+  assert.equal(historyCreator.length, 1, 'Employment-history created_by column is missing');
+  assert.equal(String(historyCreator[0].is_nullable).toUpperCase(), 'YES', 'Unknown historical creator must be nullable');
 
   const [activeDateColumn] = await pool.query(`SELECT EXTRA AS extra, GENERATION_EXPRESSION AS generation_expression FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='wfh_requests' AND column_name='active_request_date'`);
   assert.equal(activeDateColumn.length, 1, 'WFH active-request generated date column is missing');

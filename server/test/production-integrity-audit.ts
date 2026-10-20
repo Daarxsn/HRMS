@@ -21,6 +21,9 @@ if (target === 'production' && process.env.NODE_ENV !== 'production') {
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
 const findings: Finding[] = [];
 const missingTables = new Set<string>();
+const approvedLegacyChecksums = new Map<string, Set<string>>([
+  ['006_enterprise_hr.sql', new Set(['4f95aab5efc6eda1e10c05f3e108f4e7e1d3ccac31758310465365345fcc9a10'])]
+]);
 const requiredTables = [
   'employees','system_settings','attendance_records','leave_requests','wfh_requests',
   'attendance_correction_requests','flex_start_requests','notifications','audit_logs',
@@ -81,6 +84,11 @@ async function main() {
     ? String(requiredTables.length) + ' required tables exist.'
     : 'Missing tables: ' + [...missingTables].join(', '));
 
+  const enterpriseTables = ['employee_emergency_contacts','employment_history','onboarding_tasks','employee_documents','company_assets','company_policies','policy_acknowledgements','separation_cases'];
+  const missingEnterpriseTables = enterpriseTables.filter((table) => !tableMap.has(table));
+  report(missingEnterpriseTables.length === 0 ? 'PASS' : 'FAIL', 'Migration 006 enterprise schema',
+    missingEnterpriseTables.length === 0 ? 'All eight enterprise HR tables exist.' : 'Missing enterprise HR tables: ' + missingEnterpriseTables.join(', '));
+
   const badEngines = tableRows.filter((item) => requiredTables.includes(String(item.tableName).toLowerCase())
     && String(item.engine || '').toUpperCase() !== 'INNODB').map((item) => String(item.tableName));
   report(badEngines.length === 0 ? 'PASS' : 'FAIL', 'Transactional storage engine', badEngines.length === 0
@@ -110,8 +118,10 @@ async function main() {
         const actual = String(applied.checksum || '').toLowerCase();
         if (!/^[a-f0-9]{64}$/.test(actual)) {
           report('FAIL', 'Checksum ' + file, 'Missing or invalid SHA-256 checksum in ledger.');
+        } else if (actual !== expected && approvedLegacyChecksums.get(file)?.has(actual)) {
+          report('PASS', 'Checksum ' + file, 'Matches the explicitly approved historical checksum for the migration-006 creator-nullability hardening; historical ledger preserved.');
         } else if (actual !== expected) {
-          report('FAIL', 'Checksum ' + file, 'Production checksum differs from repository source.');
+          report('FAIL', 'Checksum ' + file, 'Production checksum differs from repository source and approved historical values.');
         } else {
           report('PASS', 'Checksum ' + file, 'Matches repository source.');
         }
@@ -123,22 +133,32 @@ async function main() {
 
   if (!missingTables.has('employees')) {
     try {
-      const activeAdminRows = await rows("SELECT COUNT(*) AS count FROM employees WHERE role='ADMIN' AND status='ACTIVE'");
+      const [activeAdminRows, employeeCountRows] = await Promise.all([
+        rows("SELECT COUNT(*) AS count FROM employees WHERE role='ADMIN' AND status='ACTIVE'"),
+        rows("SELECT COUNT(*) AS count FROM employees")
+      ]);
       const activeAdminCount = Number(activeAdminRows[0]?.count || 0);
-      report(activeAdminCount > 0 ? 'PASS' : 'FAIL', 'Migration 006 backfill prerequisite',
-        activeAdminCount > 0 ? 'At least one active administrator exists for employment-history backfill.' : 'No active administrator exists; migration 006 backfill would fail its required created_by value.');
+      const employeeCount = Number(employeeCountRows[0]?.count || 0);
+      const adminStatus = activeAdminCount > 0 ? 'PASS' : target === 'production' && employeeCount > 0 ? 'FAIL' : 'WARN';
+      report(adminStatus, 'Active administrator prerequisite',
+        activeAdminCount > 0 ? 'An active administrator exists.' :
+          employeeCount === 0 ? 'Clean database has no users yet; create and verify the bootstrap administrator before production use.' :
+          'Populated production database has no active administrator; HR administration cannot be considered ready.');
     } catch {
-      report('FAIL', 'Migration 006 backfill prerequisite', 'Could not verify an active administrator using a read-only count query.');
+      report('FAIL', 'Active administrator prerequisite', 'Could not verify an active administrator using read-only count queries.');
     }
   } else {
-    report('SKIP', 'Migration 006 backfill prerequisite', 'Employees table is missing; cannot check the required backfill actor.');
+    report('SKIP', 'Active administrator prerequisite', 'Employees table is missing; this database has not reached the initial-schema stage.');
   }
 
   await zeroCount('Migration 008 preflight: duplicate active WFH dates',
     'SELECT COUNT(*) AS count FROM (SELECT employee_id, request_date FROM wfh_requests WHERE status IN (\'PENDING\',\'APPROVED\') GROUP BY employee_id, request_date HAVING COUNT(*) > 1) AS active_request_duplicates',
     ['wfh_requests']);
+  await zeroCount('Duplicate pending attendance corrections',
+    "SELECT COUNT(*) AS count FROM (SELECT employee_id, attendance_date FROM attendance_correction_requests WHERE status='PENDING' GROUP BY employee_id, attendance_date HAVING COUNT(*)>1) AS duplicate_pending_corrections",
+    ['attendance_correction_requests']);
 
-  const columns = await rows('SELECT TABLE_NAME AS tableName, COLUMN_NAME AS columnName, COLUMN_TYPE AS columnType, EXTRA AS extra, GENERATION_EXPRESSION AS generationExpression FROM information_schema.columns WHERE table_schema = DATABASE()');
+  const columns = await rows('SELECT TABLE_NAME AS tableName, COLUMN_NAME AS columnName, COLUMN_TYPE AS columnType, IS_NULLABLE AS isNullable, EXTRA AS extra, GENERATION_EXPRESSION AS generationExpression FROM information_schema.columns WHERE table_schema = DATABASE()');
   const columnMap = new Map<string, any>();
   for (const item of columns) columnMap.set(String(item.tableName).toLowerCase() + '.' + String(item.columnName).toLowerCase(), item);
 
@@ -148,7 +168,11 @@ async function main() {
     'attendance_records.id','attendance_records.employee_id','attendance_records.attendance_date',
     'attendance_records.check_in_at','attendance_records.check_out_at','attendance_records.check_in_method','attendance_records.check_out_method',
     'leave_requests.employee_id','leave_requests.start_date','leave_requests.end_date','leave_requests.status',
-    'wfh_requests.employee_id','wfh_requests.request_date','wfh_requests.status','wfh_requests.active_request_date'
+    'wfh_requests.employee_id','wfh_requests.request_date','wfh_requests.status','wfh_requests.active_request_date',
+    'employee_emergency_contacts.employee_id','employment_history.employee_id','employment_history.created_by',
+    'onboarding_tasks.employee_id','onboarding_tasks.created_by','employee_documents.employee_id','employee_documents.uploaded_by',
+    'company_assets.asset_tag','company_assets.created_by','company_policies.created_by',
+    'policy_acknowledgements.policy_id','policy_acknowledgements.employee_id','separation_cases.employee_id','separation_cases.created_by'
   ];
   const absentColumns = requiredColumns.filter((item) => !columnMap.has(item));
   report(absentColumns.length === 0 ? 'PASS' : 'FAIL', 'Critical columns', absentColumns.length === 0
@@ -171,7 +195,18 @@ async function main() {
     ['wfh_requests','uq_wfh_active_employee_day','employee_id,active_request_date',true],
     ['wfh_requests','idx_wfh_employee_request_date','employee_id,request_date',false],
     ['employees','employee_code','employee_code',true],
-    ['employees','email','email',true]
+    ['employees','email','email',true],
+    ['employee_emergency_contacts','idx_emergency_employee','employee_id,is_primary',false],
+    ['employment_history','idx_employment_history_employee_date','employee_id,effective_date',false],
+    ['onboarding_tasks','idx_onboarding_employee_status','employee_id,status,due_date',false],
+    ['employee_documents','idx_document_employee_expiry','employee_id,expires_on,status',false],
+    ['company_assets','asset_tag','asset_tag',true],
+    ['company_assets','idx_asset_status_employee','status,assigned_employee_id',false],
+    ['company_policies','idx_policy_status','status,published_at',false],
+    ['policy_acknowledgements','uq_policy_employee_ack','policy_id,employee_id',true],
+    ['policy_acknowledgements','idx_policy_ack_employee','employee_id,acknowledged_at',false],
+    ['separation_cases','idx_separation_status_date','status,last_working_date',false],
+    ['separation_cases','idx_separation_employee','employee_id',false]
   ] as const;
   for (const [table, name, columnList, unique] of indexChecks) {
     if (missingTables.has(table)) {
@@ -197,7 +232,22 @@ async function main() {
   const expectedFks = [
     ['attendance_records','fk_attendance_employee'],
     ['leave_requests','fk_leave_employee'],
-    ['wfh_requests','fk_wfh_employee_active']
+    ['wfh_requests','fk_wfh_employee_active'],
+    ['employee_emergency_contacts','fk_emergency_employee'],
+    ['employment_history','fk_employment_history_employee'],
+    ['employment_history','fk_employment_history_creator'],
+    ['onboarding_tasks','fk_onboarding_employee'],
+    ['onboarding_tasks','fk_onboarding_completed_by'],
+    ['onboarding_tasks','fk_onboarding_creator'],
+    ['employee_documents','fk_document_employee'],
+    ['employee_documents','fk_document_uploader'],
+    ['company_assets','fk_asset_employee'],
+    ['company_assets','fk_asset_creator'],
+    ['company_policies','fk_policy_creator'],
+    ['policy_acknowledgements','fk_policy_ack_policy'],
+    ['policy_acknowledgements','fk_policy_ack_employee'],
+    ['separation_cases','fk_separation_employee'],
+    ['separation_cases','fk_separation_creator']
   ] as const;
   for (const [table, name] of expectedFks) {
     if (missingTables.has(table)) {
@@ -206,6 +256,50 @@ async function main() {
     }
     const valid = foreignKeys.some((item) => String(item.tableName).toLowerCase() === table && item.constraintName === name);
     report(valid ? 'PASS' : 'FAIL', 'Foreign key ' + name, valid ? 'Expected employee reference exists.' : 'Expected foreign key is missing.');
+  }
+
+  const presentEnterpriseTables = enterpriseTables.filter((table) => tableMap.has(table));
+  const enterpriseIndexChecks = indexChecks.filter(([table]) => enterpriseTables.includes(table));
+  const enterpriseIndexesReady = enterpriseIndexChecks.every(([table,name,columns,unique]) => hasIndex(indexes,table,name,columns,unique));
+  const enterpriseForeignKeyChecks = expectedFks.filter(([table]) => enterpriseTables.includes(table));
+  const enterpriseForeignKeysReady = enterpriseForeignKeyChecks.every(([table,name]) =>
+    foreignKeys.some((item) => String(item.tableName).toLowerCase()===table && item.constraintName===name)
+  );
+  const enterpriseSchemaComplete = presentEnterpriseTables.length===enterpriseTables.length && enterpriseIndexesReady && enterpriseForeignKeysReady;
+  report(enterpriseSchemaComplete ? 'PASS' : presentEnterpriseTables.length===0 ? 'WARN' : 'FAIL',
+    'Migration 006 partial-application state',
+    enterpriseSchemaComplete ? 'All enterprise tables, required indexes and foreign keys are present.' :
+      presentEnterpriseTables.length===0 ? 'No migration-006 enterprise tables are present; clean/pre-migration state.' :
+      'Mixed or partial migration-006 schema detected; do not rerun 006 blindly.');
+
+  const oldWfhIndexPresent = indexes.some((item)=>String(item.tableName).toLowerCase()==='wfh_requests' && item.indexName==='uq_wfh_employee_day');
+  const oldWfhFkPresent = foreignKeys.some((item)=>String(item.tableName).toLowerCase()==='wfh_requests' && item.constraintName==='fk_wfh_employee');
+  const activeWfhColumn = columnMap.get('wfh_requests.active_request_date');
+  const activeWfhUniquePresent = hasIndex(indexes,'wfh_requests','uq_wfh_active_employee_day','employee_id,active_request_date',true);
+  const wfhSupportIndexPresent = hasIndex(indexes,'wfh_requests','idx_wfh_employee_request_date','employee_id,request_date',false);
+  const activeWfhFkPresent = foreignKeys.some((item)=>String(item.tableName).toLowerCase()==='wfh_requests' && item.constraintName==='fk_wfh_employee_active');
+  const attendanceEnumsComplete = ['attendance_records.check_in_method','attendance_records.check_out_method'].every((name)=>{
+    const type=String(columnMap.get(name)?.columnType||'');
+    return type.includes('WIFI')&&type.includes('OFF_PREMISES');
+  });
+  const pre008Shape = oldWfhIndexPresent && oldWfhFkPresent && !activeWfhColumn && !activeWfhUniquePresent && !wfhSupportIndexPresent && !activeWfhFkPresent;
+  const complete008Shape = !oldWfhIndexPresent && !oldWfhFkPresent && Boolean(activeWfhColumn) && activeWfhUniquePresent && wfhSupportIndexPresent && activeWfhFkPresent && attendanceEnumsComplete;
+  report(complete008Shape ? 'PASS' : pre008Shape ? 'WARN' : 'FAIL',
+    'Migration 007–008 partial-application state',
+    complete008Shape ? 'WFH generated column, uniqueness, supporting index, replacement foreign key and attendance enums are complete.' :
+      pre008Shape ? 'Legacy WFH schema remains intact; 008 is not applied yet. This is a pending state, not production-ready.' :
+      'Mixed or partial 007–008 schema detected; inspect both attendance enum columns, WFH generated column, indexes and foreign keys before any repair.');
+
+  const historyCreator = columnMap.get('employment_history.created_by');
+  if (historyCreator) {
+    const nullable = String(historyCreator.isNullable || '').toUpperCase() === 'YES';
+    report(nullable ? 'PASS' : 'FAIL', 'Employment-history creator nullability',
+      nullable ? 'Unknown historical actors remain NULL; no creator is fabricated.' : 'Migration 009 must allow a NULL historical creator before production can be locked.');
+  }
+  if (!missingTables.has('employment_history') && !missingTables.has('employees')) {
+    await zeroCount('Employees missing JOINED history backfill',
+      `SELECT COUNT(*) AS count FROM employees e WHERE NOT EXISTS (SELECT 1 FROM employment_history h WHERE h.employee_id=e.id AND h.event_type='JOINED' AND h.effective_date=e.joined_on)`,
+      ['employees','employment_history']);
   }
 
   for (const name of ['attendance_records.check_in_method','attendance_records.check_out_method']) {

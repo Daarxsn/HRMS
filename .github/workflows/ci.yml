@@ -69,6 +69,17 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Rehearse migrations 006–009 on clean, populated and partial schemas
+        env:
+          CI: 'true'
+          HRMS_MIGRATION_REHEARSAL: 'true'
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run test:migration-rehearsal --workspace server
       - name: Run backend unit and contract tests
         run: npm test
       - name: Apply MySQL migrations in CI

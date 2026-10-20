@@ -443,6 +443,25 @@ jobs:
               const [countRows] = await connection.query('SELECT COUNT(*) AS rowCount FROM ' + quoted);
               rowCounts[name] = Number(countRows[0].rowCount);
             }
+            const [openShiftRows] = await connection.query(
+              'SELECT a.id AS attendanceId,e.employee_code AS employeeCode,e.full_name AS employeeName,' +
+              "DATE_FORMAT(a.attendance_date,'%Y-%m-%d') AS attendanceDate,a.check_in_at AS checkInAt," +
+              'a.check_in_method AS checkInMethod,a.check_in_latitude AS checkInLatitude,' +
+              'a.check_in_longitude AS checkInLongitude,a.check_in_accuracy_m AS checkInAccuracyMeters,' +
+              'a.check_in_distance_m AS checkInDistanceMeters FROM attendance_records a ' +
+              'JOIN employees e ON e.id=a.employee_id WHERE a.check_in_at IS NOT NULL AND a.check_out_at IS NULL ' +
+              'ORDER BY e.employee_code,a.attendance_date,a.check_in_at'
+            );
+            const openShiftIds = openShiftRows.map(row => String(row.attendanceId));
+            let attendanceAuditEvidence = [];
+            if (openShiftIds.length) {
+              const placeholders = openShiftIds.map(() => '?').join(',');
+              [attendanceAuditEvidence] = await connection.execute(
+                'SELECT entity_id AS attendanceId,action,created_at AS createdAt,details_json AS details ' +
+                'FROM audit_logs WHERE entity_type=? AND entity_id IN (' + placeholders + ') ORDER BY created_at',
+                ['attendance', ...openShiftIds]
+              );
+            }
             const schemaMaterial = JSON.stringify({tables,columns,indexes});
             const schemaFingerprint = crypto.createHash('sha256').update(schemaMaterial).digest('hex');
             const report = {
@@ -454,8 +473,10 @@ jobs:
               schema:{fingerprintSha256:schemaFingerprint,tables},
               migrationLedger:ledger,
               exactRowCounts:rowCounts,
+              openShiftReview:openShiftRows,
+              attendanceAuditEvidence,
               audit:{exitCode:process.env.AUDIT_RESULT || null,summary:process.env.AUDIT_SUMMARY || null},
-              note:'Encrypted baseline: production metadata, migration ledger and exact counts. Store the age private key offline.'
+              note:'Encrypted baseline includes employee-level shift review evidence. Keep age private key offline; never upload an unencrypted copy.'
             };
             process.stdout.write(JSON.stringify(report,null,2));
           } finally { await connection.end(); }

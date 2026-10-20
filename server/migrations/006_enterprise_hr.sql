@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS employment_history (
   id CHAR(36) PRIMARY KEY, employee_id CHAR(36) NOT NULL,
   event_type ENUM('JOINED','PROMOTED','TRANSFERRED','ROLE_CHANGED','PROBATION_COMPLETED','STATUS_CHANGED','OTHER') NOT NULL,
   effective_date DATE NOT NULL, title VARCHAR(120) NULL, department VARCHAR(120) NULL, branch VARCHAR(100) NULL,
-  notes VARCHAR(1000) NULL, created_by CHAR(36) NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notes VARCHAR(1000) NULL, created_by CHAR(36) NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_employment_history_employee FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
   CONSTRAINT fk_employment_history_creator FOREIGN KEY (created_by) REFERENCES employees(id),
   INDEX idx_employment_history_employee_date (employee_id, effective_date DESC)
@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS separation_cases (
   INDEX idx_separation_status_date (status, last_working_date), INDEX idx_separation_employee (employee_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Backfill a durable joined event for employees that already existed before Phase 44.
+-- Backfill a durable joined event for existing employees. If no active administrator
+-- exists, the actor is unknown and remains NULL rather than being fabricated.
 INSERT INTO employment_history (id,employee_id,event_type,effective_date,title,department,branch,notes,created_by)
 SELECT UUID(), e.id, 'JOINED', e.joined_on, e.title, e.department, e.branch,
        'Backfilled from the existing employee record.',

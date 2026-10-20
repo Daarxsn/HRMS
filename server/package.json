@@ -13,7 +13,8 @@
     "db:audit": "node --experimental-strip-types test/production-integrity-audit.ts",
     "test:integration": "node --experimental-strip-types test/integration.ts",
     "test": "node --experimental-strip-types --test test/policy.test.ts test/production-contract.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:migration-rehearsal": "node --experimental-strip-types test/migration-rehearsal.ts"
   },
   "overrides": {
     "uuid": "11.1.1"
