@@ -53,6 +53,42 @@ jobs:
         run: npm run db:migrate
       - name: Seed E2E database
         run: npm run db:seed
+      - name: Prepare an ordinary attendance day in the disposable E2E database
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import mysql from 'mysql2/promise';
+
+          const date = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).format(new Date());
+
+          const connection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            port: Number(process.env.DB_PORT),
+            database: process.env.DB_NAME,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectTimeout: 10000
+          });
+          try {
+            const [result] = await connection.execute(
+              'DELETE FROM company_holidays WHERE holiday_date = ?',
+              [date]
+            );
+            console.log(
+              'Prepared disposable E2E workday ' + date +
+              '; removed ' + result.affectedRows +
+              ' current-date holiday row(s) from the isolated test database.'
+            );
+          } finally {
+            await connection.end();
+          }
+          NODE
       - name: Run Playwright E2E
         run: npx playwright test
       - name: Upload Playwright report
