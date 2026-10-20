@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
+import { attendanceStatus, distanceMeters, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
@@ -36,6 +36,13 @@ test('Sunday, national holidays and company holidays are not scheduled attendanc
   assert.equal(isScheduledWorkday('2026-10-04'), false);
   assert.equal(isScheduledWorkday('2026-10-02'), false);
   assert.equal(isScheduledWorkday('2026-10-03',new Set(['2026-10-03'])), false);
+});
+
+test('attendance is allowed on floating-holiday dates and Sundays but blocked on fixed holidays', () => {
+  assert.equal(isAttendanceAllowed('2026-10-20'), true, 'Dussehra is a floating holiday and is not part of the fixed-holiday set.');
+  assert.equal(isAttendanceAllowed('2026-10-04'), true, 'Sunday is not an attendance restriction.');
+  assert.equal(isAttendanceAllowed('2026-10-03', new Set(['2026-10-03'])), false, 'A fixed company holiday blocks attendance.');
+  assert.equal(isAttendanceAllowed('2026-10-02'), false, 'A fixed national holiday blocks attendance.');
 });
 
 test('work duration accepts an administrator-configured lunch duration', () => {

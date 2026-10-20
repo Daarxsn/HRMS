@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { pool, query, transaction } from '../db.mts';
 import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { attendanceStatus, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
+import { attendanceStatus, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
 
@@ -27,7 +27,7 @@ async function effectiveAttendance(from, to) {
     query(`SELECT id,full_name,employee_code,user_type,DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on FROM employees WHERE role='EMPLOYEE' AND status='ACTIVE' AND joined_on<=:to ORDER BY full_name`, { to }),
     query(`SELECT employee_id,DATE_FORMAT(start_date,'%Y-%m-%d') AS start_date,DATE_FORMAT(end_date,'%Y-%m-%d') AS end_date FROM leave_requests WHERE status='APPROVED' AND start_date<=:to AND end_date>=:from`, { from, to }),
     query(`SELECT employee_id,DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date FROM wfh_requests WHERE status='APPROVED' AND request_date BETWEEN :from AND :to`, { from, to }),
-    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`, { from, to }),
+    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :from AND :to`, { from, to }),
     query(`SELECT employee_id,DATE_FORMAT(exception_date,'%Y-%m-%d') AS exception_date,TIME_FORMAT(approved_start_time,'%H:%i') AS approved_start_time FROM employee_schedule_exceptions WHERE exception_date BETWEEN :from AND :to`, { from, to })
   ]);
   const holidays = new Set(customHolidays.map((x)=>x.date));
@@ -39,7 +39,7 @@ async function effectiveAttendance(from, to) {
   const currentTime=indiaTime().slice(0,5);
   for(let d=new Date(fromDate);d<=toDate;d.setUTCDate(d.getUTCDate()+1)){
     const date=d.toISOString().slice(0,10);
-    if(date>today||d.getUTCDay()===0||holidays.has(date))continue;
+    if(date>today||holidays.has(date))continue;
     const isPast=date<today;
     for(const person of people){
       if(date<person.joined_on||present.has(`${person.id}:${date}`))continue;
@@ -77,11 +77,11 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
     effectiveAttendance(today,today),
     query(`SELECT id,full_name,employee_code,user_type,title FROM employees WHERE role='EMPLOYEE' AND status='ACTIVE' ORDER BY full_name`)
   ]);
-  const holidayRows=await query(`SELECT name FROM company_holidays WHERE holiday_date=:today LIMIT 1`,{today});
+  const holidayRows=await query(`SELECT name FROM company_holidays WHERE holiday_date=:today AND holiday_kind='FIXED' LIMIT 1`,{today});
   const year=today.slice(0,4);
   const nationalNames=new Map([[year+'-01-26','Republic Day'],[year+'-08-15','Independence Day'],[year+'-10-02','Gandhi Jayanti']]);
-  const officeHoliday=!isScheduledWorkday(today,new Set(holidayRows.length?[today]:[]));
-  const holidayName=holidayRows[0]?.name||nationalNames.get(today)||(new Date(today+'T12:00:00Z').getUTCDay()===0?'Sunday':'');
+  const officeHoliday=!isAttendanceAllowed(today,new Set(holidayRows.length?[today]:[]));
+  const holidayName=holidayRows[0]?.name||nationalNames.get(today)||'';
   const absenceCount=effectiveToday.filter((row)=>row.status==='ABSENT').length;
   const leaveCount=effectiveToday.filter((row)=>row.status==='ON_LEAVE').length;
   const approvedWfhCount=effectiveToday.filter((row)=>row.status==='WFH').length;

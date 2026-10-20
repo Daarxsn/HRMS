@@ -42,6 +42,13 @@ export function isScheduledWorkday(date, companyHolidayDates = new Set()) {
   const day = new Date(`${date}T12:00:00Z`).getUTCDay();
   return day !== 0 && !companyHolidayDates.has(date) && !nationalHolidayDates(Number(date.slice(0,4))).includes(date);
 }
+
+// Attendance can be recorded on any calendar day. The only blocked dates are
+// fixed company holidays and the fixed national holidays defined by policy.
+// Floating holidays are intentionally absent from the fixedHolidayDates set.
+export function isAttendanceAllowed(date, fixedHolidayDates = new Set()) {
+  return !fixedHolidayDates.has(date) && !nationalHolidayDates(Number(date.slice(0,4))).includes(date);
+}
 export function normalizeClientIp(value) {
   let ip = String(value || '').trim();
   if (ip.startsWith('::ffff:')) ip = ip.slice(7);

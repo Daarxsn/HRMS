@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
-import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
+import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
 router.use(requireAuth, (req, res, next) => {
@@ -75,7 +75,7 @@ router.get('/', asyncRoute(async (req, res) => {
     }),
     query(`SELECT DATE_FORMAT(start_date,'%Y-%m-%d') AS start_date,DATE_FORMAT(end_date,'%Y-%m-%d') AS end_date FROM leave_requests WHERE employee_id=:employee AND status='APPROVED' AND start_date<=:to AND end_date>=:from`,{employee:req.user.id,from:date,to}),
     query(`SELECT DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date FROM wfh_requests WHERE employee_id=:employee AND status='APPROVED' AND request_date BETWEEN :from AND :to`,{employee:req.user.id,from:date,to}),
-    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`,{from:date,to}),
+    query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :from AND :to`,{from:date,to}),
     query(`SELECT DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on FROM employees WHERE id=:employee`,{employee:req.user.id}),
     query(`SELECT DATE_FORMAT(exception_date,'%Y-%m-%d') AS exception_date,TIME_FORMAT(approved_start_time,'%H:%i') AS approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date BETWEEN :from AND :to`,{employee:req.user.id,from:date,to})
   ]);
@@ -84,7 +84,7 @@ router.get('/', asyncRoute(async (req, res) => {
   const display=[...rows];const existing=new Set(rows.map((x)=>String(x.attendance_date).slice(0,10)));const today=indiaDate();const currentTime=indiaTime().slice(0,5);
   const approvedStartByDate=new Map(scheduleExceptions.map((x)=>[x.exception_date,x.approved_start_time]));
   for(let d=new Date(`${date}T12:00:00Z`),end=new Date(`${to}T12:00:00Z`);d<=end;d.setUTCDate(d.getUTCDate()+1)){
-    const day=d.toISOString().slice(0,10);if(day>today||d.getUTCDay()===0||holidaySet.has(day)||day<(person[0]?.joined_on||'' )||existing.has(day))continue;
+    const day=d.toISOString().slice(0,10);if(day>today||holidaySet.has(day)||day<(person[0]?.joined_on||'' )||existing.has(day))continue;
     const onLeave=leaves.some((x)=>x.start_date<=day&&x.end_date>=day);const wfh=remoteDays.some((x)=>x.request_date===day);
     const absenceCutoff=approvedStartByDate.get(day)||'10:30';
     const absent=day<today||currentTime>absenceCutoff;const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
@@ -106,8 +106,8 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   });
   const input = validate(schema, req.body);
   const date = indiaDate();
-  const dateHolidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date});
-  if(!isScheduledWorkday(date,new Set(dateHolidays.map((x)=>x.date)))) throw Object.assign(new Error('Attendance check-in is available Monday–Saturday, excluding company holidays.'),{status:403});
+  const dateHolidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED'`,{date});
+  if(!isAttendanceAllowed(date,new Set(dateHolidays.map((x)=>x.date)))) throw Object.assign(new Error('Attendance check-in is unavailable on fixed holidays.'),{status:403});
   const settings = await getSettings();
   // The approved employee/date WFH request is the source of truth. A stale
   // browser build may still submit method=GPS; do not make WFH staff depend on
@@ -258,7 +258,7 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
   const input = validate(z.object({ date: dateSchema, startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), reason: z.string().trim().min(8).max(1000) }), req.body);
   if (input.startTime < '09:00' || input.startTime > '10:30') throw Object.assign(new Error('A flex start must be between 9:00 AM and 10:30 AM.'), { status: 400 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
-  const holidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date:input.date});
+  const holidays=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED'`,{date:input.date});
   if(!isScheduledWorkday(input.date,new Set(holidays.map((x)=>x.date)))) throw Object.assign(new Error('Choose a scheduled workday for your flex-start request.'),{status:400});
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
