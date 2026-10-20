@@ -8,6 +8,28 @@ async function signInDev(page: any, account: 'employee' | 'admin') {
   await page.goto('/');
 }
 
+function todayInIndia() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+// Attendance tests exercise punch behavior, not the date-specific holiday calendar.
+// Keep their UI fixture deterministic, while the real attendance API test still
+// sends check-in/check-out requests to the backend.
+async function stubNoHolidayCalendar(page: any) {
+  await page.route(/\/api\/calendar(?:\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ holidays: [] })
+    });
+  });
+}
+
 test('employee can sign in and reach the action center', async ({ page }) => {
   await signInDev(page, 'employee');
   await expect(page.getByText('What needs your attention')).toBeVisible();
@@ -151,6 +173,7 @@ test('WFH access outage offers retry instead of claiming access is disabled', as
 
 
 test('GPS check-in falls back to approved office Wi-Fi when laptop location is unavailable', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
     const geolocation = {
       watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
@@ -186,6 +209,7 @@ test('GPS check-in falls back to approved office Wi-Fi when laptop location is u
 
 
 test('approved WFH check-in from employee overview does not request laptop or mobile GPS', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
     const geolocation = {
       watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
@@ -202,7 +226,7 @@ test('approved WFH check-in from employee overview does not request laptop or mo
   await page.route('**/api/wfh', async (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ enabled: true, approvedToday: true, today: '2026-10-19', monthlyCap: 4, requests: [] })
+    body: JSON.stringify({ enabled: true, approvedToday: true, today: todayInIndia(), monthlyCap: 4, requests: [] })
   }));
   await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
     status: 200,
@@ -227,6 +251,7 @@ test('approved WFH check-in from employee overview does not request laptop or mo
 });
 
 test('approved WFH check-in from the Attendance page bypasses office location checks', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
     const geolocation = {
       watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
@@ -243,7 +268,7 @@ test('approved WFH check-in from the Attendance page bypasses office location ch
   await page.route('**/api/wfh', async (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ enabled: true, approvedToday: true, today: '2026-10-19', monthlyCap: 4, requests: [] })
+    body: JSON.stringify({ enabled: true, approvedToday: true, today: todayInIndia(), monthlyCap: 4, requests: [] })
   }));
   await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
     status: 200,
@@ -277,6 +302,7 @@ test('employee documents page uses the real authenticated API', async ({ page })
 });
 
 test('employee check-in and checkout exercise the real attendance API', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
   await page.context().grantPermissions(['geolocation']);
   await page.context().setGeolocation({ latitude:18.506633, longitude:73.857692, accuracy:10 });
   await signInDev(page, 'employee');
