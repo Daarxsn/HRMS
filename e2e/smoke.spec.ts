@@ -319,13 +319,13 @@ test('employee check-in and checkout exercise the real attendance API', async ({
   let record = await readToday();
   if (!record?.check_in_at) {
     await page.getByRole('button', { name:/Check in/i }).first().click();
-    await expect(page.getByText('Check-in recorded.')).toBeVisible();
+    await expect(page.getByText(/Check-in recorded\.|Check-in recorded using approved office Wi-Fi\./)).toBeVisible();
     record = await readToday();
   }
   expect(record?.check_in_at).toBeTruthy();
   if (!record?.check_out_at) {
     await page.getByRole('button', { name:/Check out/i }).first().click();
-    await expect(page.getByText('Check-out recorded.')).toBeVisible();
+    await expect(page.getByText(/Check-out recorded\.|Check-out recorded using approved office Wi-Fi\./)).toBeVisible();
     record = await readToday();
   }
   expect(record?.check_out_at).toBeTruthy();
