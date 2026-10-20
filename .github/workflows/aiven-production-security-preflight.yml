@@ -1,0 +1,305 @@
+name: Aiven Production Security Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type RUN-READ-ONLY-PRODUCTION-PREFLIGHT to confirm the target
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aiven-production-security-preflight
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: ${{ inputs.confirmation == 'RUN-READ-ONLY-PRODUCTION-PREFLIGHT' }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      AIVEN_API_TOKEN: ${{ secrets.AIVEN_API_TOKEN }}
+      AIVEN_PROJECT: ${{ vars.AIVEN_PROJECT }}
+      AIVEN_SERVICE: ${{ vars.AIVEN_SERVICE }}
+      AIVEN_ADMIN_DB_USER: ${{ vars.AIVEN_ADMIN_DB_USER }}
+      AIVEN_RUNTIME_DB_USER: ${{ vars.AIVEN_RUNTIME_DB_USER }}
+      AIVEN_MIGRATION_DB_USER: ${{ vars.AIVEN_MIGRATION_DB_USER }}
+      AIVEN_AUDIT_DB_USER: ${{ vars.AIVEN_AUDIT_DB_USER }}
+      AIVEN_DB_HOST: ${{ vars.AIVEN_DB_HOST }}
+      AIVEN_DB_PORT: ${{ vars.AIVEN_DB_PORT }}
+      AIVEN_DB_NAME: ${{ vars.AIVEN_DB_NAME }}
+      AIVEN_DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
+      AIVEN_AUDIT_DB_PASSWORD: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+    steps:
+      - name: Validate required protected configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            AIVEN_API_TOKEN AIVEN_PROJECT AIVEN_SERVICE
+            AIVEN_ADMIN_DB_USER AIVEN_RUNTIME_DB_USER
+            AIVEN_MIGRATION_DB_USER AIVEN_AUDIT_DB_USER
+            AIVEN_DB_HOST AIVEN_DB_PORT AIVEN_DB_NAME
+            AIVEN_DB_SSL_CA AIVEN_AUDIT_DB_PASSWORD
+            VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_TEAM_ID
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing protected production configuration: ${name}"
+              exit 1
+            fi
+          done
+          [[ "${AIVEN_DB_PORT}" =~ ^[0-9]+$ ]]
+          [[ "${AIVEN_DB_PORT}" -ge 1 && "${AIVEN_DB_PORT}" -le 65535 ]]
+          [[ "${AIVEN_PROJECT}" != *"/"* && "${AIVEN_SERVICE}" != *"/"* ]]
+
+          if [[ "${AIVEN_ADMIN_DB_USER}" == "${AIVEN_RUNTIME_DB_USER}" ||
+                "${AIVEN_ADMIN_DB_USER}" == "${AIVEN_MIGRATION_DB_USER}" ||
+                "${AIVEN_ADMIN_DB_USER}" == "${AIVEN_AUDIT_DB_USER}" ||
+                "${AIVEN_RUNTIME_DB_USER}" == "${AIVEN_MIGRATION_DB_USER}" ||
+                "${AIVEN_RUNTIME_DB_USER}" == "${AIVEN_AUDIT_DB_USER}" ||
+                "${AIVEN_MIGRATION_DB_USER}" == "${AIVEN_AUDIT_DB_USER}" ]]; then
+            echo "::error::Admin, runtime, migration, and audit usernames must all be distinct."
+            exit 1
+          fi
+
+      - name: Verify Aiven service, service users, and backup metadata
+        id: aiven
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          base="https://api.aiven.io/v1/project/${AIVEN_PROJECT}/service/${AIVEN_SERVICE}"
+          service_json="$RUNNER_TEMP/aiven-service.json"
+          users_json="$RUNNER_TEMP/aiven-users.json"
+          backups_json="$RUNNER_TEMP/aiven-backups.json"
+
+          if ! curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${AIVEN_API_TOKEN}" \
+            "$base" -o "$service_json" 2>/dev/null; then
+            echo "::error::Aiven service metadata could not be verified. Check the protected API token, project, and service configuration."
+            exit 1
+          fi
+          service_type="$(jq -r '.service.service_type // .service_type // empty' "$service_json")"
+          service_state="$(jq -r '.service.state // .state // empty' "$service_json")"
+          if [[ "${service_type,,}" != "mysql" || "${service_state^^}" != "RUNNING" ]]; then
+            echo "::error::The configured Aiven service is not a running MySQL service."
+            exit 1
+          fi
+
+          if ! curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${AIVEN_API_TOKEN}" \
+            "$base/user" -o "$users_json" 2>/dev/null; then
+            echo "::error::Aiven service-user inventory could not be verified."
+            exit 1
+          fi
+          jq -e '(.users // .service_users // []) | type == "array" and length > 0' "$users_json" >/dev/null || {
+            echo "::error::Aiven service-user inventory response was not in the expected format."
+            exit 1
+          }
+          usernames="$RUNNER_TEMP/aiven-usernames.txt"
+          jq -r '(.users // .service_users // [])[] | (.username // .user_name // empty)' "$users_json" > "$usernames"
+          for name in "$AIVEN_ADMIN_DB_USER" "$AIVEN_RUNTIME_DB_USER" "$AIVEN_MIGRATION_DB_USER" "$AIVEN_AUDIT_DB_USER"; do
+            if ! grep -Fxq "$name" "$usernames"; then
+              echo "::error::One or more configured database-purpose accounts were not found in the Aiven service."
+              exit 1
+            fi
+          done
+
+          if ! curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${AIVEN_API_TOKEN}" \
+            "$base/backups" -o "$backups_json" 2>/dev/null; then
+            echo "::error::Aiven backup inventory could not be verified."
+            exit 1
+          fi
+          backup_count="$(jq '(.backups // .service.backups // []) | length' "$backups_json")"
+          if [[ ! "$backup_count" =~ ^[0-9]+$ || "$backup_count" -lt 1 ]]; then
+            echo "::error::No Aiven MySQL backups were returned. Do not declare backup readiness."
+            exit 1
+          fi
+          latest="$(jq -r '(.backups // .service.backups // []) | map(.backup_time // .time // .start_time // .created_at // "") | map(select(. != "")) | sort | last // empty' "$backups_json")"
+          if [[ -z "$latest" ]]; then
+            echo "::error::Aiven returned backups but no parseable backup timestamp. Freshness is unverified."
+            exit 1
+          fi
+          normalised="$latest"
+          if [[ "$latest" =~ ^([0-9]{8})T([0-9]{6})[0-9]*Z$ ]]; then
+            d="${BASH_REMATCH[1]}"
+            t="${BASH_REMATCH[2]}"
+            normalised="${d:0:4}-${d:4:2}-${d:6:2}T${t:0:2}:${t:2:2}:${t:4:2}Z"
+          fi
+          if ! backup_epoch="$(date -u -d "$normalised" +%s 2>/dev/null)"; then
+            echo "::error::The latest Aiven backup timestamp could not be parsed; freshness is unverified."
+            exit 1
+          fi
+          now_epoch="$(date -u +%s)"
+          age_hours="$(( (now_epoch - backup_epoch) / 3600 ))"
+          if (( age_hours < 0 || age_hours > 48 )); then
+            echo "::error::The latest reported Aiven backup is not within the 48-hour readiness window."
+            exit 1
+          fi
+          echo "service_ok=true" >> "$GITHUB_OUTPUT"
+          echo "backup_ok=true" >> "$GITHUB_OUTPUT"
+          echo "backup_count=$backup_count" >> "$GITHUB_OUTPUT"
+          echo "backup_age_hours=$age_hours" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Vercel production deployment uses the runtime account
+        id: vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          env_json="$RUNNER_TEMP/vercel-env.json"
+          deployments_json="$RUNNER_TEMP/vercel-deployments.json"
+          env_url="https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_TEAM_ID}&target=production&decrypt=true"
+          if ! curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "$env_url" -o "$env_json" 2>/dev/null; then
+            echo "::error::Vercel production environment could not be verified."
+            exit 1
+          fi
+          deployed_db_user="$(jq -r '[.envs[]? | select(.key == "DB_USER") | select((.target // []) | index("production")) | .value // empty][0] // empty' "$env_json")"
+          if [[ -z "$deployed_db_user" ]]; then
+            echo "::error::Vercel did not return the production DB_USER value; refusing to rotate an account without proof of runtime identity."
+            exit 1
+          fi
+          if [[ "$deployed_db_user" != "$AIVEN_RUNTIME_DB_USER" || "$deployed_db_user" == "$AIVEN_ADMIN_DB_USER" ]]; then
+            echo "::error::The live Vercel production DB_USER does not match the designated non-admin runtime account."
+            exit 1
+          fi
+
+          deploy_url="https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1"
+          if ! curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "$deploy_url" -o "$deployments_json" 2>/dev/null; then
+            echo "::error::Vercel production deployment metadata could not be verified."
+            exit 1
+          fi
+          live_sha="$(jq -r '.deployments[0].meta.githubCommitSha // .deployments[0].gitSource.sha // empty' "$deployments_json")"
+          live_url="$(jq -r '.deployments[0].url // empty' "$deployments_json")"
+          if [[ -z "$live_sha" || -z "$live_url" ]]; then
+            echo "::error::Vercel did not return a production commit and deployment URL."
+            exit 1
+          fi
+          if [[ "$live_sha" != "$GITHUB_SHA" ]]; then
+            echo "::error::The latest Vercel production deployment does not match this checked-out commit. Re-run after the intended commit is deployed."
+            exit 1
+          fi
+          if ! curl --fail --silent --show-error --max-time 20 "https://${live_url}/api/health/ready" >/dev/null 2>&1; then
+            echo "::error::The deployed HRMS API readiness endpoint did not pass."
+            exit 1
+          fi
+          echo "deployment_ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Verify audit account is genuinely read-only
+        shell: bash
+        env:
+          DB_HOST: ${{ vars.AIVEN_DB_HOST }}
+          DB_PORT: ${{ vars.AIVEN_DB_PORT }}
+          DB_NAME: ${{ vars.AIVEN_DB_NAME }}
+          DB_USER: ${{ vars.AIVEN_AUDIT_DB_USER }}
+          DB_PASSWORD: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD }}
+          DB_SSL_MODE: VERIFY_CA
+          DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
+          DB_CONNECTION_LIMIT: "2"
+          DB_MAX_IDLE: "1"
+          DB_TRANSACTION_RETRIES: "0"
+        run: |
+          set -euo pipefail
+          set +x
+          node --input-type=module <<'NODE'
+          import mysql from 'mysql2/promise';
+          const connection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            port: Number(process.env.DB_PORT),
+            database: process.env.DB_NAME,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            ssl: { ca: process.env.DB_SSL_CA, rejectUnauthorized: true, minVersion: 'TLSv1.2' },
+            connectTimeout: 10000
+          });
+          try {
+            const [identity] = await connection.query('SELECT VERSION() AS server_version, DATABASE() AS database_name');
+            const [grantRows] = await connection.query('SHOW GRANTS');
+            const grants = grantRows.map(row => String(Object.values(row)[0] ?? '')).join('\n').toUpperCase();
+            const forbidden = /\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|INDEX|REFERENCES|TRIGGER|EVENT|EXECUTE|GRANT OPTION|CREATE USER|LOCK TABLES|RELOAD|PROCESS|SUPER|FILE|REPLICATION)\b/;
+            if (!/\bSELECT\b/.test(grants) || forbidden.test(grants)) {
+              throw new Error('audit account grants are not read-only');
+            }
+            console.log('Audit account grants: read-only PASS');
+            console.log('MySQL server version: ' + identity[0].server_version);
+          } finally {
+            await connection.end();
+          }
+          NODE
+
+      - name: Run read-only production integrity audit with private findings suppressed
+        id: audit
+        shell: bash
+        env:
+          NODE_ENV: production
+          HRMS_DB_AUDIT_TARGET: production
+          DB_HOST: ${{ vars.AIVEN_DB_HOST }}
+          DB_PORT: ${{ vars.AIVEN_DB_PORT }}
+          DB_NAME: ${{ vars.AIVEN_DB_NAME }}
+          DB_USER: ${{ vars.AIVEN_AUDIT_DB_USER }}
+          DB_PASSWORD: ${{ secrets.AIVEN_AUDIT_DB_PASSWORD }}
+          DB_SSL_MODE: VERIFY_CA
+          DB_SSL_CA: ${{ secrets.AIVEN_DB_SSL_CA }}
+          DB_CONNECTION_LIMIT: "2"
+          DB_MAX_IDLE: "1"
+          DB_TRANSACTION_RETRIES: "0"
+        run: |
+          set -euo pipefail
+          set +x
+          log="$RUNNER_TEMP/hrms-production-audit.log"
+          set +e
+          node --experimental-strip-types server/test/production-integrity-audit.ts >"$log" 2>&1
+          audit_rc=$?
+          set -e
+          summary="$(grep -E '^\[(PASS|FAIL)\] Summary:' "$log" | tail -1 || true)"
+          if [[ -z "$summary" ]]; then
+            echo "::error::The production integrity audit did not produce a summary. Detailed output is suppressed because this repository is public."
+            exit 1
+          fi
+          echo "Database audit aggregate: ${summary#*: }" >> "$GITHUB_STEP_SUMMARY"
+          echo "audit_exit=$audit_rc" >> "$GITHUB_OUTPUT"
+          if (( audit_rc != 0 )); then
+            echo "::error::Production integrity audit reported failures. Detailed schema and data findings were withheld from public logs."
+            exit 1
+          fi
+
+      - name: Record sanitized production security baseline
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Aiven production security preflight"
+            echo ""
+            echo "- Source commit: `$GITHUB_SHA`"
+            echo "- Run timestamp (UTC): `$(date -u +%Y-%m-%dT%H:%M:%SZ)`"
+            echo "- Aiven service status: ${{ steps.aiven.outputs.service_ok == 'true' && 'PASS' || 'NOT VERIFIED' }}"
+            echo "- Backup inventory/freshness: ${{ steps.aiven.outputs.backup_ok == 'true' && 'PASS' || 'NOT VERIFIED' }}"
+            echo "- Backup count: ${{ steps.aiven.outputs.backup_count || 'not verified' }}"
+            echo "- Latest backup age: ${{ steps.aiven.outputs.backup_age_hours || 'not verified' }} hour(s)"
+            echo "- Vercel deployed commit and runtime identity: ${{ steps.vercel.outputs.deployment_ok == 'true' && 'PASS' || 'NOT VERIFIED' }}"
+            echo "- Read-only audit grants: see preceding step result"
+            echo "- Database integrity audit: ${{ steps.audit.outputs.audit_exit == '0' && 'PASS' || 'FAIL OR NOT VERIFIED' }}"
+            echo ""
+            echo "No credentials, endpoint values, database names, account names, row-level records, or detailed audit findings are emitted in this public repository workflow summary."
+          } >> "$GITHUB_STEP_SUMMARY"
