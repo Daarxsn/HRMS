@@ -99,37 +99,58 @@ export async function processEmailOutboxBatch(options: {batchSize?:number; outbo
   const sender=options.send || sendEmail;
   const jobs=await claimBatch(batchSize,options.outboxId);
   const summary={claimed:jobs.length,sent:0,retried:0,failed:0,lostLease:0};
+
   for (const job of jobs) {
+    // Keep SMTP delivery errors separate from SENT-state persistence errors. If SMTP accepted
+    // the message but the database update is unavailable, leave the lease to expire rather
+    // than immediately queueing the message for a likely duplicate send.
+    let delivered=false;
+    let deliveryError:unknown=null;
     try {
-      let recipients:string[];
-      try { recipients=Array.isArray(job.recipients_json)?job.recipients_json:JSON.parse(job.recipients_json); }
-      catch { throw new Error('Outbox recipient data is invalid.'); }
+      const recipients:string[]=Array.isArray(job.recipients_json)
+        ? job.recipients_json
+        : JSON.parse(job.recipients_json);
       const result=await sender({
         to:recipients,subject:job.subject,text:job.text_body,html:job.html_body,
         replyTo:job.reply_to,fromName:job.from_name,messageId:messageIdFor(job.id)
       });
       if (result.skipped || !result.sent) throw new Error('SMTP delivery is not configured or did not confirm message acceptance.');
-      const resultRows=await query(`UPDATE email_outbox SET status='SENT',sent_at=UTC_TIMESTAMP(3),last_error=NULL,
-        lock_token=NULL,locked_at=NULL,lease_until=NULL,updated_at=UTC_TIMESTAMP(3)
-        WHERE id=:id AND status='PROCESSING' AND lock_token=:token`,{id:job.id,token:job.lock_token});
-      if(Number(resultRows.affectedRows)===1) summary.sent+=1;
-      else summary.lostLease+=1;
+      delivered=true;
     } catch(error) {
-      const lastError=safeError(error);
-      const terminal=job.attempts>=EMAIL_OUTBOX_MAX_ATTEMPTS;
-      const availableAt=new Date(Date.now()+(terminal?0:retryBackoffMs(job.attempts)));
-      const updated=await query(`UPDATE email_outbox SET
-        status=:status,available_at=:availableAt,last_error=:lastError,lock_token=NULL,locked_at=NULL,lease_until=NULL,
-        updated_at=UTC_TIMESTAMP(3)
-        WHERE id=:id AND status='PROCESSING' AND lock_token=:token`,{
-          status:terminal?'FAILED':'PENDING',availableAt,lastError,id:job.id,token:job.lock_token
-        });
-      if(Number(updated.affectedRows)===1) {
-        if(terminal) summary.failed+=1;
-        else summary.retried+=1;
-      } else summary.lostLease+=1;
-      console.warn(JSON.stringify({type:'email_outbox_delivery_failed',outbox_id:job.id,attempt:job.attempts,terminal,error:lastError}));
+      deliveryError=error;
     }
+
+    if (delivered) {
+      try {
+        const resultRows=await query(`UPDATE email_outbox SET status='SENT',sent_at=UTC_TIMESTAMP(3),last_error=NULL,
+          lock_token=NULL,locked_at=NULL,lease_until=NULL,updated_at=UTC_TIMESTAMP(3)
+          WHERE id=:id AND status='PROCESSING' AND lock_token=:token`,{id:job.id,token:job.lock_token});
+        if(Number(resultRows.affectedRows)===1) summary.sent+=1;
+        else {
+          summary.lostLease+=1;
+          console.warn(JSON.stringify({type:'email_outbox_sent_state_lost_lease',outbox_id:job.id}));
+        }
+      } catch(error) {
+        summary.lostLease+=1;
+        console.error(JSON.stringify({type:'email_outbox_sent_state_persist_failed',outbox_id:job.id,error:safeError(error)}));
+      }
+      continue;
+    }
+
+    const lastError=safeError(deliveryError);
+    const terminal=job.attempts>=EMAIL_OUTBOX_MAX_ATTEMPTS;
+    const availableAt=new Date(Date.now()+(terminal?0:retryBackoffMs(job.attempts)));
+    const updated=await query(`UPDATE email_outbox SET
+      status=:status,available_at=:availableAt,last_error=:lastError,lock_token=NULL,locked_at=NULL,lease_until=NULL,
+      updated_at=UTC_TIMESTAMP(3)
+      WHERE id=:id AND status='PROCESSING' AND lock_token=:token`,{
+        status:terminal?'FAILED':'PENDING',availableAt,lastError,id:job.id,token:job.lock_token
+      });
+    if(Number(updated.affectedRows)===1) {
+      if(terminal) summary.failed+=1;
+      else summary.retried+=1;
+    } else summary.lostLease+=1;
+    console.warn(JSON.stringify({type:'email_outbox_delivery_failed',outbox_id:job.id,attempt:job.attempts,terminal,error:lastError}));
   }
   return summary;
 }
