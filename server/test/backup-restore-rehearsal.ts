@@ -68,9 +68,9 @@ async function snapshot(name){
       counts[table]=Number(rows[0].count);
     }
     const [ledger]=await c.query('SELECT version,checksum FROM schema_migrations ORDER BY version');
-    const [columns]=await c.query("SELECT TABLE_NAME AS t,COLUMN_NAME AS c,COLUMN_TYPE AS ty,IS_NULLABLE AS n,EXTRA AS x,GENERATION_EXPRESSION AS g FROM information_schema.columns WHERE table_schema=DATABASE() AND ((TABLE_NAME='wfh_requests' AND COLUMN_NAME='active_request_date') OR (TABLE_NAME='employment_history' AND COLUMN_NAME='created_by'))");
-    const [indexes]=await c.query("SELECT TABLE_NAME AS t,INDEX_NAME AS n,NON_UNIQUE AS u,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols FROM information_schema.statistics WHERE table_schema=DATABASE() GROUP BY TABLE_NAME,INDEX_NAME,NON_UNIQUE");
-    const [fks]=await c.query("SELECT TABLE_NAME AS t,CONSTRAINT_NAME AS n FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND constraint_type='FOREIGN KEY'");
+    const [columns]=await c.query("SELECT TABLE_NAME AS t,COLUMN_NAME AS c,COLUMN_TYPE AS ty,IS_NULLABLE AS n,EXTRA AS x,GENERATION_EXPRESSION AS g FROM information_schema.columns WHERE table_schema=DATABASE() AND ((TABLE_NAME='wfh_requests' AND COLUMN_NAME='active_request_date') OR (TABLE_NAME='employment_history' AND COLUMN_NAME='created_by')) ORDER BY TABLE_NAME,COLUMN_NAME");
+    const [indexes]=await c.query("SELECT TABLE_NAME AS t,INDEX_NAME AS n,NON_UNIQUE AS u,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols FROM information_schema.statistics WHERE table_schema=DATABASE() GROUP BY TABLE_NAME,INDEX_NAME,NON_UNIQUE ORDER BY TABLE_NAME,INDEX_NAME");
+    const [fks]=await c.query("SELECT TABLE_NAME AS t,CONSTRAINT_NAME AS n FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND constraint_type='FOREIGN KEY' ORDER BY TABLE_NAME,CONSTRAINT_NAME");
     const [marker]=await c.execute("SELECT e.id,e.employee_code,a.check_in_method,l.reason,w.status,JSON_UNQUOTE(JSON_EXTRACT(log.details_json,'$.marker')) AS marker FROM employees e JOIN attendance_records a ON a.employee_id=e.id JOIN leave_requests l ON l.employee_id=e.id JOIN wfh_requests w ON w.employee_id=e.id JOIN audit_logs log ON log.actor_id=(SELECT id FROM employees WHERE role='ADMIN' AND email LIKE 'restore-admin-%' ORDER BY created_at DESC LIMIT 1) WHERE e.email LIKE 'restore-employee-%' ORDER BY e.created_at DESC LIMIT 1");
     return {counts,ledger,columns,indexes,fks,marker};
   }finally{await c.end();}
