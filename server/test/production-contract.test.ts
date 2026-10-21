@@ -29,6 +29,7 @@ const seed=fs.readFileSync(path.join(root,'src/seed.ts'),'utf8');
 const vite=fs.readFileSync(path.join(root,'../client/vite.config.ts'),'utf8');
 const objectStorage=fs.readFileSync(path.join(root,'src/object-storage.mts'),'utf8');
 const vercel=fs.readFileSync(path.join(root,'../vercel.json'),'utf8');
+const productionConfig=fs.readFileSync(path.join(root,'src/production-config.mts'),'utf8');
 const playwright=fs.readFileSync(path.join(root,'../playwright.config.ts'),'utf8');
 const preflight=fs.readFileSync(path.join(root,'../.github/workflows/production-preflight.yml'),'utf8');
 const productionSmoke=fs.readFileSync(path.join(root,'../.github/workflows/production-smoke.yml'),'utf8');
@@ -180,7 +181,8 @@ assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/workplace\/
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await post\('\/attendance\/(corrections|flex-requests)/);
 assert.doesNotMatch(main,/gmail\.send|GmailAccessBridge|useGoogleLogin/);
 assert.match(index,/Permissions-Policy/);
-assert.match(index,/Set a private JWT_SECRET of at least 32 bytes in production/);
+assert.match(index,/assertProductionConfiguration\(process\.env\)/);
+assert.match(productionConfig,/Set a private JWT_SECRET of at least 32 bytes in production/);
 assert.match(index,/private_object_storage/);
 assert.match(objectStorage,/getObjectStorageReadiness/);
 assert.match(objectStorage,/BLOB_READ_WRITE_TOKEN/);
