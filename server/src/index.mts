@@ -15,6 +15,7 @@ import adminRoutes from './routes/admin.mts';
 import accountRoutes from './routes/account.mts';
 import enterpriseRoutes from './routes/enterprise.mts';
 import { getObjectStorageReadiness } from './object-storage.mts';
+import { assertProductionConfiguration } from './production-config.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -29,7 +30,7 @@ app.disable('x-powered-by');
 // Trust the forwarded client IP only on Vercel, which overwrites X-Forwarded-For at its edge.
 // Local/direct deployments must not let a client-supplied forwarding header choose req.ip.
 app.set('trust proxy', process.env.VERCEL === '1' ? 1 : false);
-if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');}
+assertProductionConfiguration(process.env);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 app.use((req,res,next)=>{
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(self)');
