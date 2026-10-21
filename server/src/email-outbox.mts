@@ -77,8 +77,9 @@ async function claimBatch(batchSize: number, onlyId?: string): Promise<ClaimedMe
     const [rows] = await connection.execute(`SELECT id,dedupe_key,recipients_json,subject,text_body,html_body,reply_to,from_name,attempts
       FROM email_outbox
       WHERE status='PENDING' AND available_at<=UTC_TIMESTAMP(3) AND attempts<max_attempts
+        AND (:onlyId IS NULL OR id=:onlyId)
       ORDER BY available_at,created_at
-      LIMIT :limit FOR UPDATE SKIP LOCKED`, {limit:size});
+      LIMIT :limit FOR UPDATE SKIP LOCKED`, {limit:size,onlyId:onlyId || null});
     const claimed:ClaimedMessage[]=[];
     for (const row of rows as any[]) {
       const token=crypto.randomUUID();
