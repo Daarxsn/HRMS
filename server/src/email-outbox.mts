@@ -66,7 +66,7 @@ type ClaimedMessage = {
   lock_token:string;
 };
 
-async function claimBatch(batchSize: number): Promise<ClaimedMessage[]> {
+async function claimBatch(batchSize: number, onlyId?: string): Promise<ClaimedMessage[]> {
   const size=Math.max(1,Math.min(EMAIL_OUTBOX_BATCH_SIZE,Math.floor(batchSize || EMAIL_OUTBOX_BATCH_SIZE)));
   return transaction(async (connection) => {
     await connection.execute(\`UPDATE email_outbox
@@ -93,10 +93,10 @@ async function claimBatch(batchSize: number): Promise<ClaimedMessage[]> {
   });
 }
 
-export async function processEmailOutboxBatch(options: {batchSize?:number; send?:typeof sendEmail} = {}) {
+export async function processEmailOutboxBatch(options: {batchSize?:number; outboxId?:string; send?:typeof sendEmail} = {}) {
   const batchSize=options.batchSize ?? EMAIL_OUTBOX_BATCH_SIZE;
   const sender=options.send || sendEmail;
-  const jobs=await claimBatch(batchSize);
+  const jobs=await claimBatch(batchSize,options.outboxId);
   const summary={claimed:jobs.length,sent:0,retried:0,failed:0,lostLease:0};
   for (const job of jobs) {
     try {
