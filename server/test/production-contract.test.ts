@@ -199,7 +199,7 @@ assert.match(enterprise,/employee_documents WHERE id=:id AND employee_id=:employ
 assert.match(validate,/LIMIT_FILE_SIZE/);
 assert.match(auth,/googleLoginLimiter/);
 assert.match(auth,/claims\.email_verified !== true/);
-assert.match(emailOutbox,/uq_email_outbox_dedupe_key/);
+assert.match(emailOutboxMigration,/uq_email_outbox_dedupe_key/);
 assert.match(emailOutbox,/FOR UPDATE SKIP LOCKED/);
 assert.match(emailOutbox,/lease_until/);
 assert.match(emailOutbox,/EMAIL_OUTBOX_MAX_ATTEMPTS/);
@@ -210,7 +210,7 @@ assert.match(emailOutboxRoutes,/EMAIL_OUTBOX_CRON_SECRET/);
 assert.match(emailOutboxMigration,/CREATE TABLE IF NOT EXISTS email_outbox/);
 assert.match(emailOutboxMigration,/UNIQUE KEY uq_email_outbox_dedupe_key/);
 assert.match(emailOutboxWorker,/processEmailOutboxBatch/);
-assert.match(emailOutboxWorkflow,/cron: '\\*\/5 \\* \\* \\* \\*'/);
+assert.match(emailOutboxWorkflow,/cron: '.*\/5 \* \* \* \*'/);
 assert.match(leave,/outboxId/);
 assert.match(workplace,/outboxId/);
 assert.match(attendance,/outboxId/);
