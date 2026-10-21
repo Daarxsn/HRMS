@@ -840,7 +840,7 @@ try {
   const createRollbackTaskId=crypto.randomUUID();
   const createRollbackTrigger='hrms_step6_fail_onboarding_create_audit';
   try {
-    await pool.query(`CREATE TRIGGER ${createRollbackTrigger BEFORE INSERT ON audit_logs FOR EACH ROW
+    await pool.query(`CREATE TRIGGER ${createRollbackTrigger} BEFORE INSERT ON audit_logs FOR EACH ROW
       BEGIN
         IF NEW.action='ONBOARDING_TASK_CREATED' AND NEW.entity_id='${createRollbackTaskId}' THEN
           SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected onboarding-create audit failure';
