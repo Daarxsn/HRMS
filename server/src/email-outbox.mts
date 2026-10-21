@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { query, transaction } from './db.mts';
-import { getHrNotificationEmail, sendEmail, type EmailMessage } from './mailer.mts';
+import { getHrNotificationEmail, sendEmail, smtpConfigured, type EmailMessage } from './mailer.mts';
 
 export const EMAIL_OUTBOX_MAX_ATTEMPTS = 8;
 export const EMAIL_OUTBOX_BATCH_SIZE = 10;
@@ -50,7 +50,7 @@ export async function enqueueHrNotificationEmail(message: Omit<EmailMessage,'to'
   const recipient = getHrNotificationEmail();
   if (!recipient) return {queued:false, skipped:true, id:null, status:'SKIPPED', recipient:null, recipients:0};
   const result = await enqueueEmail({...message,to:[recipient]},dedupeKey);
-  return {...result, recipient, recipients:result.recipientCount};
+  return {...result, configured:smtpConfigured(), recipient, recipients:result.recipientCount};
 }
 
 type ClaimedMessage = {
