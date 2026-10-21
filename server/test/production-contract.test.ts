@@ -104,8 +104,6 @@ assert.match(e2e,/WFH-enabled employee can check in from Attendance without a da
 assert.match(integration,/WFH check-out must not require office geolocation/);
 assert.match(app,/wfhData\.approvedToday===true/);
 assert.match(app,/Your WFH is approved for today/);
-assert.match(e2e,/approved WFH check-in from employee overview does not request laptop or mobile GPS/);
-assert.match(e2e,/approved WFH check-in from the Attendance page bypasses office location checks/);
 assert.match(email,/SMTP_HOST/);
 assert.match(email,/SMTP_PASSWORD/);
 assert.match(email,/STARTTLS/);

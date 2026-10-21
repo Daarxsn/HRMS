@@ -129,21 +129,21 @@ try {
   const spoofedGpsAttempt = await request('/attendance/check-in', {
     method:'POST',
     headers:{ Cookie:employeeSession.cookie, 'X-Forwarded-For':'198.51.100.10' },
-    body:JSON.stringify({method:'GPS',latitude:18.506633,longitude:73.857692,accuracy:10})
+    body:JSON.stringify({method:'GPS',workLocation:'OFFICE',latitude:18.506633,longitude:73.857692,accuracy:10})
   });
   assert.equal(spoofedGpsAttempt.response.status,403,'Client-supplied X-Forwarded-For and GPS coordinates must not bypass the office IP allow-list.');
 
   const gpsInsideWithoutOfficeNetwork = await request('/attendance/check-in', {
     method:'POST',
     headers:{Cookie:employeeSession.cookie},
-    body:JSON.stringify({method:'GPS',latitude:18.506633,longitude:73.857692,accuracy:10})
+    body:JSON.stringify({method:'GPS',workLocation:'OFFICE',latitude:18.506633,longitude:73.857692,accuracy:10})
   });
   assert.equal(gpsInsideWithoutOfficeNetwork.response.status,403,'Client GPS coordinates alone must not authorize a punch when the server-observed IP is not on the office allow-list.');
 
   const gpsOutsideOffice = await request('/attendance/check-in', {
     method:'POST',
     headers:{Cookie:employeeSession.cookie},
-    body:JSON.stringify({method:'GPS',latitude:18.516633,longitude:73.857692,accuracy:10})
+    body:JSON.stringify({method:'GPS',workLocation:'OFFICE',latitude:18.516633,longitude:73.857692,accuracy:10})
   });
   assert.equal(gpsOutsideOffice.response.status,422,'An outside-geofence check-in must be rejected when office-network verification also fails.');
 
