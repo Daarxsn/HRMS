@@ -136,7 +136,7 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
         + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p>'
         + '</div></body></html>';
       const result = await enqueueHrNotificationEmail({ subject, text, html, replyTo:req.user.email, fromName:'Falchion Xeniaa HRMS' }, 'wfh-request:' + id);
-      return { configured:!result.skipped, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
+      return { configured:result.configured, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
     } catch (error) {
       console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));
       return { configured:false, sent:0, recipients:0 };
