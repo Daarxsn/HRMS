@@ -822,11 +822,11 @@ try {
   const adminSettingsBefore = await request('/admin/settings',{headers:{Cookie:adminSession.cookie}});
   assert.equal(adminSettingsBefore.response.status,200);
   assert.ok(adminSettingsBefore.data.settings);
-  const settingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({late_threshold:'09:17'})});
-  assert.equal(settingsUpdate.response.status,200,'Settings updates must persist through the real API.');
-  const persistedSetting = await query("SELECT setting_value FROM system_settings WHERE setting_key='late_threshold'");
-  assert.equal(persistedSetting[0]?.setting_value,'09:17');
-  const restoreSetting = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({late_threshold:'09:30'})});
+  const settingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:35})});
+  assert.equal(settingsUpdate.response.status,200,'Settings updates must persist through the real API: '+JSON.stringify(settingsUpdate.data));
+  const persistedSetting = await query("SELECT setting_value FROM system_settings WHERE setting_key='fixed_lunch_minutes'");
+  assert.equal(persistedSetting[0]?.setting_value,'35');
+  const restoreSetting = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:30})});
   assert.equal(restoreSetting.response.status,200);
   const report = await request('/admin/leave-report?from=2026-01-01&to=2099-12-31',{headers:{Cookie:adminSession.cookie}});
   assert.equal(report.response.status,200);
