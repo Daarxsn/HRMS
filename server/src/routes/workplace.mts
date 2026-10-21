@@ -6,7 +6,8 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, requireAdmin, requirePeople, notifyAdmins } from '../security.mts';
-import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape } from '../mailer.mts';
+import { enqueueHrNotificationEmail } from '../email-outbox.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, isScheduledWorkday } from '../policy.mts';
 import { saveObject, deleteObject, readObject } from '../object-storage.mts';
@@ -134,8 +135,8 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
         + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
         + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p>'
         + '</div></body></html>';
-      const result = await sendHrNotificationEmail({ subject, text, html, replyTo:req.user.email, fromName:'Falchion Xeniaa HRMS' });
-      return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
+      const result = await enqueueHrNotificationEmail({ subject, text, html, replyTo:req.user.email, fromName:'Falchion Xeniaa HRMS' }, 'wfh-request:' + id);
+      return { configured:!result.skipped, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
     } catch (error) {
       console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));
       return { configured:false, sent:0, recipients:0 };
