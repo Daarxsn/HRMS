@@ -50,8 +50,8 @@ async function seedAndMigrate(name){
   try{
     const employeeId=crypto.randomUUID();
     const adminId=crypto.randomUUID();
-    await c.execute("INSERT INTO employees (id,employee_code,full_name,email,role,user_type,status,title,joined_on,wfh_enabled) VALUES (?,?,? ,?,'ADMIN','ADMIN','ACTIVE','Restore admin','2025-01-06',FALSE)",[adminId,'BKR-A-'+suffix,'Backup Restore Admin','restore-admin-'+suffix+'@example.test']);
-    await c.execute("INSERT INTO employees (id,employee_code,full_name,email,role,user_type,status,title,joined_on,wfh_enabled) VALUES (?,?,?,?,'EMPLOYEE','EMPLOYEE','ACTIVE','Restore employee','2025-01-07',FALSE)",[employeeId,'BKR-E-'+suffix,'Backup Restore Employee','restore-employee-'+suffix+'@example.test']);
+    await c.execute("INSERT INTO employees (id,employee_code,full_name,email,role,user_type,status,title,joined_on,wfh_enabled) VALUES (?,?,? ,?,'ADMIN','ADMIN','ACTIVE','Restore admin','2025-01-06',FALSE)",[adminId,'BA'+suffix.slice(-10),'Backup Restore Admin','restore-admin-'+suffix+'@example.test']);
+    await c.execute("INSERT INTO employees (id,employee_code,full_name,email,role,user_type,status,title,joined_on,wfh_enabled) VALUES (?,?,?,?,'EMPLOYEE','EMPLOYEE','ACTIVE','Restore employee','2025-01-07',FALSE)",[employeeId,'BE'+suffix.slice(-10),'Backup Restore Employee','restore-employee-'+suffix+'@example.test']);
     await c.execute("INSERT INTO attendance_records (id,employee_id,attendance_date,check_in_at,check_out_at,check_in_method,check_out_method,status) VALUES (?,?, '2026-02-03','2026-02-03 03:00:00','2026-02-03 11:00:00','WFH','WFH','ON_TIME')",[crypto.randomUUID(),employeeId]);
     await c.execute("INSERT INTO leave_requests (id,employee_id,leave_type,start_date,end_date,days,reason,status) VALUES (?,?, 'CASUAL','2026-02-04','2026-02-04',1,'Backup restore fixture','REJECTED')",[crypto.randomUUID(),employeeId]);
     await c.execute("INSERT INTO wfh_requests (id,employee_id,request_date,request_kind,reason,status) VALUES (?,?, '2026-02-05','PLANNED','Backup restore fixture','REJECTED')",[crypto.randomUUID(),employeeId]);
