@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { deleteObject } from '../src/object-storage.mts';
 import { pool, query } from '../src/db.mts';
 
 const port = 8090;
@@ -11,6 +12,9 @@ const env = {
   PORT: String(port),
   APP_ORIGIN: `http://127.0.0.1:${port}`,
   DEMO_AUTH_ENABLED: 'true',
+  GOOGLE_CLIENT_ID: 'ci-oauth-client.apps.googleusercontent.com',
+  VERCEL: '0',
+  BLOB_READ_WRITE_TOKEN: '',
   OFFICE_NETWORK_IPS: '198.51.100.10',
   JWT_SECRET: 'ci-integration-secret-0123456789-abcdefghijklmnopqrstuvwxyz'
 };
@@ -81,6 +85,8 @@ try {
   assert.equal(health.data.database, 'ok');
   assert.ok(health.data.version);
   assert.ok(health.data.build);
+  assert.match(health.response.headers.get('permissions-policy') || '', /geolocation=\\(self\\)/i);
+  assert.equal(health.response.headers.get('x-content-type-options'), 'nosniff');
 
   const demoUsers = await request('/auth/demo-users');
   assert.equal(demoUsers.response.status, 200);
@@ -156,6 +162,94 @@ try {
 
 
   const adminSession = await signIn(admin.email);
+
+  // Step 4 / 22: document self-service, IDOR denial, and administrative access are tested independently.
+  const otherEmployee = demoUsers.data.users.find((user) => user.role === 'EMPLOYEE' && user.email !== employee.email);
+  assert.ok(otherEmployee?.email, 'Seed must provide a second employee for document ownership tests.');
+  const pdfBytes = Buffer.from('%PDF-1.4\nHRMS Step 4 document ownership test\n%%EOF\n');
+  const documentForm = () => {
+    const form = new FormData();
+    form.append('document', new Blob([pdfBytes], {type:'application/pdf'}), 'step4-ownership.pdf');
+    form.append('documentType', 'TEST');
+    form.append('title', 'Step 4 document ownership test');
+    return form;
+  };
+  const uploadResponse = await fetch(baseUrl + '/enterprise/admin/employees/' + employeeSession.user.id + '/documents', {
+    method:'POST', headers:{Cookie:adminSession.cookie}, body:documentForm()
+  });
+  const uploadText = await uploadResponse.text();
+  const uploaded = uploadText ? JSON.parse(uploadText) : null;
+  assert.equal(uploadResponse.status, 201, 'Admin upload of a valid private PDF must succeed: ' + uploadText);
+  assert.ok(uploaded?.id);
+
+  const ownList = await request('/enterprise/employee/documents', {headers:{Cookie:employeeSession.cookie}});
+  assert.equal(ownList.response.status, 200);
+  assert.ok(ownList.data.documents.some((doc) => doc.id === uploaded.id));
+  const ownDownload = await fetch(baseUrl + '/enterprise/employee/documents/' + uploaded.id, {headers:{Cookie:employeeSession.cookie}});
+  assert.equal(ownDownload.status, 200);
+  assert.match(ownDownload.headers.get('content-disposition') || '', /attachment/i);
+  assert.match(ownDownload.headers.get('cache-control') || '', /private, no-store/i);
+  assert.equal(ownDownload.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await ownDownload.arrayBuffer()), pdfBytes);
+
+  const otherSession = await signIn(otherEmployee.email);
+  const idor = await request('/enterprise/employee/documents/' + uploaded.id, {headers:{Cookie:otherSession.cookie}});
+  assert.equal(idor.response.status, 404, 'Changing document ID cannot disclose another employee document.');
+  const employeeAdminDownload = await request('/enterprise/admin/documents/' + uploaded.id, {headers:{Cookie:employeeSession.cookie}});
+  assert.equal(employeeAdminDownload.response.status, 403, 'Employees must not use the admin document route.');
+  const adminDownload = await fetch(baseUrl + '/enterprise/admin/documents/' + uploaded.id, {headers:{Cookie:adminSession.cookie}});
+  assert.equal(adminDownload.status, 200, 'Authorized administrator can access the HR document.');
+  assert.match(adminDownload.headers.get('cache-control') || '', /private, no-store/i);
+
+  const invalidMime = new FormData();
+  invalidMime.append('document', new Blob(['not a PDF'], {type:'text/plain'}), 'invalid.txt');
+  invalidMime.append('documentType', 'TEST');
+  invalidMime.append('title', 'Invalid MIME regression');
+  const invalidMimeResponse = await fetch(baseUrl + '/enterprise/admin/employees/' + employeeSession.user.id + '/documents', {
+    method:'POST', headers:{Cookie:adminSession.cookie}, body:invalidMime
+  });
+  assert.equal(invalidMimeResponse.status, 400);
+
+  const fakePdf = new FormData();
+  fakePdf.append('document', new Blob(['not a PDF despite MIME'], {type:'application/pdf'}), 'fake.pdf');
+  fakePdf.append('documentType', 'TEST');
+  fakePdf.append('title', 'Fake PDF regression');
+  const fakePdfResponse = await fetch(baseUrl + '/enterprise/admin/employees/' + employeeSession.user.id + '/documents', {
+    method:'POST', headers:{Cookie:adminSession.cookie}, body:fakePdf
+  });
+  assert.equal(fakePdfResponse.status, 400, 'MIME labels must be backed by a valid file signature.');
+
+  const oversized = new FormData();
+  oversized.append('document', new Blob([new Uint8Array(10 * 1024 * 1024 + 1)], {type:'application/pdf'}), 'oversized.pdf');
+  oversized.append('documentType', 'TEST');
+  oversized.append('title', 'Oversized document regression');
+  const oversizedResponse = await fetch(baseUrl + '/enterprise/admin/employees/' + employeeSession.user.id + '/documents', {
+    method:'POST', headers:{Cookie:adminSession.cookie}, body:oversized
+  });
+  assert.equal(oversizedResponse.status, 413, 'Files above 10 MiB must return HTTP 413.');
+
+  const employeeUpload = await fetch(baseUrl + '/enterprise/admin/employees/' + employeeSession.user.id + '/documents', {
+    method:'POST', headers:{Cookie:employeeSession.cookie}, body:documentForm()
+  });
+  assert.equal(employeeUpload.status, 403, 'Employees must not upload HR-controlled documents.');
+
+  const objectRows = await query('SELECT object_key FROM employee_documents WHERE id=:id LIMIT 1', {id:uploaded.id});
+  await query('DELETE FROM employee_documents WHERE id=:id', {id:uploaded.id});
+  if (objectRows[0]?.object_key) await deleteObject(objectRows[0].object_key);
+
+  // Both role and user_type must be compatible to reach protected administration.
+  for (const invalid of [{role:'ADMIN',user_type:'EMPLOYEE'}, {role:'EMPLOYEE',user_type:'ADMIN'}]) {
+    await query('UPDATE employees SET role=:role,user_type=:type WHERE id=:id', {role:invalid.role,type:invalid.user_type,id:employeeSession.user.id});
+    try {
+      const invalidMe = await request('/auth/me', {headers:{Cookie:employeeSession.cookie}});
+      assert.equal(invalidMe.response.status, 403, 'Mismatched role/type must fail closed.');
+      const invalidAdmin = await request('/enterprise/admin/overview', {headers:{Cookie:employeeSession.cookie}});
+      assert.equal(invalidAdmin.response.status, 403, 'Mismatched accounts cannot enter the enterprise admin namespace.');
+    } finally {
+      await query("UPDATE employees SET role='EMPLOYEE',user_type='EMPLOYEE' WHERE id=:id", {id:employeeSession.user.id});
+    }
+  }
+
   const adminMe = await request('/auth/me', {
     headers: { Cookie: adminSession.cookie }
   });
@@ -666,6 +760,22 @@ try {
   assert.equal(dashboard.response.status, 200);
   assert.ok(dashboard.data.stats);
   assert.equal(Number.isInteger(dashboard.data.stats.employees), true);
+
+  const missingJwtAtStartup = spawnSync(process.execPath, ['--experimental-strip-types','src/index.mts'], {
+    cwd:process.cwd(),
+    encoding:'utf8',
+    timeout:5000,
+    env:{...process.env,NODE_ENV:'production',JWT_SECRET:'',APP_ORIGIN:'https://hrms.invalid',GOOGLE_CLIENT_ID:'ci-oauth-client.apps.googleusercontent.com',PORT:'8091'}
+  });
+  assert.notEqual(missingJwtAtStartup.status, 0, 'Production must refuse to start without JWT_SECRET.');
+  assert.match((missingJwtAtStartup.stderr || '') + (missingJwtAtStartup.stdout || ''), /Set a private JWT_SECRET of at least 32 bytes in production/);
+
+  let googleLoginResponse;
+  for(let attempt=0;attempt<11;attempt+=1) {
+    googleLoginResponse=await request('/auth/google',{method:'POST',body:JSON.stringify({credential:'deliberately-invalid-google-token'})});
+    if(attempt<10) assert.equal(googleLoginResponse.response.status,401);
+  }
+  assert.equal(googleLoginResponse.response.status,429,'The dedicated Google login limiter must throttle request eleven.');
 
   const logout = await request('/auth/logout', {
     method: 'POST',
