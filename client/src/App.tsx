@@ -289,7 +289,7 @@ function EmployeeHome(){
   const name=user.full_name.split(' ')[0];
   const earned=balance.find((b)=>b.type==='EARNED');
   const week=weekDaysFor(today);const holidayMap=new Map(calendarHolidays.map((item)=>[item.date,item]));const weekProgress=week.map((day)=>{const row=weekRecords.find((record)=>record.attendance_date===day.date);const holiday=holidayMap.get(day.date);const holidayName=holiday?.name;const fixedHoliday=holiday?.kind==='FIXED';return {...day,row,holidayName,fixedHoliday,working:day.working&&!fixedHoliday,completed:Boolean(row?.check_in_at&&row?.check_out_at),isCurrent:day.date===today};});
-  const completedDays=weekProgress.filter((day)=>day.completed).length;const remainingDays=weekProgress.filter((day)=>day.working&&day.date>=today&&!day.completed).length;const shared=balance.find((b)=>b.type==='CASUAL');const floating=balance.find((b)=>b.type==='FLOATING');const pendingLeave=leaveRequests.filter((item)=>item.status==='PENDING').length;const pendingWfh=wfhData.requests.filter((item)=>item.status==='PENDING').length;const approvedWfhThisMonth=wfhData.requests.filter((item)=>item.status==='APPROVED'&&String(item.request_date).slice(0,7)===today.slice(0,7)).length;const nextHoliday=calendarHolidays.find((item)=>item.date>today);const unread=Number(notifications?.unread||0);const latestAnnouncement=notifications?.notifications?.find((item)=>item.kind==='ANNOUNCEMENT')||null;const [punchBusy,setPunchBusy]=useState(false);const [punchError,setPunchError]=useState('');const approvedWfhToday=wfhData.approvedToday===true||wfhData.requests.some((item)=>String(item.request_date||'').slice(0,10)===String(wfhData.today||today).slice(0,10)&&String(item.status||'').toUpperCase()==='APPROVED');
+  const completedDays=weekProgress.filter((day)=>day.completed).length;const remainingDays=weekProgress.filter((day)=>day.working&&day.date>=today&&!day.completed).length;const shared=balance.find((b)=>b.type==='CASUAL');const floating=balance.find((b)=>b.type==='FLOATING');const pendingLeave=leaveRequests.filter((item)=>item.status==='PENDING').length;const pendingWfh=wfhData.requests.filter((item)=>item.status==='PENDING').length;const approvedWfhThisMonth=wfhData.requests.filter((item)=>item.status==='APPROVED'&&String(item.request_date).slice(0,7)===today.slice(0,7)).length;const nextHoliday=calendarHolidays.find((item)=>item.date>today);const unread=Number(notifications?.unread||0);const latestAnnouncement=notifications?.notifications?.find((item)=>item.kind==='ANNOUNCEMENT')||null;const [punchBusy,setPunchBusy]=useState(false);const [punchError,setPunchError]=useState('');const [punchStage,setPunchStage]=useState('');const approvedWfhToday=wfhData.approvedToday===true||wfhData.requests.some((item)=>String(item.request_date||'').slice(0,10)===String(wfhData.today||today).slice(0,10)&&String(item.status||'').toUpperCase()==='APPROVED');
   const quickLocation=()=>new Promise((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
     let best=null;let watchId=null;let timeoutId=null;let settled=false;
@@ -320,16 +320,25 @@ function EmployeeHome(){
     if(punchBusy||holiday)return;
     setPunchBusy(true);setPunchError('');
     const method=type==='check-out'&&todayRow?.check_in_method==='WFH'?'WFH':approvedWfhToday&&type==='check-in'?'WFH':'GPS';
+    setPunchStage(method==='WFH'?'Using approved WFH status…':'Requesting an accurate location (up to 5 seconds)…');
     try{
       let geo={};let verifiedMethod=method;
-      if(method==='GPS'){try{geo=await quickLocation();}catch(locationError){verifiedMethod='WIFI';}}
+      if(method==='GPS'){
+        try{geo=await quickLocation();}
+        catch(locationError){
+          verifiedMethod=type==='check-out'?'OFF_PREMISES':'WIFI';
+          setPunchStage(type==='check-out'?'GPS unavailable; saving off-premises check-out…':'GPS unavailable or inaccurate; checking the approved office Wi-Fi…');
+        }
+      }
+      if(verifiedMethod==='WIFI')setPunchStage('Verifying the approved office network…');
+      setPunchStage('Saving attendance and audit record…');
       const result=await post(`/attendance/${type}`,{method:verifiedMethod,...geo});
       const successMessage=type==='check-in'?(verifiedMethod==='WFH'?'Remote check-in recorded.':verifiedMethod==='WIFI'?'Check-in recorded using approved office Wi-Fi.':'Check-in recorded.'):(verifiedMethod==='WFH'?'Remote check-out recorded.':verifiedMethod==='WIFI'?'Check-out recorded using approved office Wi-Fi.':'Check-out recorded.');
       notify(result?.warning?.code==='PRIOR_OPEN_SHIFT_REQUIRES_REVIEW' ? successMessage+(result.warning.hrNotified?' HR has been alerted to review earlier attendance records.':' HR review is required for earlier attendance records; the notice could not be sent.') : successMessage);
       try{const a=await get(`/attendance?from=${today}&to=${today}`);setTodayRow(a.records?.[0]||null);setWeekRecords((prev)=>[...prev.filter((row)=>row.attendance_date!==today),...(a.records||[])]);}
       catch{setError('Your attendance action was recorded, but the latest status could not be refreshed. Retry the overview to confirm it.');}
     }catch(e){setPunchError(e.message||'The attendance action could not be completed.');}
-    finally{setPunchBusy(false);}
+    finally{setPunchBusy(false);setPunchStage('');}
   };
 
   return <>
@@ -362,7 +371,7 @@ function EmployeeHome(){
       <div className="hero-bottom"><span><MapPin size={14}/> Falchion Xeniaa · Pune HQ</span><span>Mon–Sat <b>·</b> Report by 9:30 AM</span></div>
     </section>
     {todayOpen&&<TodayDrawer row={todayRow} holiday={holiday} close={()=>setTodayOpen(false)}/>}
-    <Card className="overview-attendance-card"><div className="overview-attendance-copy"><div className="eyebrow">ATTENDANCE</div><h2>{holiday?'Holiday today':todayRow?.check_in_at?(todayRow.check_out_at?'Today is complete':'You are checked in'):'Ready to check in'}</h2><p>{holiday?'No attendance action is expected today.':todayRow?.check_in_at?(todayRow.check_out_at?'Your attendance entry is complete for today.':`Checked in at ${formatTime(todayRow.check_in_at)}. Check out when you finish.`):approvedWfhToday?'Your approved WFH day can be started without office location verification.':'Report between 9:00 and 9:30 AM. Office check-in verifies your location once.'}</p>{punchError&&<div className="inline-alert alert-error"><CircleAlert size={16}/>{punchError}<button type="button" onClick={()=>setPunchError('')} aria-label="Dismiss"><X size={14}/></button></div>}</div><div className="overview-attendance-action">{holiday?<Link className="button button-soft" to="/calendar">View calendar</Link>:todayRow?.check_in_at&&!todayRow?.check_out_at?<Button loading={punchBusy} icon={LogOut} onClick={()=>quickPunch('check-out')}>Check out</Button>:todayRow?.check_out_at?<span className="overview-attendance-done"><Check size={16}/> Checked out</span>:<Button loading={punchBusy} icon={LogIn} onClick={()=>quickPunch('check-in')}>{approvedWfhToday?'Check in remotely':'Check in'}</Button>}<span className="report-window">Report time · 9:00–9:30 AM</span></div></Card>
+    <Card className="overview-attendance-card"><div className="overview-attendance-copy"><div className="eyebrow">ATTENDANCE</div><h2>{holiday?'Holiday today':todayRow?.check_in_at?(todayRow.check_out_at?'Today is complete':'You are checked in'):'Ready to check in'}</h2><p>{holiday?'No attendance action is expected today.':todayRow?.check_in_at?(todayRow.check_out_at?'Your attendance entry is complete for today.':`Checked in at ${formatTime(todayRow.check_in_at)}. Check out when you finish.`):approvedWfhToday?'Your approved WFH day can be started without office location verification.':'Report between 9:00 and 9:30 AM. Office check-in verifies your location once.'}</p>{punchStage&&<small className="attendance-progress" role="status" aria-live="polite">{punchStage}</small>}{punchError&&<div className="inline-alert alert-error"><CircleAlert size={16}/>{punchError}<button type="button" onClick={()=>setPunchError('')} aria-label="Dismiss"><X size={14}/></button></div>}</div><div className="overview-attendance-action">{holiday?<Link className="button button-soft" to="/calendar">View calendar</Link>:todayRow?.check_in_at&&!todayRow?.check_out_at?<Button loading={punchBusy} icon={LogOut} onClick={()=>quickPunch('check-out')}>Check out</Button>:todayRow?.check_out_at?<span className="overview-attendance-done"><Check size={16}/> Checked out</span>:<Button loading={punchBusy} icon={LogIn} onClick={()=>quickPunch('check-in')}>{approvedWfhToday?'Check in remotely':'Check in'}</Button>}<span className="report-window">Report time · 9:00–9:30 AM</span></div></Card>
     {latestAnnouncement&&<Card className="announcement-banner"><div className="announcement-banner-icon"><Megaphone size={18}/></div><div className="announcement-banner-copy"><span className="eyebrow">FROM FALCHION XENIAA</span><h2>{latestAnnouncement.title}</h2><p>{latestAnnouncement.body}</p><small>{formatDate(String(latestAnnouncement.created_at).slice(0,10),{day:'numeric',month:'short'})} · {formatTime(latestAnnouncement.created_at)}</small></div><Link className="tiny-arrow" to="/notifications"><ArrowUpRight size={16}/></Link></Card>}
     <section className="employee-action-center">
       <Card className="action-center-card">
@@ -399,6 +408,7 @@ function AdminSelfAttendanceCard(){
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [attendanceProgress,setAttendanceProgress]=useState('');
   const [time,setTime]=useState(new Date());
   const load=async()=>{
     setLoading(true);setError('');
@@ -425,14 +435,20 @@ function AdminSelfAttendanceCard(){
     );
   });
   const punch=async(type)=>{
-    setBusy(true);setError('');
+    setBusy(true);setError('');setAttendanceProgress('Requesting an accurate location (up to 5 seconds)…');
     try{
-      let geo={};let method='GPS';
-      try{geo=await getLocation();}catch(locationError){method='WIFI';}
-      await post(`/attendance/${type}`,{method,...geo});
+      let geo={};let method=type==='check-out'&&row?.check_in_method==='WFH'?'WFH':'GPS';
+      if(method==='GPS'){
+        try{geo=await getLocation();}
+        catch(locationError){method=type==='check-out'?'OFF_PREMISES':'WIFI';setAttendanceProgress(type==='check-out'?'GPS unavailable; saving off-premises check-out…':'GPS unavailable; checking the approved office Wi-Fi…');}
+      }
+      if(method==='WIFI')setAttendanceProgress('Verifying the approved office network…');
+      setAttendanceProgress('Saving attendance and audit record…');
+      const result=await post(`/attendance/${type}`,{method,...geo});
       await load();
-      notify(method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.');
-    }catch(e){setError(e.message);}finally{setBusy(false);}
+      const message=method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':method==='OFF_PREMISES'?'Off-premises check-out recorded.':type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.';
+      notify(result?.shortShiftReviewRequired?message+' This was a short shift and has been flagged for review.':message);
+    }catch(e){setError(e.message);}finally{setBusy(false);setAttendanceProgress('');}
   };
   const state=holiday
     ? {label:'Holiday',title:holiday.name||'Office holiday',body:'Attendance is not expected today.'}
@@ -445,7 +461,7 @@ function AdminSelfAttendanceCard(){
     <div className="admin-self-attendance-copy">
       <div className="admin-self-attendance-kicker"><span className="pulse-dot"/><span>YOUR ATTENDANCE</span><small>{new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(time)} IST</small></div>
       <div className="admin-self-attendance-heading"><div><h2>{state.title}</h2><p>{state.body}</p></div><span className={`admin-self-attendance-status admin-self-attendance-status-${state.label.toLowerCase().replaceAll(' ','-')}`}>{state.label}</span></div>
-      {error&&<div className="admin-self-attendance-error"><CircleAlert size={15}/>{error}<button type="button" className="text-button" onClick={load}>Retry</button></div>}
+      {attendanceProgress&&<small className="attendance-progress" role="status" aria-live="polite">{attendanceProgress}</small>}{error&&<div className="admin-self-attendance-error"><CircleAlert size={15}/>{error}<button type="button" className="text-button" onClick={load}>Retry</button></div>}
       {!holiday&&<div className="admin-self-attendance-actions">
         <Button variant={row?.check_in_at?'soft':'primary'} onClick={()=>punch('check-in')} loading={busy} disabled={loading||Boolean(row?.check_in_at)} icon={LogIn}>Check in</Button>
         <Button variant={row?.check_in_at&&!row?.check_out_at?'primary':'soft'} onClick={()=>punch('check-out')} loading={busy} disabled={loading||!row?.check_in_at||Boolean(row?.check_out_at)} icon={LogOut}>Check out</Button>
@@ -530,7 +546,7 @@ function TodayDrawer({row,holiday,close}){
 }
 function AttendancePage(){
   const {user,notify,refresh}=useApp();
-  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [attendanceAvailable,setAttendanceAvailable]=useState(false);const attendanceRequest=useRef(0);const attendanceLoaded=useRef(false);const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [actionBusy,setActionBusy]=useState(false);const [actionError,setActionError]=useState('');const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',requests:[]});
+  const [rows,setRows]=useState([]);const [todayHoliday,setTodayHoliday]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [attendanceAvailable,setAttendanceAvailable]=useState(false);const attendanceRequest=useRef(0);const attendanceLoaded=useRef(false);const [correctionOpen,setCorrectionOpen]=useState(false);const [flexOpen,setFlexOpen]=useState(false);const [actionBusy,setActionBusy]=useState(false);const [actionError,setActionError]=useState('');const [actionStage,setActionStage]=useState('');const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',requests:[]});
   const load=async()=>{
     const requestId=++attendanceRequest.current;
     if(!attendanceLoaded.current)setLoading(true);
@@ -574,16 +590,22 @@ function AttendancePage(){
   });
   const punch=async(type)=>{
     setActionBusy(true);setActionError('');
+    let method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
+    setActionStage(method==='WFH'?'Using approved WFH status…':'Requesting an accurate location (up to 5 seconds)…');
     try{
-      let method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
       let geo={};
-      if(method==='GPS'){try{geo=await requestLocation();}catch(locationError){method='WIFI';}}
+      if(method==='GPS'){
+        try{geo=await requestLocation();}
+        catch(locationError){method=type==='check-out'?'OFF_PREMISES':'WIFI';setActionStage(type==='check-out'?'GPS unavailable; saving off-premises check-out…':'GPS unavailable or inaccurate; checking the approved office Wi-Fi…');}
+      }
+      if(method==='WIFI')setActionStage('Verifying the approved office network…');
+      setActionStage('Saving attendance and audit record…');
       const result=await post(`/attendance/${type}`,{method,...geo});
       await load();
       const successMessage=method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.');
       notify(result?.warning?.code==='PRIOR_OPEN_SHIFT_REQUIRES_REVIEW' ? successMessage+(result.warning.hrNotified?' HR has been alerted to review earlier attendance records.':' HR review is required for earlier attendance records; the notice could not be sent.') : successMessage);
     }catch(e){setActionError(e.message);}
-    finally{setActionBusy(false);}
+    finally{setActionBusy(false);setActionStage('');}
   };const statusLabel=todayHoliday?'Holiday':!attendanceAvailable?(loading?'Loading':'Unavailable'):current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';
   const presentRows=rows.filter((r)=>['ON_TIME','LATE_ENTRY'].includes(r.status)||r.check_in_at);const lateRows=rows.filter((r)=>r.status==='LATE_ENTRY');const absentRows=rows.filter((r)=>r.status==='ABSENT');const leaveRows=rows.filter((r)=>r.status==='ON_LEAVE');const considered=Math.max(1,presentRows.length+absentRows.length);const healthPercent=Math.round((presentRows.length/considered)*100);
   return <>
@@ -594,7 +616,7 @@ function AttendancePage(){
         <div className="attendance-overview-kicker"><span className="eyebrow">TODAY · {today}</span><span className="attendance-live-badge"><i className="pulse-dot"/> LIVE</span></div>
         <h2>{todayHoliday?todayHoliday.name:statusLabel==='Complete'?'Attendance recorded.':statusLabel==='In progress'?'You checked in at '+formatTime(current.check_in_at)+'.':'Ready when you are.'}</h2>
         <p>{todayHoliday?'No attendance action is expected today.':statusLabel==='Complete'?'Your attendance entry is complete for today.':statusLabel==='In progress'?'Your workday is underway. Check out when you finish.':approvedWfhToday?'You have an approved WFH day. Check in remotely when you start.':'Check in when you arrive. Your office location is verified only when you press the attendance action.'}</p>
-        {actionError&&<div className="attendance-action-error" role="alert"><CircleAlert size={15}/><span>{actionError}</span><button type="button" onClick={()=>setActionError('')} aria-label="Dismiss"><X size={14}/></button></div>}
+        {actionStage&&<small className="attendance-progress" role="status" aria-live="polite">{actionStage}</small>}{actionError&&<div className="attendance-action-error" role="alert"><CircleAlert size={15}/><span>{actionError}</span><button type="button" onClick={()=>setActionError('')} aria-label="Dismiss"><X size={14}/></button></div>}
         <div className="attendance-overview-meta"><span><Clock3 size={15}/> 9:00–9:30 AM report window</span><span><ShieldCheck size={15}/> One-time verification</span><span>{approvedWfhToday?<House size={15}/>:<MapPin size={15}/>} {approvedWfhToday?'Approved WFH':'Pune HQ'}</span></div>
       </div>
       <div className="attendance-overview-state">
@@ -731,10 +753,17 @@ function LeavePage(){
 }
 
 function WfhPage(){
-  const {notify,refresh}=useApp();const [data,setData]=useState({enabled:false,approvedToday:false,today:'',requests:[],monthlyCap:4});const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [date,setDate]=useState('');const [kind,setKind]=useState('PLANNED');const [reason,setReason]=useState('');const [error,setError]=useState('');const [loadError,setLoadError]=useState('');const wfhRequest=useRef(0);const wfhLoaded=useRef(false);
+  const {notify,refresh}=useApp();const [data,setData]=useState({enabled:false,approvedToday:false,today:'',requests:[],monthlyCap:4});const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [cancelBusy,setCancelBusy]=useState(null);const [date,setDate]=useState('');const [kind,setKind]=useState('PLANNED');const [reason,setReason]=useState('');const [error,setError]=useState('');const [loadError,setLoadError]=useState('');const wfhRequest=useRef(0);const wfhLoaded=useRef(false);
   const load=async()=>{const requestId=++wfhRequest.current;setLoading(true);setLoadError('');try{const next=await get('/wfh');if(requestId!==wfhRequest.current)return;setData({enabled:Boolean(next.enabled),approvedToday:next.approvedToday===true,today:String(next.today||today).slice(0,10),requests:Array.isArray(next.requests)?next.requests:[],monthlyCap:Number(next.monthlyCap||4)});}catch(e){if(requestId===wfhRequest.current)setLoadError(e.message||'WFH eligibility could not be checked.');}finally{if(requestId===wfhRequest.current){wfhLoaded.current=true;setLoading(false);}}};
   useEffect(()=>{void load();return()=>{wfhRequest.current+=1;};},[]);
   const submit=async(e)=>{e.preventDefault();if(busy||loading||loadError)return;setBusy(true);setError('');try{if(!date)throw new Error('Choose a remote-work date.');if(data.requests.some((r)=>r.request_date===date&&['PENDING','APPROVED'].includes(r.status)))throw new Error('You already have a pending or approved WFH request for that date.');if(kind==='EMERGENCY'&&date!==today)throw new Error('Unexpected WFH requests are for today.');if(kind==='PLANNED'){const target=new Date(`${date}T00:00:00+05:30`).getTime();if(target-Date.now()<24*60*60*1000)throw new Error('Planned WFH requests should be submitted at least 24 hours ahead.');}const result=await post('/wfh',{date,kind,reason});notify(result?.emailDelivery?.sent?'Your WFH request was emailed to HR. You can reply to the notification to contact you.': 'Your request was saved, but the HR email could not be sent. Please notify HR or try again later.');setDate('');setReason('');await load();refresh();}catch(e){setError(e.message);}finally{setBusy(false);}};
+  const cancelRequest=async(request)=>{
+    if(cancelBusy||!['PENDING','APPROVED'].includes(String(request.status).toUpperCase()))return;
+    setCancelBusy(request.id);setError('');
+    try{await del('/wfh/'+encodeURIComponent(request.id));notify('WFH request cancelled. You can submit a new request for this date.');await load();refresh();}
+    catch(e){setError(e.message||'Could not cancel the WFH request.');}
+    finally{setCancelBusy(null);}
+  };
   const approvedThisMonth=data.requests.filter((r)=>r.status==='APPROVED'&&String(r.request_date).slice(0,7)===today.slice(0,7)).length;const pendingWfhCount=data.requests.filter((r)=>r.status==='PENDING').length;const remainingWfhDays=Math.max(0,Number(data.monthlyCap||0)-approvedThisMonth);
   return <><PageTitle eyebrow="FLEXIBILITY, WITH ALIGNMENT" title="Work from home" description="Occasional remote days are available by approval." action={<span className="policy-chip"><House size={14}/> No activity tracking</span>}/>
     {error&&<InlineError>{error}</InlineError>}
@@ -745,12 +774,12 @@ function WfhPage(){
     <section className="wfh-banner"><div className="wfh-banner-icon"><House size={21}/></div><div><span className="hero-kicker">FLEXIBILITY IS BUILT ON TRUST</span><h2>{loading?'Checking your remote-work access…':loadError?'Remote-work status is temporarily unavailable.':data.enabled?'A remote day, with a little planning.':'WFH isn’t enabled for your account yet.'}</h2><p>{loading?'We’re checking your current eligibility and request history.':loadError?'Retry the access check. We won’t treat a connection failure as a disabled account.':data.enabled?`WFH is available for you by approval, typically up to ${data.monthlyCap} days per month.`:'Ask an administrator if your role should be included in the current WFH arrangement.'}</p></div><div className="wfh-banner-art"><div/><House size={42}/><span/></div></section>
     <div className="wfh-layout"><Card className="wfh-request-card"><CardHeading title="Request a remote day" subtitle="Your manager will review the date and context."/>{loading?<div className="employee-page-loading" role="status"><Spinner/><span>Checking eligibility…</span></div>:loadError?<div className="employee-page-error-inline"><CircleAlert size={16}/><span>Remote-work access could not be verified.</span><button type="button" className="text-button" onClick={()=>void load()}>Retry</button></div>:data.enabled?<form className="form-stack" onSubmit={submit}><label className="form-field"><span>Remote work date</span><input type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><div className="request-kind-toggle"><button type="button" className={kind==='PLANNED'?'kind-selected':''} onClick={()=>setKind('PLANNED')}><CalendarDays size={16}/><span><b>Planned</b><small>Ask at least 24 hours ahead</small></span></button><button type="button" className={kind==='EMERGENCY'?'kind-selected':''} onClick={()=>setKind('EMERGENCY')}><CircleAlert size={16}/><span><b>Unexpected</b><small>Same-day emergency request</small></span></button></div><label className="form-field"><span>Anything your manager should know?</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="A little context helps with team coordination." minLength="8" maxLength="1000" required/></label><div className="wfh-policy-note"><ShieldCheck size={15}/><span>Remote work follows the same 9 AM–6 PM schedule. Performance is measured through delivery, not online presence.</span></div>{(date||reason)&&<div className="wfh-request-preview"><div className="wfh-request-preview-head"><span className="eyebrow">REQUEST PREVIEW</span><Check size={15}/></div><div className="wfh-request-preview-grid"><span><CalendarDays size={16}/><b>{date?formatDate(date,{weekday:"short",day:"numeric",month:"short",year:"numeric"}):"Choose a date"}</b></span><span><House size={16}/><b>{kind==="EMERGENCY"?"Unexpected":"Planned"}</b><small>{reason?reason.length+" characters added":"Add a little context"}</small></span></div></div>}<Button type="submit" loading={busy} disabled={loading||Boolean(loadError)} icon={Send}>Request WFH approval</Button></form>:<div className="wfh-disabled"><LockIcon/><h3>Not enabled for this account</h3><p>WFH currently applies to one employee and can be configured by an administrator.</p></div>}</Card>
       <div className="wfh-side"><Card className="wfh-guidelines"><CardHeading title="Working remotely" subtitle="Simple expectations for a good day."/><div className="guideline-row"><span className="guideline-number">01</span><div><b>Keep your team aligned</b><p>Availability on Slack, email and calls during regular working hours.</p></div></div><div className="guideline-row"><span className="guideline-number">02</span><div><b>Protect company information</b><p>Use a private workspace and avoid unsecured public Wi-Fi.</p></div></div><div className="guideline-row"><span className="guideline-number">03</span><div><b>Trust over tracking</b><p>No spyware, screen recording, webcam watching or keyboard tracking.</p></div></div></Card><div className="wfh-quote">“We measure contribution through delivery, not online presence.”<small>REMOTE WORK POLICY</small></div></div></div>
-    <div className="section-head"><div><h2>Your WFH requests</h2><p>Planned and emergency requests for this year.</p></div></div><Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>REQUEST TYPE</th><th>CONTEXT</th><th>STATUS</th><th>NOTE</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:data.requests?.length?data.requests.map((r)=><tr key={r.id}><td><b>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td>{r.request_kind==='EMERGENCY'?'Emergency':'Planned'}</td><td className="reason-cell">{r.reason}</td><td><StatusPill value={r.status}/></td><td>{r.reviewer_note||'—'}</td></tr>):<tr><td colSpan="5"><div className="table-message">No WFH requests yet.</div></td></tr>}</tbody></table></div></Card>
+    <div className="section-head"><div><h2>Your WFH requests</h2><p>Planned and emergency requests for this year.</p></div></div><Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>REQUEST TYPE</th><th>CONTEXT</th><th>STATUS</th><th>NOTE</th><th>ACTION</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:data.requests?.length?data.requests.map((r)=><tr key={r.id}><td><b>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td>{r.request_kind==='EMERGENCY'?'Emergency':'Planned'}</td><td className="reason-cell">{r.reason}</td><td><StatusPill value={r.status}/></td><td>{r.reviewer_note||'—'}</td><td>{['PENDING','APPROVED'].includes(String(r.status).toUpperCase())&&String(r.request_date).slice(0,10)>=today?<Button size="small" variant="soft" loading={cancelBusy===r.id} disabled={Boolean(cancelBusy)} onClick={()=>void cancelRequest(r)}>Cancel</Button>:'—'}</td></tr>):<tr><td colSpan="6"><div className="table-message">No WFH requests yet.</div></td></tr>}</tbody></table></div></Card>
     <div className="mobile-request-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:data.requests?.length?data.requests.map((r)=><Card className="mobile-request-card" key={'mobile-'+r.id}>
         <div className="mobile-request-card-top"><span className="mobile-request-date"><House size={16}/></span><div><b>{r.request_kind==='EMERGENCY'?'Emergency WFH':'Planned WFH'}</b><small>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</small></div><StatusPill value={r.status}/></div>
         <p className="mobile-request-reason">{r.reason}</p>
-        {r.reviewer_note&&<div className="mobile-request-note"><CircleHelp size={14}/><span>{r.reviewer_note}</span></div>}
+        {r.reviewer_note&&<div className="mobile-request-note"><CircleHelp size={14}/><span>{r.reviewer_note}</span></div>}{['PENDING','APPROVED'].includes(String(r.status).toUpperCase())&&String(r.request_date).slice(0,10)>=today&&<Button size="small" variant="soft" loading={cancelBusy===r.id} disabled={Boolean(cancelBusy)} onClick={()=>void cancelRequest(r)}>Cancel request</Button>}
       </Card>):<EmptyState icon={House} title="No WFH requests yet." body="Your planned and emergency remote-work requests will appear here."/>}
     </div>
   </>;

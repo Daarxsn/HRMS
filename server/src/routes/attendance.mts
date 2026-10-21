@@ -238,7 +238,7 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
 }));
 
 router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ method: z.enum(['GPS','WIFI','WFH']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
+  const input = validate(z.object({ method: z.enum(['GPS','WIFI','WFH','OFF_PREMISES']).default('GPS'), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), accuracy: z.number().min(0).optional() }), req.body || {});
   const today = indiaDate();
   const settings = await getSettings();
   // Find the most recent open shift, not only a row dated today. This allows
@@ -271,16 +271,43 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
   let result;
   await transaction(async (connection) => {
     await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE',{employee:req.user.id});
-    const [rows] = await connection.execute(`SELECT id,attendance_date,check_in_method,check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date<=:today AND check_out_at IS NULL ORDER BY attendance_date DESC LIMIT 1 FOR UPDATE`, { employee:req.user.id, today });
+    const [rows] = await connection.execute(`SELECT id,attendance_date,check_in_at,check_in_method,check_out_at,TIMESTAMPDIFF(MINUTE,check_in_at,UTC_TIMESTAMP()) AS elapsed_minutes FROM attendance_records WHERE employee_id=:employee AND attendance_date<=:today AND check_out_at IS NULL ORDER BY attendance_date DESC LIMIT 1 FOR UPDATE`, { employee:req.user.id, today });
     if (!rows[0]) throw Object.assign(new Error('No open attendance shift was found. Check in first or contact HR if a previous shift needs correction.'), { status:409 });
     if (method === 'WFH' && rows[0].check_in_method !== 'WFH') throw Object.assign(new Error('WFH check-out is available only for an approved WFH attendance record.'), { status:403 });
+    const elapsedMinutes = Math.max(0, Number(rows[0].elapsed_minutes || 0));
+    const configuredLunch = Number(settings.fixed_lunch_minutes);
+    const lunchMinutes = Number.isFinite(configuredLunch) && configuredLunch >= 0 ? configuredLunch : POLICY.fixedLunchMinutes;
+    const workedMinutes = Math.max(0, elapsedMinutes - lunchMinutes);
+    // Flag only shifts shorter than the configured lunch deduction; this avoids inventing a new minimum-shift policy.
+    const shortShiftReviewRequired = elapsedMinutes < lunchMinutes;
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
       id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
     });
-    result = { id:rows[0].id, method, date:String(rows[0].attendance_date).slice(0,10) };
+    const details = {
+      method,date:String(rows[0].attendance_date).slice(0,10),
+      distance_m:distance===null?null:Math.round(distance),
+      elapsed_minutes:elapsedMinutes,worked_minutes:workedMinutes,lunch_minutes:lunchMinutes,
+      short_shift_review_required:shortShiftReviewRequired
+    };
+    await connection.execute(`INSERT INTO audit_logs
+      (id,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at)
+      VALUES (:logId,:actorId,'ATTENDANCE_CHECK_OUT','attendance',:attendanceId,:details,:ipAddress,UTC_TIMESTAMP())`, {
+      logId:crypto.randomUUID(),actorId:req.user.id,attendanceId:rows[0].id,
+      details:JSON.stringify(details),ipAddress:req.ip
+    });
+    result = {id:rows[0].id,method,date:String(rows[0].attendance_date).slice(0,10),elapsedMinutes,workedMinutes,shortShiftReviewRequired};
   });
-  await audit({ actorId:req.user.id, action:'ATTENDANCE_CHECK_OUT', entityType:'attendance', entityId:result.id, details:{method:result.method,date:result.date,distance_m:distance===null?null:Math.round(distance)}, ipAddress:req.ip });
-  res.json({ ok: true, method: result.method });
+  if (result.shortShiftReviewRequired) {
+    try {
+      await notifyAdmins('Short attendance shift requires review',
+        req.user.full_name+' ('+req.user.employee_code+') checked out after '+result.elapsedMinutes+' minute(s) on '+result.date+'. Timestamps are preserved; net time follows the lunch-deduction rule.',
+        'UPDATE',{type:'short_attendance_shift',attendanceId:result.id,date:result.date,elapsedMinutes:result.elapsedMinutes,workedMinutes:result.workedMinutes});
+    } catch (error) {
+      console.warn(JSON.stringify({type:'short_shift_review_notification_failed',attendance_id:result.id,error:String(error?.message||error)}));
+    }
+  }
+  res.json({ok:true,method:result.method,elapsedMinutes:result.elapsedMinutes,workedMinutes:result.workedMinutes,shortShiftReviewRequired:result.shortShiftReviewRequired});
+
 }));
 
 router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute(async (req, res) => {
@@ -324,6 +351,13 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
   if(!isScheduledWorkday(input.date,new Set(holidays.map((x)=>x.date)))) throw Object.assign(new Error('Choose a scheduled workday for your flex-start request.'),{status:400});
   const id = crypto.randomUUID();
   await transaction(async (connection) => {
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', {employee:req.user.id});
+    const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (leaveConflict[0]) throw Object.assign(new Error('A flex-start request cannot overlap pending or approved leave.'), {status:409});
+    const [wfhConflict] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (wfhConflict[0]) throw Object.assign(new Error('A flex-start request cannot overlap pending or approved WFH.'), {status:409});
+    const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (attendanceConflict[0]) throw Object.assign(new Error('Attendance is already recorded for this date; a flex-start request cannot change it retroactively.'), {status:409});
     const [existing] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
     if (existing[0]) throw Object.assign(new Error('You already have a pending or approved flex-start request for this date.'), { status:409 });
     await connection.execute(`INSERT INTO flex_start_requests (id, employee_id, request_date, requested_start_time, reason) VALUES (:id, :employee, :date, :time, :reason)`, {

@@ -133,6 +133,28 @@ try {
   });
   assert.equal(spoofedGpsAttempt.response.status,403,'Client-supplied X-Forwarded-For and GPS coordinates must not bypass the office IP allow-list.');
 
+  const gpsInsideWithoutOfficeNetwork = await request('/attendance/check-in', {
+    method:'POST',
+    headers:{Cookie:employeeSession.cookie},
+    body:JSON.stringify({method:'GPS',latitude:18.506633,longitude:73.857692,accuracy:10})
+  });
+  assert.equal(gpsInsideWithoutOfficeNetwork.response.status,403,'Client GPS coordinates alone must not authorize a punch when the server-observed IP is not on the office allow-list.');
+
+  const gpsOutsideOffice = await request('/attendance/check-in', {
+    method:'POST',
+    headers:{Cookie:employeeSession.cookie},
+    body:JSON.stringify({method:'GPS',latitude:18.516633,longitude:73.857692,accuracy:10})
+  });
+  assert.equal(gpsOutsideOffice.response.status,422,'An outside-geofence check-in must be rejected when office-network verification also fails.');
+
+  const offPremisesCheckIn = await request('/attendance/check-in', {
+    method:'POST',
+    headers:{Cookie:employeeSession.cookie},
+    body:JSON.stringify({method:'OFF_PREMISES'})
+  });
+  assert.equal(offPremisesCheckIn.response.status,400,'OFF_PREMISES must be checkout-only.');
+
+
   const adminSession = await signIn(admin.email);
   const adminMe = await request('/auth/me', {
     headers: { Cookie: adminSession.cookie }
@@ -142,6 +164,41 @@ try {
   assert.equal(adminMe.data.user.user_type, 'ADMIN');
   assert.equal(adminMe.data.user.platform, 'ADMIN');
   assert.equal(adminMe.data.user.landingPath, '/admin');
+
+  // Concurrent correction submissions for the same employee/date must create one
+  // pending request and return a conflict for the other attempt, never ER_DUP_ENTRY.
+  const indiaTodayForCorrection = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+  }).format(new Date());
+  const correctionBase = new Date(indiaTodayForCorrection+'T12:00:00Z');
+  let correctionDate='';
+  for(let offset=2;offset<=365&&!correctionDate;offset+=1){
+    const candidate = new Date(correctionBase.getTime()-offset*86400000).toISOString().slice(0,10);
+    const pending = await query("SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1",{employee:employeeSession.user.id,date:candidate});
+    if(!pending[0]) correctionDate=candidate;
+  }
+  assert.ok(correctionDate,'Integration test must find a date without an existing pending correction.');
+  const correctionBody = {
+    date:correctionDate,
+    requestedCheckIn:new Date(correctionDate+'T03:00:00.000Z').toISOString(),
+    reason:'Concurrent correction submission regression'
+  };
+  const concurrentCorrections = await Promise.all([
+    request('/attendance/corrections',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify(correctionBody)}),
+    request('/attendance/corrections',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify(correctionBody)})
+  ]);
+  assert.equal(concurrentCorrections.filter((x)=>x.response.status===201).length,1,'Exactly one concurrent correction submission must succeed.');
+  assert.equal(concurrentCorrections.filter((x)=>x.response.status===409).length,1,'The duplicate concurrent correction must receive HTTP 409.');
+  const createdCorrection=concurrentCorrections.find((x)=>x.response.status===201);
+  assert.ok(createdCorrection?.data?.id);
+  const rejectCorrection=await request('/admin/approvals/correction/'+createdCorrection.data.id,{
+    method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Integration-test cleanup'})
+  });
+  assert.equal(rejectCorrection.response.status,200,'The test correction must be reviewable without changing attendance.');
+  const testedBalances=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+  assert.equal(testedBalances.response.status,200);
+  const earnedBalance=(testedBalances.data.balances||[]).find((balance)=>balance.type==='EARNED');
+  assert.ok(earnedBalance&&Number.isFinite(earnedBalance.accrued)&&Number.isFinite(earnedBalance.remaining),'Earned balance must expose numeric accrued and remaining fields.');
 
   // Regression: approved WFH must override the stale client mode "GPS" on the
   // server. This simulates the production browser build still asking for GPS,
@@ -245,6 +302,8 @@ try {
     });
     assert.equal(remoteCheckOut.response.status, 200, 'WFH check-out must not require office geolocation.');
     assert.equal(remoteCheckOut.data.method, 'WFH');
+    assert.equal(remoteCheckOut.data.shortShiftReviewRequired,true,'An unusually short shift must remain check-outable and be flagged for review.');
+    assert.equal(remoteCheckOut.data.workedMinutes,0,'The lunch deduction must never create negative net work minutes.');
     const preservedHistoricalShift = await query('SELECT check_out_at FROM attendance_records WHERE id=:id', {id:previousOpenFixtureId});
     assert.equal(preservedHistoricalShift[0]?.check_out_at, null, 'Today’s check-out must not fabricate a timestamp for the historical shift.');
     await query('DELETE FROM attendance_records WHERE id=:id', {id:previousOpenFixtureId});
@@ -252,6 +311,82 @@ try {
   } else {
     console.log('WFH GPS-fallback integration scenario skipped: today is a non-working day, company holiday, or attendance already exists.');
   }
+
+  // End-to-end WFH lifecycle in future, isolated business dates: concurrent create,
+  // approval, conflicts against leave/flex, cancellation, reapplication, rejection.
+  const lifecycleCandidates=[];
+  const lifecycleMonths=new Set();
+  const wfhBase=new Date(wfhDate+'T12:00:00Z');
+  for(let offset=35;offset<=400&&lifecycleCandidates.length<2;offset+=1){
+    const candidate=new Date(wfhBase.getTime()+offset*86400000).toISOString().slice(0,10);
+    const weekday=new Date(candidate+'T12:00:00Z').getUTCDay();
+    if(weekday===0)continue;
+    if(['01-26','08-15','10-02'].includes(candidate.slice(5)))continue;
+    if(lifecycleMonths.has(candidate.slice(0,7)))continue;
+    const [fixedHoliday]=await query("SELECT id FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED' LIMIT 1",{date:candidate});
+    if(fixedHoliday[0])continue;
+    const monthStart=candidate.slice(0,7)+'-01';
+    const [yy,mm]=candidate.split('-').map(Number);
+    const monthEnd=new Date(Date.UTC(yy,mm,0)).toISOString().slice(0,10);
+    const [monthlyCount]=await query("SELECT COUNT(*) AS count FROM wfh_requests WHERE employee_id=:employee AND request_date BETWEEN :start AND :end AND status IN ('PENDING','APPROVED')",{employee:employeeSession.user.id,start:monthStart,end:monthEnd});
+    if(Number(monthlyCount[0]?.count||0)>=Number(wfhState.data.monthlyCap||4))continue;
+    const [existingActive]=await query("SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1",{employee:employeeSession.user.id,date:candidate});
+    if(existingActive[0])continue;
+    lifecycleCandidates.push(candidate);
+    lifecycleMonths.add(candidate.slice(0,7));
+  }
+  assert.equal(lifecycleCandidates.length,2,'Must find two future non-fixed-holiday business dates in different months for WFH lifecycle tests.');
+
+  const concurrentWfhRequests=await Promise.all([
+    request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[0],kind:'PLANNED',reason:'Concurrent WFH lifecycle request A'})}),
+    request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[0],kind:'PLANNED',reason:'Concurrent WFH lifecycle request B'})})
+  ]);
+  assert.equal(concurrentWfhRequests.filter((x)=>x.response.status===201).length,1,'Only one concurrent active WFH request may be created.');
+  assert.equal(concurrentWfhRequests.filter((x)=>x.response.status===409).length,1,'Concurrent duplicate WFH submission must receive HTTP 409.');
+  const createdLifecycleWfh=concurrentWfhRequests.find((x)=>x.response.status===201);
+  assert.ok(createdLifecycleWfh?.data?.id);
+  const approveLifecycleWfh=await request('/admin/approvals/wfh/'+createdLifecycleWfh.data.id,{
+    method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Step 3 integration lifecycle'})
+  });
+  assert.equal(approveLifecycleWfh.response.status,200);
+  const leaveAgainstWfh=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({type:'CASUAL',startDate:lifecycleCandidates[0],endDate:lifecycleCandidates[0],reason:'Leave conflicts with approved WFH'})});
+  assert.equal(leaveAgainstWfh.response.status,409,'Leave submission must not contradict approved WFH.');
+  const flexAgainstWfh=await request('/attendance/flex-requests',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[0],startTime:'10:00',reason:'Flex conflicts with approved WFH'})});
+  assert.equal(flexAgainstWfh.response.status,409,'Flex-start submission must not contradict approved WFH.');
+
+  const cancelApprovedWfh=await request('/wfh/'+createdLifecycleWfh.data.id,{method:'DELETE',headers:{Cookie:employeeSession.cookie}});
+  assert.equal(cancelApprovedWfh.response.status,200,'A future approved WFH request with no attendance can be cancelled.');
+  const reapplyWfh=await request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[0],kind:'PLANNED',reason:'Reapply after WFH cancellation'})});
+  assert.equal(reapplyWfh.response.status,201,'Cancellation must release active-date uniqueness for reapplication.');
+  const cancelReappliedWfh=await request('/wfh/'+reapplyWfh.data.id,{method:'DELETE',headers:{Cookie:employeeSession.cookie}});
+  assert.equal(cancelReappliedWfh.response.status,200);
+
+  const createRejectedWfh=await request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[1],kind:'PLANNED',reason:'WFH rejection lifecycle'})});
+  assert.equal(createRejectedWfh.response.status,201);
+  const rejectLifecycleWfh=await request('/admin/approvals/wfh/'+createRejectedWfh.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Step 3 rejection lifecycle'})});
+  assert.equal(rejectLifecycleWfh.response.status,200);
+  const reapplyRejectedWfh=await request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[1],kind:'PLANNED',reason:'Reapply after WFH rejection'})});
+  assert.equal(reapplyRejectedWfh.response.status,201,'Rejected WFH must release active-date uniqueness for reapplication.');
+  const cancelAfterRejection=await request('/wfh/'+reapplyRejectedWfh.data.id,{method:'DELETE',headers:{Cookie:employeeSession.cookie}});
+  assert.equal(cancelAfterRejection.response.status,200);
+
+  // Sick-leave validation must identify the correct type and rule when documentation is missing.
+  let sickStart='';
+  for(let offset=7;offset<=60&&!sickStart;offset+=1){
+    const candidate=new Date(wfhBase.getTime()+offset*86400000).toISOString().slice(0,10);
+    if(new Date(candidate+'T12:00:00Z').getUTCDay()!==1)continue;
+    const sickEndDate=new Date(new Date(candidate+'T12:00:00Z').getTime()+2*86400000).toISOString().slice(0,10);
+    if(candidate.slice(0,4)!==sickEndDate.slice(0,4))continue;
+    const [fixedRows]=await query("SELECT id FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :start AND :end LIMIT 1",{start:candidate,end:sickEndDate});
+    if(fixedRows[0])continue;
+    if(['01-26','08-15','10-02'].some((fixed)=>candidate.slice(5)===fixed||sickEndDate.slice(5)===fixed))continue;
+    sickStart=candidate;
+  }
+  assert.ok(sickStart,'Must find a Monday for the three-calendar-day sick-leave policy test.');
+  const sickEnd=new Date(new Date(sickStart+'T12:00:00Z').getTime()+2*86400000).toISOString().slice(0,10);
+  const sickWithoutNote=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({type:'SICK',startDate:sickStart,endDate:sickEnd,reason:'Sick leave documentation regression'})});
+  assert.equal(sickWithoutNote.response.status,400);
+  assert.match(sickWithoutNote.data?.error||' ',/doctor.*note.*sick leave/i,'Sick leave error must name the right leave type and document requirement.');
 
   const employeePolicies = await request('/enterprise/policies', {
     headers: { Cookie: employeeSession.cookie }
@@ -349,11 +484,13 @@ try {
   const overnightCheckout = await request('/attendance/check-out',{
     method:'POST',
     headers:{Cookie:adminSession.cookie},
-    body:JSON.stringify({method:'GPS'})
+    body:JSON.stringify({method:'OFF_PREMISES'})
   });
-  assert.equal(overnightCheckout.response.status,200,'An open shift from yesterday must be closable today.');
-  const closedOvernight = await query('SELECT check_out_at FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date',{employee:adminSession.user.id,date:previousIndiaDate});
+  assert.equal(overnightCheckout.response.status,200,'An off-premises check-out must close an open overnight shift.');
+  const closedOvernight = await query('SELECT check_out_at,check_out_method FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date',{employee:adminSession.user.id,date:previousIndiaDate});
   assert.ok(closedOvernight[0]?.check_out_at,'Overnight checkout must persist a checkout timestamp.');
+  assert.equal(closedOvernight[0]?.check_out_method,'OFF_PREMISES','Off-premises checkout must record its actual verification method.');
+
 
   const adminLeaveAttempt = await request('/leave', {
     headers: { Cookie: adminSession.cookie }

@@ -333,6 +333,8 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       if (leaveConflict[0]) throw Object.assign(new Error('This flex-start request overlaps pending or approved leave. Resolve leave before approving the flex start.'), {status:409});
       const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, {employee:item.employee_id,date:item.request_date});
       if (attendanceConflict[0]) throw Object.assign(new Error('Attendance is already recorded for this date. A flex-start approval cannot change it retroactively.'), {status:409});
+      const [wfhConflict] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (wfhConflict[0]) throw Object.assign(new Error('This flex-start request overlaps pending or approved WFH.'), {status:409});
       await connection.execute(`INSERT INTO employee_schedule_exceptions (id,employee_id,exception_date,approved_start_time,approved_by,reason)
         VALUES (:id,:employee,:date,:time,:actor,:reason) ON DUPLICATE KEY UPDATE approved_start_time=VALUES(approved_start_time),approved_by=VALUES(approved_by),reason=VALUES(reason)`, {
         id:crypto.randomUUID(), employee:item.employee_id, date:item.request_date, time:item.requested_start_time, actor:req.user.id, reason:item.reason
