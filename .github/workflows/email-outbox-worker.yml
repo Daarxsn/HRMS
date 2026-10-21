@@ -20,23 +20,23 @@ jobs:
     steps:
       - name: Call the protected outbox runner
         env:
-          OUTBOX_URL: \${{ secrets.HRMS_EMAIL_OUTBOX_URL }}
-          OUTBOX_SECRET: \${{ secrets.HRMS_EMAIL_OUTBOX_SECRET }}
+          OUTBOX_URL: ${{ secrets.HRMS_EMAIL_OUTBOX_URL }}
+          OUTBOX_SECRET: ${{ secrets.HRMS_EMAIL_OUTBOX_SECRET }}
         run: |
           set -euo pipefail
-          test -n "\${OUTBOX_URL}" || { echo "::error::Set HRMS_EMAIL_OUTBOX_URL in repository Actions secrets."; exit 1; }
-          test -n "\${OUTBOX_SECRET}" || { echo "::error::Set HRMS_EMAIL_OUTBOX_SECRET in repository Actions secrets."; exit 1; }
-          [[ "\${OUTBOX_URL}" == https://* ]]
-          response_file="\${RUNNER_TEMP}/email-outbox-response.json"
+          test -n "${OUTBOX_URL}" || { echo "::error::Set HRMS_EMAIL_OUTBOX_URL in repository Actions secrets."; exit 1; }
+          test -n "${OUTBOX_SECRET}" || { echo "::error::Set HRMS_EMAIL_OUTBOX_SECRET in repository Actions secrets."; exit 1; }
+          [[ "${OUTBOX_URL}" == https://* ]]
+          response_file="${RUNNER_TEMP}/email-outbox-response.json"
           status="$(curl --silent --show-error --max-time 70 \
-            -o "\${response_file}" -w '%{http_code}' \
-            -X POST "\${OUTBOX_URL}" \
-            -H "Authorization: Bearer \${OUTBOX_SECRET}" \
+            -o "${response_file}" -w '%{http_code}' \
+            -X POST "${OUTBOX_URL}" \
+            -H "Authorization: Bearer ${OUTBOX_SECRET}" \
             -H 'Content-Type: application/json' \
             --data '{}')"
-          if [[ "\${status}" != "200" ]]; then
-            echo "::error::Email outbox runner returned HTTP \${status}."
-            cat "\${response_file}"
+          if [[ "${status}" != "200" ]]; then
+            echo "::error::Email outbox runner returned HTTP ${status}."
+            cat "${response_file}"
             exit 1
           fi
-          cat "\${response_file}"
+          cat "${response_file}"
