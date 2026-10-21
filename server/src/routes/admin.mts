@@ -44,7 +44,7 @@ async function effectiveAttendance(from, to) {
     for(const person of people){
       if(date<person.joined_on||present.has(`${person.id}:${date}`))continue;
       const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||POLICY.standardStart;
-      const absenceCutoff=isPast||hasPassedAbsenceCutoff(currentTime,scheduledStart);
+      const absenceCutoff=isPast||hasPassedAbsenceCutoff(String(currentTime),String(scheduledStart));
       const onLeave=leaves.some((item)=>item.employee_id===person.id&&item.start_date<=date&&item.end_date>=date);
       const remote=wfh.some((item)=>item.employee_id===person.id&&item.request_date===date);
       const status=onLeave?'ON_LEAVE':remote?'WFH':absenceCutoff?'ABSENT':null;

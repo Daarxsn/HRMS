@@ -111,7 +111,7 @@ export function hasPassedAbsenceCutoff(currentTime: string, scheduledStart: stri
 
 export function earnedLeaveAccrual(asOfDate: string, joinedOn: string | null | undefined, probationEndDate: string | null | undefined, entitlement = POLICY.leaveEntitlements.EARNED) {
   const accrualStart = String(probationEndDate || joinedOn || '').slice(0,10);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(asOfDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(accrualStart) || accrualStart > asOfDate) return 0;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate) || !/^\d{4}-\d{2}-\d{2}$/.test(accrualStart) || accrualStart > asOfDate) return 0;
   const year = Number(asOfDate.slice(0,4));
   const month = Number(asOfDate.slice(5,7));
   const day = Number(asOfDate.slice(8,10));

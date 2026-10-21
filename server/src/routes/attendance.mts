@@ -87,7 +87,7 @@ router.get('/', asyncRoute(async (req, res) => {
     const day=d.toISOString().slice(0,10);if(day>today||holidaySet.has(day)||day<(person[0]?.joined_on||'' )||existing.has(day))continue;
     const onLeave=leaves.some((x)=>x.start_date<=day&&x.end_date>=day);const wfh=remoteDays.some((x)=>x.request_date===day);
     const scheduledStart=approvedStartByDate.get(day)||POLICY.standardStart;
-    const absent=day<today||hasPassedAbsenceCutoff(currentTime,scheduledStart);const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
+    const absent=day<today||hasPassedAbsenceCutoff(String(currentTime),String(scheduledStart));const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
     if(status)display.push({id:`${req.user.id}-${day}`,attendance_date:day,check_in_at:null,check_out_at:null,check_in_method:status==='WFH'?'WFH':null,check_out_method:null,status,approved_start_time:null,correction_pending:false});
   }
   const lunchRows = await query('SELECT setting_value FROM system_settings WHERE setting_key=\'fixed_lunch_minutes\'');
