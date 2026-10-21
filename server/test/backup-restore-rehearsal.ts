@@ -88,9 +88,7 @@ try{
   const dumpPath=path.join('/tmp','hrms-restore-'+suffix+'.sql');
   const fs=await import('node:fs/promises');
   await fs.writeFile(dumpPath,dump,{mode:0o600});
-  try{run('mysql',[...sqlClientArgs(restored)],{MYSQL_PWD:password});}
-  catch{}
-  // mysql CLI reads stdin via spawnSync input; restore into the isolated target only.
+  // Restore into the isolated target only; no production database is reachable from this test.
   const restore=spawnSync('mysql',sqlClientArgs(restored),{input:dump,encoding:'utf8',timeout:120000,env:{...process.env,MYSQL_PWD:password}});
   if(restore.status!==0)throw new Error('mysql restore failed ('+restore.status+'):\n'+String(restore.stdout||'')+'\n'+String(restore.stderr||''));
   const after=await snapshot(restored);
