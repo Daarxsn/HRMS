@@ -117,8 +117,10 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     `SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`,
     { employee: req.user.id, date }
   );
-  // Approved WFH defaults stale clients to remote mode, unless the employee explicitly chose office attendance.
-  let method = approvedWfhToday[0] && input.workLocation !== 'OFFICE' ? 'WFH' : input.method;
+  // WFH access is an explicit administrator permission. Promote stale clients that still submit GPS
+  // to the remote path before any GPS/IP verification, unless the employee chose the office path.
+  const wfhEnabled = req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1;
+  let method = input.workLocation !== 'OFFICE' && (approvedWfhToday[0] || wfhEnabled) ? 'WFH' : input.method;
   let distance = null;
   let locationAccuracy = null;
   if (method === 'GPS') {
@@ -146,7 +148,6 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     }
   }
   if (method === 'WIFI') verifyOfficeNetwork(req);
-  const wfhEnabled = req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1;
   if (method === 'WFH' && !wfhEnabled && !approvedWfhToday[0]) {
     throw Object.assign(new Error('WFH access is not enabled for this employee. Ask an administrator to enable WFH before checking in remotely.'), { status: 403 });
   }

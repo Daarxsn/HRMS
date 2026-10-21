@@ -336,12 +336,12 @@ try {
   assert.equal(existingTodayAttendance.response.status, 200);
   const alreadyCheckedIn = (existingTodayAttendance.data.records || []).some((item) => item.attendance_date === wfhDate && item.check_in_at);
   if (dayNumber !== 0 && !holidayToday && !alreadyCheckedIn) {
-    // WFH eligibility alone must be sufficient for a remote attendance punch.
+    // WFH eligibility alone must be sufficient for a remote punch, including stale browsers still sending GPS.
     // No daily request approval, GPS coordinates, or office network should be required.
     const enabledRemoteCheckIn = await request('/attendance/check-in', {
-      method:'POST', headers:{Cookie:employeeSession.cookie}, body:JSON.stringify({method:'WFH'})
+      method:'POST', headers:{Cookie:employeeSession.cookie}, body:JSON.stringify({method:'GPS'})
     });
-    assert.equal(enabledRemoteCheckIn.response.status,201,'WFH-enabled employee must check in remotely without an approved day request: '+JSON.stringify(enabledRemoteCheckIn.data));
+    assert.equal(enabledRemoteCheckIn.response.status,201,'A stale GPS-mode client must be promoted to remote check-in for WFH-enabled employees without an approved day request: '+JSON.stringify(enabledRemoteCheckIn.data));
     assert.equal(enabledRemoteCheckIn.data.method,'WFH');
     const enabledRemoteCheckOut = await request('/attendance/check-out', {
       method:'POST', headers:{Cookie:employeeSession.cookie}, body:JSON.stringify({method:'WFH'})
