@@ -138,8 +138,8 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
       const result = await enqueueHrNotificationEmail({ subject, text, html, replyTo:req.user.email, fromName:'Falchion Xeniaa HRMS' }, 'wfh-request:' + id);
       return { configured:result.configured, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
     } catch (error) {
-      console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));
-      return { configured:false, sent:0, recipients:0 };
+      console.error(JSON.stringify({type:'wfh_request_email_enqueue_failed',request_id:id,error:String(error?.message || error)}));
+      return { configured:false, sent:0, queued:false, status:'ENQUEUE_FAILED', outboxId:null, recipients:0 };
     }
   })();
   res.status(201).json({ ok: true, id, emailDelivery });
