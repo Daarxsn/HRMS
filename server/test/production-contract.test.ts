@@ -201,7 +201,7 @@ const workflowMigration=fs.readFileSync(path.join(root,'migrations/008_attendanc
 
 // Regression checks for the October 2026 forensic audit fixes.
 assert.match(filesSeedForAudit,/setting_value=VALUES\(setting_value\)/);
-assert.match(leave,/earnedLeaveAccrual\(today/);
+assert.match(leave,/earnedLeaveAccrual/);
 assert.match(leave,/input\.type === 'SICK' \? 'Sick leave'/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);

@@ -323,7 +323,7 @@ try {
     if(weekday===0)continue;
     if(['01-26','08-15','10-02'].includes(candidate.slice(5)))continue;
     if(lifecycleMonths.has(candidate.slice(0,7)))continue;
-    const [fixedHoliday]=await query("SELECT id FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED' LIMIT 1",{date:candidate});
+    const [fixedHoliday]=await query("SELECT holiday_date FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED' LIMIT 1",{date:candidate});
     if(fixedHoliday[0])continue;
     const monthStart=candidate.slice(0,7)+'-01';
     const [yy,mm]=candidate.split('-').map(Number);
@@ -377,7 +377,7 @@ try {
     if(new Date(candidate+'T12:00:00Z').getUTCDay()!==1)continue;
     const sickEndDate=new Date(new Date(candidate+'T12:00:00Z').getTime()+2*86400000).toISOString().slice(0,10);
     if(candidate.slice(0,4)!==sickEndDate.slice(0,4))continue;
-    const [fixedRows]=await query("SELECT id FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :start AND :end LIMIT 1",{start:candidate,end:sickEndDate});
+    const [fixedRows]=await query("SELECT holiday_date FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :start AND :end LIMIT 1",{start:candidate,end:sickEndDate});
     if(fixedRows[0])continue;
     if(['01-26','08-15','10-02'].some((fixed)=>candidate.slice(5)===fixed||sickEndDate.slice(5)===fixed))continue;
     sickStart=candidate;
