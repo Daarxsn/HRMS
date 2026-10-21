@@ -840,7 +840,7 @@ try {
   const createRollbackTaskId=crypto.randomUUID();
   const createRollbackTrigger='hrms_step6_fail_onboarding_create_audit';
   try {
-    await query(`CREATE TRIGGER ${createRollbackTrigger} BEFORE INSERT ON audit_logs FOR EACH ROW
+    await pool.query(`CREATE TRIGGER ${createRollbackTrigger BEFORE INSERT ON audit_logs FOR EACH ROW
       BEGIN
         IF NEW.action='ONBOARDING_TASK_CREATED' AND NEW.entity_id='${createRollbackTaskId}' THEN
           SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected onboarding-create audit failure';
@@ -854,7 +854,7 @@ try {
     const partialTask=await query("SELECT id FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
     assert.equal(partialTask.length,0,'Onboarding task insert must roll back when audit insertion fails.');
   } finally {
-    await query('DROP TRIGGER IF EXISTS '+createRollbackTrigger);
+    await pool.query('DROP TRIGGER IF EXISTS '+createRollbackTrigger);
     await query("DELETE FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
   }
 
@@ -863,7 +863,7 @@ try {
   await query("INSERT INTO onboarding_tasks (id,employee_id,title,category,status,created_by) VALUES (:id,:employee,'Step 6 rollback fixture','PROFILE','PENDING',:admin)",{id:onboardingTaskId,employee:employeeSession.user.id,admin:adminSession.user.id});
   const rollbackTriggerName='hrms_step6_fail_onboarding_audit';
   try {
-    await query(`CREATE TRIGGER ${rollbackTriggerName} BEFORE INSERT ON audit_logs FOR EACH ROW
+    await pool.query(`CREATE TRIGGER ${rollbackTriggerName} BEFORE INSERT ON audit_logs FOR EACH ROW
       BEGIN
         IF NEW.action='ONBOARDING_TASK_UPDATED' AND NEW.entity_id='${onboardingTaskId}' THEN
           SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected audit failure';
@@ -880,7 +880,7 @@ try {
     const auditAfterFailure=await query("SELECT id FROM audit_logs WHERE action='ONBOARDING_TASK_UPDATED' AND entity_id=:id",{id:onboardingTaskId});
     assert.equal(auditAfterFailure.length,0,'A failed onboarding mutation must not leave an audit row.');
   } finally {
-    await query('DROP TRIGGER IF EXISTS '+rollbackTriggerName);
+    await pool.query('DROP TRIGGER IF EXISTS '+rollbackTriggerName);
     await query('DELETE FROM onboarding_tasks WHERE id=:id',{id:onboardingTaskId});
   }
   const successfulTaskId=crypto.randomUUID();
