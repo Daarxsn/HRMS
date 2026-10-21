@@ -213,6 +213,116 @@ test('GPS check-in falls back to approved office Wi-Fi when laptop location is u
 
 
 
+test('denied GPS permission falls back to approved office Wi-Fi with a clear recovery status', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ records: [] })
+  }));
+  await page.addInitScript(() => {
+    const fail = (error: (failure: { code: number; message: string }) => void) => {
+      window.setTimeout(() => error({ code: 1, message: 'Permission denied' }), 20);
+    };
+    const geolocation = {
+      watchPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        fail(error); return 1;
+      },
+      clearWatch() {},
+      getCurrentPosition(_success: unknown, error: (failure: { code: number; message: string }) => void) {
+        fail(error);
+      }
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+
+  let attendancePostBody: Record<string, unknown> | null = null;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'WIFI', attendanceId: 'e2e-denied-gps' })
+    });
+  });
+  await signInDev(page, 'employee');
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method).toBe('WIFI');
+  await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
+});
+
+test('slow but accurate GPS acquisition completes check-in without Wi-Fi fallback', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ records: [] })
+  }));
+  await page.addInitScript(() => {
+    const succeed = (success: (position: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) => {
+      window.setTimeout(() => success({ coords: { latitude: 18.506633, longitude: 73.857692, accuracy: 15 } }), 1400);
+    };
+    const geolocation = {
+      watchPosition(success: (position: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) {
+        succeed(success); return 1;
+      },
+      clearWatch() {},
+      getCurrentPosition(success: (position: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) {
+        succeed(success);
+      }
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+
+  let attendancePostBody: Record<string, unknown> | null = null;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'GPS', attendanceId: 'e2e-slow-gps' })
+    });
+  });
+  await signInDev(page, 'employee');
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method, { timeout: 7000 }).toBe('GPS');
+  await expect(page.getByText('Check-in recorded.')).toBeVisible();
+});
+
+test('GPS acquisition timeout falls back to Wi-Fi instead of leaving the employee waiting indefinitely', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ records: [] })
+  }));
+  await page.addInitScript(() => {
+    const geolocation = {
+      watchPosition() { return 1; },
+      clearWatch() {},
+      getCurrentPosition() {}
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geolocation });
+  });
+
+  let attendancePostBody: Record<string, unknown> | null = null;
+  await page.route('**/api/attendance/check-in', async (route) => {
+    attendancePostBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, status: 'ON_TIME', method: 'WIFI', attendanceId: 'e2e-gps-timeout' })
+    });
+  });
+  await signInDev(page, 'employee');
+  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => attendancePostBody?.method, { timeout: 8000 }).toBe('WIFI');
+  await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
+});
+
 test('approved WFH check-in from employee overview does not request laptop or mobile GPS', async ({ page }) => {
   await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
