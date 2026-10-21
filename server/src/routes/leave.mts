@@ -6,7 +6,8 @@ import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { earnedLeaveAccrualForEmployment, indiaDate, workingDaysInclusive } from '../policy.mts';
-import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape } from '../mailer.mts';
+import { enqueueHrNotificationEmail } from '../email-outbox.mts';
 
 const router = Router();
 router.use(requireAuth, requirePeople);
@@ -48,8 +49,8 @@ async function emailLeaveRequestToAdmin(request) {
       + (approvalUrl ? '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>' : '')
       + '<p style="font-size:12px;color:#777;margin-top:26px">This email is a record of the leave request. Final approval remains inside HRMS.</p>'
       + '</div></body></html>';
-    const result = await sendHrNotificationEmail({ subject, text, html, replyTo:request.employeeEmail, fromName:'Falchion Xeniaa HRMS' });
-    return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
+    const result = await enqueueHrNotificationEmail({ subject, text, html, replyTo:request.employeeEmail, fromName:'Falchion Xeniaa HRMS' }, 'leave-request:' + request.id);
+    return { configured:!result.skipped, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
   } catch (error) {
     console.warn(JSON.stringify({
       type:'leave_request_email_failed',
