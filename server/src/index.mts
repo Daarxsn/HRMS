@@ -16,6 +16,7 @@ import accountRoutes from './routes/account.mts';
 import enterpriseRoutes from './routes/enterprise.mts';
 import { getObjectStorageReadiness } from './object-storage.mts';
 import { assertProductionConfiguration } from './production-config.mts';
+import emailOutboxRoutes from './email-outbox-routes.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -114,6 +115,7 @@ app.use('/api/leave',leaveRoutes);
 app.use('/api',workplaceRoutes);
 app.use('/api/admin',adminRoutes);
 app.use('/api/account',accountRoutes);
+app.use('/api/internal/email-outbox',emailOutboxRoutes);
 app.use('/api/enterprise',enterpriseRoutes);
 app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
 app.use(errorHandler);
