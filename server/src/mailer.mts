@@ -232,7 +232,7 @@ const buildMessage = (message: EmailMessage, senderOverride: string | null = nul
     'To: ' + to.join(', '),
     ...(message.replyTo ? ['Reply-To: ' + emailAddress(message.replyTo)] : []),
     'Subject: ' + message.subject.replace(/[\r\n]/g, ' '),
-    ...(message.messageId ? ['Message-ID: ' + String(message.messageId).replace(/[\r\n<>]/g, '')] : []),
+    ...(message.messageId ? ['Message-ID: <' + String(message.messageId).replace(/[\r\n<>]/g, '') + '>'] : []),
     'MIME-Version: 1.0',
     'Content-Type: multipart/alternative; boundary="=FXHRMS"',
     '',
