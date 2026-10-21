@@ -836,6 +836,28 @@ try {
   assert.equal(auditBefore.response.status,200);
   assert.ok(Array.isArray(auditBefore.data.logs));
 
+  // Onboarding task creation is also atomic with its audit row.
+  const createRollbackTaskId=crypto.randomUUID();
+  const createRollbackTrigger='hrms_step6_fail_onboarding_create_audit';
+  try {
+    await query(`CREATE TRIGGER ${createRollbackTrigger} BEFORE INSERT ON audit_logs FOR EACH ROW
+      BEGIN
+        IF NEW.action='ONBOARDING_TASK_CREATED' AND NEW.entity_id='${createRollbackTaskId}' THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected onboarding-create audit failure';
+        END IF;
+      END`);
+    const failedCreate=await request('/enterprise/admin/employees/'+employeeSession.user.id+'/onboarding',{
+      method:'POST',headers:{Cookie:adminSession.cookie},
+      body:JSON.stringify({title:'Injected create rollback',category:'PROFILE'})
+    });
+    assert.equal(failedCreate.response.status,500,'Onboarding task creation should fail when its audit insert fails.');
+    const partialTask=await query("SELECT id FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
+    assert.equal(partialTask.length,0,'Onboarding task insert must roll back when audit insertion fails.');
+  } finally {
+    await query('DROP TRIGGER IF EXISTS '+createRollbackTrigger);
+    await query("DELETE FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
+  }
+
   // Onboarding updates and their audit rows must commit or roll back together.
   const onboardingTaskId=crypto.randomUUID();
   await query("INSERT INTO onboarding_tasks (id,employee_id,title,category,status,created_by) VALUES (:id,:employee,'Step 6 rollback fixture','PROFILE','PENDING',:admin)",{id:onboardingTaskId,employee:employeeSession.user.id,admin:adminSession.user.id});
