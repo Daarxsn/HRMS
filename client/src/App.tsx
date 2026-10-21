@@ -323,8 +323,9 @@ function EmployeeHome(){
     try{
       let geo={};let verifiedMethod=method;
       if(method==='GPS'){try{geo=await quickLocation();}catch(locationError){verifiedMethod='WIFI';}}
-      await post(`/attendance/${type}`,{method:verifiedMethod,...geo});
-      notify(type==='check-in'?(verifiedMethod==='WFH'?'Remote check-in recorded.':verifiedMethod==='WIFI'?'Check-in recorded using approved office Wi-Fi.':'Check-in recorded.'):(verifiedMethod==='WFH'?'Remote check-out recorded.':verifiedMethod==='WIFI'?'Check-out recorded using approved office Wi-Fi.':'Check-out recorded.'));
+      const result=await post(`/attendance/${type}`,{method:verifiedMethod,...geo});
+      const successMessage=type==='check-in'?(verifiedMethod==='WFH'?'Remote check-in recorded.':verifiedMethod==='WIFI'?'Check-in recorded using approved office Wi-Fi.':'Check-in recorded.'):(verifiedMethod==='WFH'?'Remote check-out recorded.':verifiedMethod==='WIFI'?'Check-out recorded using approved office Wi-Fi.':'Check-out recorded.');
+      notify(result?.warning?.code==='PRIOR_OPEN_SHIFT_REQUIRES_REVIEW' ? successMessage+(result.warning.hrNotified?' HR has been alerted to review earlier attendance records.':' HR review is required for earlier attendance records; the notice could not be sent.') : successMessage);
       try{const a=await get(`/attendance?from=${today}&to=${today}`);setTodayRow(a.records?.[0]||null);setWeekRecords((prev)=>[...prev.filter((row)=>row.attendance_date!==today),...(a.records||[])]);}
       catch{setError('Your attendance action was recorded, but the latest status could not be refreshed. Retry the overview to confirm it.');}
     }catch(e){setPunchError(e.message||'The attendance action could not be completed.');}
@@ -577,9 +578,10 @@ function AttendancePage(){
       let method=type==='check-out'&&current?.check_in_method==='WFH'?'WFH':type==='check-in'&&approvedWfhToday?'WFH':'GPS';
       let geo={};
       if(method==='GPS'){try{geo=await requestLocation();}catch(locationError){method='WIFI';}}
-      await post(`/attendance/${type}`,{method,...geo});
+      const result=await post(`/attendance/${type}`,{method,...geo});
       await load();
-      notify(method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.'));
+      const successMessage=method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Check-in recorded.'):(method==='WFH'?'Remote check-out recorded.':'Check-out recorded.');
+      notify(result?.warning?.code==='PRIOR_OPEN_SHIFT_REQUIRES_REVIEW' ? successMessage+(result.warning.hrNotified?' HR has been alerted to review earlier attendance records.':' HR review is required for earlier attendance records; the notice could not be sent.') : successMessage);
     }catch(e){setActionError(e.message);}
     finally{setActionBusy(false);}
   };const statusLabel=todayHoliday?'Holiday':!attendanceAvailable?(loading?'Loading':'Unavailable'):current?.check_in_at?(current.check_out_at?'Complete':'In progress'):'Not checked in';

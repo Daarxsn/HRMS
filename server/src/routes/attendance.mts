@@ -156,23 +156,85 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
   const approvedStart = approved[0]?.approved_start_time || null;
   const status = attendanceStatus(new Date(), approvedStart, String(settings.late_threshold || POLICY.lateThreshold));
   const id = crypto.randomUUID();
+  let previousOpenShifts: Array<{id:string; attendance_date:string}> = [];
   await transaction(async (connection) => {
     // Serialize check-in against leave/WFH request creation and approval.
     await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', { employee:req.user.id });
-    const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:req.user.id, date });
+    const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1 FOR UPDATE`, { employee:req.user.id, date });
     if (leaveConflict[0]) throw Object.assign(new Error('You have a pending or approved leave request for today. Resolve it with HR before recording attendance.'), { status:409 });
     const [existing] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: req.user.id, date });
     if (existing[0]) throw Object.assign(new Error('Today’s attendance is already started.'), { status: 409 });
-    const [previousOpen] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date<:date AND check_out_at IS NULL LIMIT 1 FOR UPDATE', { employee:req.user.id, date });
-    if (previousOpen[0]) throw Object.assign(new Error('You have an unfinished shift from a previous date. Check out of that shift before starting today’s attendance.'), { status:409 });
+
+    // Historical missing checkouts are HR exceptions, not a reason to deny a
+    // new date's attendance. Lock and preserve previous rows without modifying them.
+    const [previousOpen] = await connection.execute(
+      "SELECT id, DATE_FORMAT(attendance_date,'%Y-%m-%d') AS attendance_date FROM attendance_records WHERE employee_id=:employee AND attendance_date<:date AND check_out_at IS NULL ORDER BY attendance_date DESC FOR UPDATE",
+      { employee:req.user.id, date }
+    );
+    previousOpenShifts = previousOpen.map((row:any) => ({
+      id:String(row.id),
+      attendance_date:String(row.attendance_date).slice(0,10)
+    }));
+
     await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
       VALUES (:id, :employee, :date, UTC_TIMESTAMP(), :method, :lat, :lon, :accuracy, :distance, :status, :approvedStart)`, {
       id, employee: req.user.id, date, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null,
       accuracy: method === 'GPS' ? locationAccuracy : null, distance: method === 'GPS' ? distance : null, status, approvedStart
     });
+
+    // Keep the attendance row and audit event atomic so a post-commit audit
+    // error cannot make a saved check-in look like a failed request.
+    await connection.execute(`INSERT INTO audit_logs
+      (id, actor_id, action, entity_type, entity_id, details_json, ip_address, created_at)
+      VALUES (:logId, :actorId, 'ATTENDANCE_CHECK_IN', 'attendance', :attendanceId, :details, :ipAddress, UTC_TIMESTAMP())`, {
+      logId:crypto.randomUUID(),
+      actorId:req.user.id,
+      attendanceId:id,
+      details:JSON.stringify({
+        method,
+        date,
+        distance_m:distance===null?null:Math.round(distance),
+        prior_open_shift_count:previousOpenShifts.length,
+        prior_open_shifts:previousOpenShifts
+      }),
+      ipAddress:req.ip
+    });
   });
-  await audit({ actorId: req.user.id, action: 'ATTENDANCE_CHECK_IN', entityType: 'attendance', entityId: id, details: { method, date, distance_m: distance === null ? null : Math.round(distance) }, ipAddress: req.ip });
-  res.status(201).json({ ok: true, status, method, attendanceId: id });
+  let hrNotified = false;
+  if (previousOpenShifts.length) {
+    try {
+      await notifyAdmins(
+        'Historical attendance shift needs review',
+        req.user.full_name + ' (' + req.user.employee_code + ') recorded attendance for ' + date +
+          ' while ' + previousOpenShifts.length + ' earlier attendance shift(s) remain open. Review the private attendance record and supporting evidence; do not infer checkout times.',
+        'UPDATE',
+        {
+          type:'attendance_open_shift_review',
+          employeeId:req.user.id,
+          currentAttendanceId:id,
+          priorOpenShifts:previousOpenShifts
+        }
+      );
+      hrNotified = true;
+    } catch (error) {
+      // A notification outage must not turn a committed punch into an apparent
+      // failure. The atomic attendance audit event retains the review evidence.
+      console.error(JSON.stringify({
+        type:'attendance_prior_open_shift_notification_failed',
+        employeeId:req.user.id,
+        currentAttendanceId:id,
+        count:previousOpenShifts.length,
+        error:String(error?.message || error)
+      }));
+    }
+  }
+  const warning = previousOpenShifts.length ? {
+    code:'PRIOR_OPEN_SHIFT_REQUIRES_REVIEW',
+    count:previousOpenShifts.length,
+    hrNotified,
+    message:'Today’s attendance was recorded. One or more earlier attendance records remain open and require HR review; their timestamps were not changed.'
+  } : undefined;
+  res.status(201).json({ ok:true, status, method, attendanceId:id, ...(warning ? {warning} : {}) });
 }));
 
 router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res) => {

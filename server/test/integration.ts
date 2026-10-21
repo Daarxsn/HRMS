@@ -206,13 +206,35 @@ try {
     assert.equal(approvedWfhState.response.status, 200);
     assert.equal(approvedWfhState.data.approvedToday, true, 'Approved WFH must be reflected by the employee WFH endpoint.');
 
+    // Place one intentionally unresolved prior-date row in the disposable CI database.
+    // A historical exception must be preserved but must not prevent today's valid check-in.
+    const basePreviousDate = new Date(wfhDate + 'T12:00:00Z');
+    let previousShiftDate = '';
+    for (let offset = 1; offset <= 3650 && !previousShiftDate; offset += 1) {
+      const candidate = new Date(basePreviousDate.getTime() - offset * 86400000).toISOString().slice(0,10);
+      const occupied = await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', {
+        employee:employeeSession.user.id, date:candidate
+      });
+      if (!occupied[0]) previousShiftDate = candidate;
+    }
+    assert.ok(previousShiftDate, 'Test must find a free historical attendance date.');
+    const previousOpenFixtureId = crypto.randomUUID();
+    await query(`INSERT INTO attendance_records (id,employee_id,attendance_date,check_in_at,check_in_method,status)
+      VALUES (:id,:employee,:date,:checkIn,'GPS','ON_TIME')`, {
+      id:previousOpenFixtureId, employee:employeeSession.user.id, date:previousShiftDate,
+      checkIn:new Date(previousShiftDate + 'T03:00:00.000Z')
+    });
+
     // Deliberately omit coordinates and submit GPS, as a stale frontend can do.
     const remoteCheckIn = await request('/attendance/check-in', {
       method: 'POST',
       headers: { Cookie: employeeSession.cookie },
       body: JSON.stringify({ method: 'GPS' })
     });
-    assert.equal(remoteCheckIn.response.status, 201, 'Approved WFH check-in must bypass office GPS and network checks.');
+    assert.equal(remoteCheckIn.response.status, 201, 'An unresolved previous-date shift must not block today’s approved WFH check-in.');
+    assert.equal(remoteCheckIn.data.warning?.code, 'PRIOR_OPEN_SHIFT_REQUIRES_REVIEW', 'Historical open shifts must be surfaced as a warning.');
+    assert.equal(Number(remoteCheckIn.data.warning?.count) >= 1, true);
+    assert.equal(remoteCheckIn.data.warning?.hrNotified, true, 'Active HR administrators must receive a review notification.');
     assert.equal(remoteCheckIn.data.method, 'WFH', 'Server must promote an old GPS-mode request to WFH when today is approved.');
 
     // Check-out must follow the saved WFH mode even when an older client submits GPS.
@@ -223,6 +245,10 @@ try {
     });
     assert.equal(remoteCheckOut.response.status, 200, 'WFH check-out must not require office geolocation.');
     assert.equal(remoteCheckOut.data.method, 'WFH');
+    const preservedHistoricalShift = await query('SELECT check_out_at FROM attendance_records WHERE id=:id', {id:previousOpenFixtureId});
+    assert.equal(preservedHistoricalShift[0]?.check_out_at, null, 'Today’s check-out must not fabricate a timestamp for the historical shift.');
+    await query('DELETE FROM attendance_records WHERE id=:id', {id:previousOpenFixtureId});
+    await query('DELETE FROM audit_logs WHERE entity_type=\'attendance\' AND entity_id=:id', {id:remoteCheckIn.data.attendanceId});
   } else {
     console.log('WFH GPS-fallback integration scenario skipped: today is a non-working day, company holiday, or attendance already exists.');
   }
