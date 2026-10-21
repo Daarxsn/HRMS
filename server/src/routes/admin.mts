@@ -249,15 +249,12 @@ router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
   res.setHeader('Content-Type',photo.profile_photo_content_type||'image/jpeg');
   res.setHeader('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(photo.profile_photo_filename||'profile-photo'));
   res.setHeader('Cache-Control','private, no-store');
-  if (file.kind === 'buffer') {
-    res.send(file.buffer);
-  } else {
-    file.stream
-      .on('error', () => {
-        if (!res.headersSent) res.status(404).end();
-      })
-      .pipe(res);
-  }
+  if (file.kind === 'buffer') res.send(file.buffer);
+  else file.stream.on('error', () => {
+    console.error(JSON.stringify({type:'admin_profile_photo_stream_failed',request_id:req.requestId}));
+    if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
+    else res.destroy();
+  }).pipe(res);
 }));
 router.get('/attendance', asyncRoute(async (req, res) => {
   const from = String(req.query.from || indiaDate());
