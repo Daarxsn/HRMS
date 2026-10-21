@@ -336,6 +336,21 @@ try {
   assert.equal(existingTodayAttendance.response.status, 200);
   const alreadyCheckedIn = (existingTodayAttendance.data.records || []).some((item) => item.attendance_date === wfhDate && item.check_in_at);
   if (dayNumber !== 0 && !holidayToday && !alreadyCheckedIn) {
+    // WFH eligibility alone must be sufficient for a remote attendance punch.
+    // No daily request approval, GPS coordinates, or office network should be required.
+    const enabledRemoteCheckIn = await request('/attendance/check-in', {
+      method:'POST', headers:{Cookie:employeeSession.cookie}, body:JSON.stringify({method:'WFH'})
+    });
+    assert.equal(enabledRemoteCheckIn.response.status,201,'WFH-enabled employee must check in remotely without an approved day request: '+JSON.stringify(enabledRemoteCheckIn.data));
+    assert.equal(enabledRemoteCheckIn.data.method,'WFH');
+    const enabledRemoteCheckOut = await request('/attendance/check-out', {
+      method:'POST', headers:{Cookie:employeeSession.cookie}, body:JSON.stringify({method:'WFH'})
+    });
+    assert.equal(enabledRemoteCheckOut.response.status,200,'WFH-enabled employee must check out remotely without location or office network.');
+    assert.equal(enabledRemoteCheckOut.data.method,'WFH');
+    await query("DELETE FROM audit_logs WHERE entity_type='attendance' AND entity_id=:id",{id:enabledRemoteCheckIn.data.attendanceId});
+    await query('DELETE FROM attendance_records WHERE id=:id',{id:enabledRemoteCheckIn.data.attendanceId});
+
     const createWfh = await request('/wfh', {
       method: 'POST',
       headers: { Cookie: employeeSession.cookie },

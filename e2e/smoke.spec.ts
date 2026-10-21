@@ -353,7 +353,7 @@ test('GPS acquisition timeout falls back to Wi-Fi instead of leaving the employe
   await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
 });
 
-test('approved WFH check-in from employee overview does not request laptop or mobile GPS', async ({ page }) => {
+test('WFH-enabled employee can check in from the overview without a daily approval or GPS', async ({ page }) => {
   await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
     const geolocation = {
@@ -371,7 +371,7 @@ test('approved WFH check-in from employee overview does not request laptop or mo
   await page.route('**/api/wfh', async (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ enabled: true, approvedToday: true, today: todayInIndia(), monthlyCap: 4, requests: [] })
+    body: JSON.stringify({ enabled: true, approvedToday: false, today: todayInIndia(), monthlyCap: 4, requests: [] })
   }));
   await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
     status: 200,
@@ -395,7 +395,7 @@ test('approved WFH check-in from employee overview does not request laptop or mo
   await expect(page.getByText('Remote check-in recorded.')).toBeVisible();
 });
 
-test('approved WFH check-in from the Attendance page bypasses office location checks', async ({ page }) => {
+test('WFH-enabled employee can check in from Attendance without a daily approval or GPS', async ({ page }) => {
   await stubNoHolidayCalendar(page);
   await page.addInitScript(() => {
     const geolocation = {
@@ -413,7 +413,7 @@ test('approved WFH check-in from the Attendance page bypasses office location ch
   await page.route('**/api/wfh', async (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify({ enabled: true, approvedToday: true, today: todayInIndia(), monthlyCap: 4, requests: [] })
+    body: JSON.stringify({ enabled: true, approvedToday: false, today: todayInIndia(), monthlyCap: 4, requests: [] })
   }));
   await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
     status: 200,

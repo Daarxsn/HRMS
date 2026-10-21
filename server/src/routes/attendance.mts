@@ -100,6 +100,7 @@ router.get('/', asyncRoute(async (req, res) => {
 router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) => {
   const schema = z.object({
     method: z.enum(['GPS','WIFI','WFH']),
+    workLocation: z.enum(['OFFICE']).optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
     accuracy: z.number().min(0).optional(),
@@ -116,7 +117,8 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     `SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status='APPROVED' LIMIT 1`,
     { employee: req.user.id, date }
   );
-  let method = approvedWfhToday[0] ? 'WFH' : input.method;
+  // Approved WFH defaults stale clients to remote mode, unless the employee explicitly chose office attendance.
+  let method = approvedWfhToday[0] && input.workLocation !== 'OFFICE' ? 'WFH' : input.method;
   let distance = null;
   let locationAccuracy = null;
   if (method === 'GPS') {
@@ -144,13 +146,9 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     }
   }
   if (method === 'WIFI') verifyOfficeNetwork(req);
-  if (method === 'WFH' && !approvedWfhToday[0]) {
-    // Only a request explicitly submitted as WFH must pass this check.
-    // Approved WFH above is allowed even if the client sent the old GPS mode.
-    if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) {
-      throw Object.assign(new Error('WFH has not been enabled for this employee and no approved WFH request was found for today.'), { status: 403 });
-    }
-    throw Object.assign(new Error('An approved WFH request is required for today.'), { status: 403 });
+  const wfhEnabled = req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1;
+  if (method === 'WFH' && !wfhEnabled && !approvedWfhToday[0]) {
+    throw Object.assign(new Error('WFH access is not enabled for this employee. Ask an administrator to enable WFH before checking in remotely.'), { status: 403 });
   }
   const approved = await query(`SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date LIMIT 1`, { employee: req.user.id, date });
   const approvedStart = approved[0]?.approved_start_time || null;
