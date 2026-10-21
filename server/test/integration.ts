@@ -200,6 +200,65 @@ try {
   const earnedBalance=(testedBalances.data.balances||[]).find((balance)=>balance.type==='EARNED');
   assert.ok(earnedBalance&&Number.isFinite(earnedBalance.accrued)&&Number.isFinite(earnedBalance.remaining),'Earned balance must expose numeric accrued and remaining fields.');
 
+  // Validate actual balance transitions over a two-day leave range: pending request
+  // reserves balance, withdrawal restores it, and approval moves it from pending
+  // to used without a second deduction.
+  const leaveToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+  }).format(new Date());
+  const leaveBase = new Date(leaveToday+'T12:00:00Z');
+  let leaveRange = null;
+  for(let offset=1;offset<=30&&!leaveRange;offset+=1){
+    const start=new Date(leaveBase.getTime()+offset*86400000).toISOString().slice(0,10);
+    const end=new Date(leaveBase.getTime()+(offset+1)*86400000).toISOString().slice(0,10);
+    if(start.slice(0,4)!==leaveToday.slice(0,4)||end.slice(0,4)!==leaveToday.slice(0,4))continue;
+    const startWeekday=new Date(start+'T12:00:00Z').getUTCDay();
+    if(startWeekday===0||startWeekday===6)continue;
+    if(['01-26','08-15','10-02'].some((fixed)=>start.slice(5)===fixed||end.slice(5)===fixed))continue;
+    const fixedRows=await query("SELECT holiday_date FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :start AND :end LIMIT 1",{start,end});
+    if(fixedRows[0])continue;
+    const attendanceConflict=await query("SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1",{employee:employeeSession.user.id,start,end});
+    if(attendanceConflict[0])continue;
+    const leaveConflict=await query("SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:end AND end_date>=:start LIMIT 1",{employee:employeeSession.user.id,start,end});
+    if(leaveConflict[0])continue;
+    const wfhConflict=await query("SELECT id FROM wfh_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1",{employee:employeeSession.user.id,start,end});
+    if(wfhConflict[0])continue;
+    const flexConflict=await query("SELECT id FROM flex_start_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1",{employee:employeeSession.user.id,start,end});
+    if(flexConflict[0])continue;
+    leaveRange={start,end};
+  }
+  if(leaveRange){
+    const eligibleLeaveBalance=(testedBalances.data.balances||[])
+      .filter((balance)=>['CASUAL','FLOATING','EARNED'].includes(balance.type)&&Number(balance.remaining)>=2&&!balance.reviewRequired)
+      .sort((a,b)=>['CASUAL','FLOATING','EARNED'].indexOf(a.type)-['CASUAL','FLOATING','EARNED'].indexOf(b.type))[0];
+    assert.ok(eligibleLeaveBalance,'Integration fixture needs at least one two-day leave balance for balance-transition testing.');
+    const leaveType=eligibleLeaveBalance.type;
+    const balanceBefore=eligibleLeaveBalance;
+    const requestBody={type:leaveType,startDate:leaveRange.start,endDate:leaveRange.end,reason:'Balance transition regression test'};
+    const createdLeave=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify(requestBody)});
+    assert.equal(createdLeave.response.status,201,'A valid two-day leave request should be accepted.');
+    assert.equal(createdLeave.data.days,2,'The two consecutive workdays should calculate as two days.');
+    const pendingBalanceResponse=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+    const pendingBalance=(pendingBalanceResponse.data.balances||[]).find((balance)=>balance.type===leaveType);
+    assert.equal(Number(pendingBalance.remaining),Number(balanceBefore.remaining)-2,'Pending leave must reserve its full calculated duration.');
+    const cancelledLeave=await request('/leave/'+createdLeave.data.id,{method:'DELETE',headers:{Cookie:employeeSession.cookie}});
+    assert.equal(cancelledLeave.response.status,200,'A pending leave request must be withdrawable.');
+    const restoredBalanceResponse=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+    const restoredBalance=(restoredBalanceResponse.data.balances||[]).find((balance)=>balance.type===leaveType);
+    assert.equal(Number(restoredBalance.remaining),Number(balanceBefore.remaining),'Withdrawing pending leave must restore the reserved balance.');
+    const approvedLeaveRequest=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify(requestBody)});
+    assert.equal(approvedLeaveRequest.response.status,201,'The leave date range should be re-applicable after withdrawal.');
+    const approvedLeave=await request('/admin/approvals/leave/'+approvedLeaveRequest.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Balance transition integration test'})});
+    assert.equal(approvedLeave.response.status,200,'Administrator should be able to approve the valid leave request.');
+    const finalBalanceResponse=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+    const finalBalance=(finalBalanceResponse.data.balances||[]).find((balance)=>balance.type===leaveType);
+    assert.equal(Number(finalBalance.remaining),Number(balanceBefore.remaining)-2,'Approval should retain exactly one balance deduction.');
+    assert.equal(Number(finalBalance.pending),Number(restoredBalance.pending),'Approval should move the request out of pending without double-deducting.');
+    assert.equal(Number(finalBalance.used),Number(restoredBalance.used)+2,'Approval should move the requested duration into used leave.');
+  } else {
+    console.log('Leave balance transition regression skipped: no conflict-free two-day work range remains in the current calendar year.');
+  }
+
   // Regression: approved WFH must override the stale client mode "GPS" on the
   // server. This simulates the production browser build still asking for GPS,
   // so a laptop/phone with unavailable or inaccurate location can check in.
