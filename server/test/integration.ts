@@ -85,7 +85,7 @@ try {
   assert.equal(health.data.database, 'ok');
   assert.ok(health.data.version);
   assert.ok(health.data.build);
-  assert.match(health.response.headers.get('permissions-policy') || '', /geolocation=\\(self\\)/i);
+  assert.match(health.response.headers.get('permissions-policy') || '', /geolocation=\(self\)/i);
   assert.equal(health.response.headers.get('x-content-type-options'), 'nosniff');
 
   const demoUsers = await request('/auth/demo-users');
