@@ -237,6 +237,23 @@ try {
   await query('DELETE FROM employee_documents WHERE id=:id', {id:uploaded.id});
   if (objectRows[0]?.object_key) await deleteObject(objectRows[0].object_key);
 
+  // Step 4 / 24: calendar mutation must remain administrator-only.
+  const employeeCalendarCreate = await request('/calendar', {
+    method:'POST', headers:{Cookie:employeeSession.cookie},
+    body:JSON.stringify({date:'2099-12-31',name:'Step 4 employee denial fixture',kind:'FLOATING'})
+  });
+  assert.equal(employeeCalendarCreate.response.status,403,'Employees cannot create or alter company holidays.');
+  const testHolidayName = 'Step 4 admin calendar authorization fixture';
+  await query('DELETE FROM company_holidays WHERE holiday_date=:date AND name=:name',{date:'2099-12-31',name:testHolidayName});
+  const adminCalendarCreate = await request('/calendar', {
+    method:'POST', headers:{Cookie:adminSession.cookie},
+    body:JSON.stringify({date:'2099-12-31',name:testHolidayName,kind:'FLOATING'})
+  });
+  assert.equal(adminCalendarCreate.response.status,201,'A properly authorized ADMIN/ADMIN account can create a holiday.');
+  const createdHoliday = await query('SELECT holiday_date FROM company_holidays WHERE holiday_date=:date AND name=:name AND created_by=:admin LIMIT 1',{date:'2099-12-31',name:testHolidayName,admin:adminSession.user.id});
+  assert.ok(createdHoliday[0],'Authorized calendar creation should persist its record.');
+  await query('DELETE FROM company_holidays WHERE holiday_date=:date AND name=:name',{date:'2099-12-31',name:testHolidayName});
+
   // Both role and user_type must be compatible to reach protected administration.
   for (const invalid of [{role:'ADMIN',user_type:'EMPLOYEE'}, {role:'EMPLOYEE',user_type:'ADMIN'}]) {
     await query('UPDATE employees SET role=:role,user_type=:type WHERE id=:id', {role:invalid.role,type:invalid.user_type,id:employeeSession.user.id});
@@ -245,6 +262,8 @@ try {
       assert.equal(invalidMe.response.status, 403, 'Mismatched role/type must fail closed.');
       const invalidAdmin = await request('/enterprise/admin/overview', {headers:{Cookie:employeeSession.cookie}});
       assert.equal(invalidAdmin.response.status, 403, 'Mismatched accounts cannot enter the enterprise admin namespace.');
+      const invalidCalendar = await request('/calendar', {method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:'2099-12-30',name:'Invalid role calendar attempt',kind:'FLOATING'})});
+      assert.equal(invalidCalendar.response.status,403,'Mismatched accounts cannot create company holidays.');
     } finally {
       await query("UPDATE employees SET role='EMPLOYEE',user_type='EMPLOYEE' WHERE id=:id", {id:employeeSession.user.id});
     }
