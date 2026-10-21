@@ -762,14 +762,14 @@ try {
   assert.equal(Number.isInteger(dashboard.data.stats.employees), true);
 
   const productionStartupEnv = {
-    ...process.env,
+    PATH: process.env.PATH || '/usr/bin:/bin',
     NODE_ENV:'production',
     APP_ORIGIN:'https://hrms.invalid',
     GOOGLE_CLIENT_ID:'ci-oauth-client.apps.googleusercontent.com',
-    DOTENV_CONFIG_PATH:'/tmp/hrms-step4-no-dotenv-file',
+    DOTENV_CONFIG_PATH:'/dev/null',
+    DOTENV_CONFIG_OVERRIDE:'false',
     PORT:'8091'
   };
-  delete productionStartupEnv.JWT_SECRET;
   const missingJwtAtStartup = spawnSync(process.execPath, ['--experimental-strip-types','src/index.mts'], {
     cwd:process.cwd(),
     encoding:'utf8',
