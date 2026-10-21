@@ -82,6 +82,8 @@ jobs:
         run: npm run test:migration-rehearsal --workspace server
       - name: Run backend unit and contract tests
         run: npm test
+      - name: Install MySQL client tools for logical backup and restore
+        run: sudo apt-get update && sudo apt-get install --yes mysql-client
       - name: Run isolated MySQL backup and restore rehearsal
         env:
           CI: 'true'
