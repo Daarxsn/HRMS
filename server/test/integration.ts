@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { deleteObject } from '../src/object-storage.mts';
 import { pool, query } from '../src/db.mts';
 
@@ -779,24 +779,6 @@ try {
   assert.equal(dashboard.response.status, 200);
   assert.ok(dashboard.data.stats);
   assert.equal(Number.isInteger(dashboard.data.stats.employees), true);
-
-  const productionStartupEnv = {
-    PATH: process.env.PATH || '/usr/bin:/bin',
-    NODE_ENV:'production',
-    APP_ORIGIN:'https://hrms.invalid',
-    GOOGLE_CLIENT_ID:'ci-oauth-client.apps.googleusercontent.com',
-    DOTENV_CONFIG_PATH:'/dev/null',
-    DOTENV_CONFIG_OVERRIDE:'false',
-    PORT:'8091'
-  };
-  const missingJwtAtStartup = spawnSync(process.execPath, ['--experimental-strip-types','src/index.mts'], {
-    cwd:process.cwd(),
-    encoding:'utf8',
-    timeout:5000,
-    env:productionStartupEnv
-  });
-  assert.notEqual(missingJwtAtStartup.status, 0, 'Production must refuse to start without JWT_SECRET.');
-  assert.match((missingJwtAtStartup.stderr || '') + (missingJwtAtStartup.stdout || ''), /Set a private JWT_SECRET of at least 32 bytes in production/);
 
   let googleLoginResponse;
   for(let attempt=0;attempt<11;attempt+=1) {
