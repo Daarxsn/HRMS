@@ -52,12 +52,12 @@ async function emailLeaveRequestToAdmin(request) {
     const result = await enqueueHrNotificationEmail({ subject, text, html, replyTo:request.employeeEmail, fromName:'Falchion Xeniaa HRMS' }, 'leave-request:' + request.id);
     return { configured:result.configured, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0 };
   } catch (error) {
-    console.warn(JSON.stringify({
-      type:'leave_request_email_failed',
+    console.error(JSON.stringify({
+      type:'leave_request_email_enqueue_failed',
       request_id:request.id,
       error:String(error?.message || error)
     }));
-    return { configured:false, sent:0, recipients:0 };
+    return { configured:false, sent:0, queued:false, status:'ENQUEUE_FAILED', outboxId:null, recipients:0 };
   }
 }
 
