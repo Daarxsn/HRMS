@@ -48,8 +48,8 @@ async function emailAdminRequest({ id, title, description, type, details, employ
     const result = await enqueueHrNotificationEmail({ subject:title + ' · ' + employee.name, text, html, replyTo:employee.email, fromName:'Falchion Xeniaa HRMS' }, 'attendance-request:' + type + ':' + id);
     return { configured:result.configured, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0, type };
   } catch (error) {
-    console.warn(JSON.stringify({type:'admin_request_email_failed',request_id:id,request_type:type,error:String(error?.message || error)}));
-    return { configured:false, sent:0, recipients:0, type };
+    console.error(JSON.stringify({type:'admin_request_email_enqueue_failed',request_id:id,request_type:type,error:String(error?.message || error)}));
+    return { configured:false, sent:0, queued:false, status:'ENQUEUE_FAILED', outboxId:null, recipients:0, type };
   }
 }
 
