@@ -842,7 +842,7 @@ try {
   try {
     await pool.query(`CREATE TRIGGER ${createRollbackTrigger} BEFORE INSERT ON audit_logs FOR EACH ROW
       BEGIN
-        IF NEW.action='ONBOARDING_TASK_CREATED' AND NEW.entity_id='${createRollbackTaskId}' THEN
+        IF NEW.action='ONBOARDING_TASK_CREATED' AND JSON_UNQUOTE(JSON_EXTRACT(NEW.details_json,'$.title'))='Injected create rollback' THEN
           SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected onboarding-create audit failure';
         END IF;
       END`);
