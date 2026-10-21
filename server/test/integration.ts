@@ -222,6 +222,33 @@ try {
   const earnedBalance=(testedBalances.data.balances||[]).find((balance)=>balance.type==='EARNED');
   assert.ok(earnedBalance&&Number.isFinite(earnedBalance.accrued)&&Number.isFinite(earnedBalance.remaining),'Earned balance must expose numeric accrued and remaining fields.');
 
+  // API-level regression: a NULL probation end date accrues earned leave from
+  // joining date, and this test restores the original employee fields afterwards.
+  const earnedAsOf=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const earnedYear=Number(earnedAsOf.slice(0,4));
+  const earnedMonth=Number(earnedAsOf.slice(5,7));
+  const earnedDay=Number(earnedAsOf.slice(8,10));
+  const earnedLastMonth=earnedDay===new Date(Date.UTC(earnedYear,earnedMonth,0)).getUTCDate()?earnedMonth:earnedMonth-1;
+  const savedEmployeeFields=(await query(`SELECT DATE_FORMAT(joined_on,'%Y-%m-%d') AS joined_on,
+    DATE_FORMAT(probation_end_date,'%Y-%m-%d') AS probation_end_date,status
+    FROM employees WHERE id=:employee`,{employee:employeeSession.user.id}))[0];
+  assert.ok(savedEmployeeFields,'Integration employee must exist for the earned-leave API regression.');
+  try {
+    await query("UPDATE employees SET joined_on=:joined,probation_end_date=NULL,status='ACTIVE' WHERE id=:employee",{
+      employee:employeeSession.user.id,joined:(earnedYear-1)+'-01-01'
+    });
+    const nullProbationResponse=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+    assert.equal(nullProbationResponse.response.status,200);
+    const nullProbationBalance=(nullProbationResponse.data.balances||[]).find((balance)=>balance.type==='EARNED');
+    assert.ok(nullProbationBalance,'Earned-leave balance must be returned when probation end date is NULL.');
+    assert.equal(Number(nullProbationBalance.accrued),Math.max(0,earnedLastMonth),'A NULL probation end date must use joining date and completed-month accrual.');
+    assert.equal(nullProbationBalance.reviewRequired,false,'An active employee with NULL probation end date should not require inactive-employment review.');
+  } finally {
+    await query("UPDATE employees SET joined_on=:joined,probation_end_date=:probation,status=:status WHERE id=:employee",{
+      employee:employeeSession.user.id,joined:savedEmployeeFields.joined_on,probation:savedEmployeeFields.probation_end_date,status:savedEmployeeFields.status
+    });
+  }
+
   // Validate actual balance transitions over a two-day leave range: pending request
   // reserves balance, withdrawal restores it, and approval moves it from pending
   // to used without a second deduction.

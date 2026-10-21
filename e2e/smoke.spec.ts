@@ -291,6 +291,36 @@ test('slow but accurate GPS acquisition completes check-in without Wi-Fi fallbac
   await expect(page.getByText('Check-in recorded.')).toBeVisible();
 });
 
+test('inaccurate indoor GPS falls back to the approved office network', async ({ page }) => {
+  await stubNoHolidayCalendar(page);
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify({records:[]})
+  }));
+  await page.addInitScript(() => {
+    const provideInaccuratePosition=(success:(position:{coords:{latitude:number;longitude:number;accuracy:number}})=>void)=>{
+      window.setTimeout(()=>success({coords:{latitude:18.506633,longitude:73.857692,accuracy:350}}),40);
+    };
+    const geolocation={
+      watchPosition(success:(position:{coords:{latitude:number;longitude:number;accuracy:number}})=>void){provideInaccuratePosition(success);return 1;},
+      clearWatch(){},
+      getCurrentPosition(success:(position:{coords:{latitude:number;longitude:number;accuracy:number}})=>void){provideInaccuratePosition(success);}
+    };
+    Object.defineProperty(navigator,'geolocation',{configurable:true,value:geolocation});
+  });
+  let attendancePostBody:Record<string,unknown>|null=null;
+  await page.route('**/api/attendance/check-in',async(route)=>{
+    attendancePostBody=route.request().postDataJSON();
+    await route.fulfill({status:201,contentType:'application/json',body:JSON.stringify({ok:true,status:'ON_TIME',method:'WIFI',attendanceId:'e2e-inaccurate-gps'})});
+  });
+  await signInDev(page,'employee');
+  await page.locator('.overview-attendance-card').getByRole('button',{name:'Check in'})
+    .evaluate((button:HTMLButtonElement)=>button.click());
+  await expect.poll(()=>attendancePostBody?.method,{timeout:8000}).toBe('WIFI');
+  await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
+});
+
 test('GPS acquisition timeout falls back to Wi-Fi instead of leaving the employee waiting indefinitely', async ({ page }) => {
   await stubNoHolidayCalendar(page);
   await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
