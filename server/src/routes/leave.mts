@@ -141,6 +141,14 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
       employee: req.user.id, start: input.startDate, end: input.endDate
     });
     if (wfhOverlap[0]) throw Object.assign(new Error('A pending or approved WFH request already exists during those dates. Cancel or resolve it before requesting leave.'), { status: 409 });
+    const [flexOverlap] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1`, {
+      employee:req.user.id, start:input.startDate, end:input.endDate
+    });
+    if (flexOverlap[0]) throw Object.assign(new Error('A pending or approved flex-start request exists during those dates. Resolve it before requesting leave.'), {status:409});
+    const [correctionOverlap] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND status='PENDING' AND attendance_date BETWEEN :start AND :end LIMIT 1`, {
+      employee:req.user.id, start:input.startDate, end:input.endDate
+    });
+    if (correctionOverlap[0]) throw Object.assign(new Error('A pending attendance correction exists during those dates. Resolve it before requesting leave.'), {status:409});
     const [attendanceOverlap] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1`, {
       employee: req.user.id, start: input.startDate, end: input.endDate
     });

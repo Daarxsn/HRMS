@@ -320,6 +320,8 @@ router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute
     await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', { employee:req.user.id });
     const [pending] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
     if (pending[0]) throw Object.assign(new Error('A pending attendance correction already exists for this date.'), { status:409 });
+    const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (leaveConflict[0]) throw Object.assign(new Error('A pending or approved leave request covers this date. Resolve it before submitting an attendance correction.'), {status:409});
     const [locked] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee:req.user.id, date:input.date });
     const attendanceId = locked[0]?.id || null;
     await connection.execute(`INSERT INTO attendance_correction_requests (id, employee_id, attendance_id, attendance_date, requested_check_in_at, requested_check_out_at, reason)
@@ -358,6 +360,8 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
     if (wfhConflict[0]) throw Object.assign(new Error('A flex-start request cannot overlap pending or approved WFH.'), {status:409});
     const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, {employee:req.user.id,date:input.date});
     if (attendanceConflict[0]) throw Object.assign(new Error('Attendance is already recorded for this date; a flex-start request cannot change it retroactively.'), {status:409});
+    const [correctionConflict] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (correctionConflict[0]) throw Object.assign(new Error('A pending attendance correction already exists for this date. Resolve it before requesting a flex start.'), {status:409});
     const [existing] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1 FOR UPDATE`, { employee:req.user.id, date:input.date });
     if (existing[0]) throw Object.assign(new Error('You already have a pending or approved flex-start request for this date.'), { status:409 });
     await connection.execute(`INSERT INTO flex_start_requests (id, employee_id, request_date, requested_start_time, reason) VALUES (:id, :employee, :date, :time, :reason)`, {

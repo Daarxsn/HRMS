@@ -101,6 +101,10 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
     if (activeRequest[0]) throw Object.assign(new Error('A pending or approved WFH request already exists for this date.'), { status:409 });
     const [leaveOverlap] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:req.user.id, date:input.date });
     if (leaveOverlap[0]) throw Object.assign(new Error('A pending or approved leave request already covers this date. Resolve it before requesting WFH.'), { status:409 });
+    const [flexOverlap] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (flexOverlap[0]) throw Object.assign(new Error('A pending or approved flex-start request already exists for this date. Resolve it before requesting WFH.'), {status:409});
+    const [correctionOverlap] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1`, {employee:req.user.id,date:input.date});
+    if (correctionOverlap[0]) throw Object.assign(new Error('A pending attendance correction exists for this date. Resolve it before requesting WFH.'), {status:409});
     const [attendanceExists] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, { employee:req.user.id, date:input.date });
     if (attendanceExists[0]) throw Object.assign(new Error('Attendance has already been recorded for this date. Contact HR if the record needs correction.'), { status:409 });
     const [count] = await connection.execute(`SELECT COUNT(*) AS count FROM wfh_requests WHERE employee_id=:employee AND request_date BETWEEN :start AND :end AND status IN ('APPROVED','PENDING')`, { employee: req.user.id, start: monthStart, end: monthEnd });

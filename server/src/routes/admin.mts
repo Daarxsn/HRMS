@@ -308,16 +308,24 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       if (wfhConflict[0]) throw Object.assign(new Error('This leave overlaps a pending or approved WFH request. Resolve the WFH request before approving leave.'), {status:409});
       const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1`, { employee:item.employee_id, start:item.start_date, end:item.end_date });
       if (attendanceConflict[0]) throw Object.assign(new Error('Attendance already exists during this leave period. Review the attendance record before approving leave.'), {status:409});
+      const [flexConflict] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1`, {employee:item.employee_id,start:item.start_date,end:item.end_date});
+      if (flexConflict[0]) throw Object.assign(new Error('This leave overlaps a pending or approved flex-start request. Resolve the flex-start request before approving leave.'), {status:409});
+      const [correctionConflict] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND status='PENDING' AND attendance_date BETWEEN :start AND :end LIMIT 1`, {employee:item.employee_id,start:item.start_date,end:item.end_date});
+      if (correctionConflict[0]) throw Object.assign(new Error('A pending attendance correction overlaps this leave. Resolve it before approving leave.'), {status:409});
     }
     if (input.decision === 'APPROVED' && kind === 'wfh') {
       const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, { employee:item.employee_id, date:item.request_date });
       if (leaveConflict[0]) throw Object.assign(new Error('This WFH request overlaps a pending or approved leave request. Resolve the leave request before approving WFH.'), {status:409});
       const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, { employee:item.employee_id, date:item.request_date });
       if (attendanceConflict[0]) throw Object.assign(new Error('Attendance already exists for this date. Review the attendance record before approving WFH.'), {status:409});
+      const [flexConflict] = await connection.execute(`SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (flexConflict[0]) throw Object.assign(new Error('This WFH request overlaps a pending or approved flex-start request. Resolve the flex-start request before approving WFH.'), {status:409});
+      const [correctionConflict] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (correctionConflict[0]) throw Object.assign(new Error('A pending attendance correction exists for this date. Resolve it before approving WFH.'), {status:409});
     }
     if (kind === 'correction' && input.decision === 'APPROVED') {
-      const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status='APPROVED' AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:item.employee_id,date:item.attendance_date});
-      if (leaveConflict[0]) throw Object.assign(new Error('This correction overlaps approved leave. Review the leave decision before adding attendance to this date.'), {status:409});
+      const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:item.employee_id,date:item.attendance_date});
+      if (leaveConflict[0]) throw Object.assign(new Error('This correction overlaps pending or approved leave. Resolve the leave request before adding attendance to this date.'), {status:409});
       const [existing] = await connection.execute('SELECT * FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: item.employee_id, date: item.attendance_date });
       const checkIn = item.requested_check_in_at || existing[0]?.check_in_at;
       const checkOut = item.requested_check_out_at || existing[0]?.check_out_at;
@@ -342,6 +350,8 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       if (leaveConflict[0]) throw Object.assign(new Error('This flex-start request overlaps pending or approved leave. Resolve leave before approving the flex start.'), {status:409});
       const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, {employee:item.employee_id,date:item.request_date});
       if (attendanceConflict[0]) throw Object.assign(new Error('Attendance is already recorded for this date. A flex-start approval cannot change it retroactively.'), {status:409});
+      const [correctionConflict] = await connection.execute(`SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (correctionConflict[0]) throw Object.assign(new Error('A pending attendance correction exists for this date. Resolve it before approving a flex start.'), {status:409});
       const [wfhConflict] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1`, {employee:item.employee_id,date:item.request_date});
       if (wfhConflict[0]) throw Object.assign(new Error('This flex-start request overlaps pending or approved WFH.'), {status:409});
       await connection.execute(`INSERT INTO employee_schedule_exceptions (id,employee_id,exception_date,approved_start_time,approved_by,reason)

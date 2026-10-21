@@ -174,8 +174,14 @@ try {
   let correctionDate='';
   for(let offset=2;offset<=365&&!correctionDate;offset+=1){
     const candidate = new Date(correctionBase.getTime()-offset*86400000).toISOString().slice(0,10);
-    const pending = await query("SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1",{employee:employeeSession.user.id,date:candidate});
-    if(!pending[0]) correctionDate=candidate;
+    const [pending, existingAttendance, leaveConflict, flexConflict, activeWfh] = await Promise.all([
+      query("SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM flex_start_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM wfh_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate})
+    ]);
+    if(!pending[0]&&!existingAttendance[0]&&!leaveConflict[0]&&!flexConflict[0]&&!activeWfh[0]) correctionDate=candidate;
   }
   assert.ok(correctionDate,'Integration test must find a date without an existing pending correction.');
   const correctionBody = {
@@ -195,6 +201,22 @@ try {
     method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Integration-test cleanup'})
   });
   assert.equal(rejectCorrection.response.status,200,'The test correction must be reviewable without changing attendance.');
+
+  const approvalRaceRequest=await request('/attendance/corrections',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({...correctionBody,reason:'Concurrent correction approval regression'})});
+  assert.equal(approvalRaceRequest.response.status,201,'A new correction can be filed after the prior request was rejected.');
+  const concurrentCorrectionApprovals=await Promise.all([
+    request('/admin/approvals/correction/'+approvalRaceRequest.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Concurrent approval A'})}),
+    request('/admin/approvals/correction/'+approvalRaceRequest.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Concurrent approval B'})})
+  ]);
+  assert.equal(concurrentCorrectionApprovals.filter((x)=>x.response.status===200).length,1,'Exactly one concurrent correction approval may succeed.');
+  assert.equal(concurrentCorrectionApprovals.filter((x)=>x.response.status===409).length,1,'A retried/concurrent approval must return 409, not ER_DUP_ENTRY.');
+  const approvedCorrectionRecords=await query('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date',{employee:employeeSession.user.id,date:correctionDate});
+  assert.equal(approvedCorrectionRecords.length,1,'Concurrent approval must result in exactly one attendance record.');
+  await query('DELETE FROM audit_logs WHERE entity_type=\'attendance\' AND entity_id=:id',{id:approvedCorrectionRecords[0].id});
+  await query('DELETE FROM audit_logs WHERE entity_id=:id AND entity_type IN (\'attendance_correction\',\'correction_request\')',{id:approvalRaceRequest.data.id});
+  await query('DELETE FROM attendance_correction_requests WHERE id=:id',{id:approvalRaceRequest.data.id});
+  await query('DELETE FROM attendance_records WHERE id=:id',{id:approvedCorrectionRecords[0].id});
+
   const testedBalances=await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
   assert.equal(testedBalances.response.status,200);
   const earnedBalance=(testedBalances.data.balances||[]).find((balance)=>balance.type==='EARNED');
@@ -376,7 +398,7 @@ try {
   const lifecycleCandidates=[];
   const lifecycleMonths=new Set();
   const wfhBase=new Date(wfhDate+'T12:00:00Z');
-  for(let offset=35;offset<=400&&lifecycleCandidates.length<2;offset+=1){
+  for(let offset=35;offset<=400&&lifecycleCandidates.length<4;offset+=1){
     const candidate=new Date(wfhBase.getTime()+offset*86400000).toISOString().slice(0,10);
     const weekday=new Date(candidate+'T12:00:00Z').getUTCDay();
     if(weekday===0)continue;
@@ -389,12 +411,18 @@ try {
     const monthEnd=new Date(Date.UTC(yy,mm,0)).toISOString().slice(0,10);
     const monthlyCount=await query("SELECT COUNT(*) AS count FROM wfh_requests WHERE employee_id=:employee AND request_date BETWEEN :start AND :end AND status IN ('PENDING','APPROVED')",{employee:employeeSession.user.id,start:monthStart,end:monthEnd});
     if(Number(monthlyCount[0]?.count||0)>=Number(wfhState.data.monthlyCap||4))continue;
-    const existingActive=await query("SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1",{employee:employeeSession.user.id,date:candidate});
-    if(existingActive[0])continue;
+    const [existingActive, existingAttendance, existingLeave, existingFlex, existingCorrection] = await Promise.all([
+      query("SELECT id FROM wfh_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM flex_start_requests WHERE employee_id=:employee AND request_date=:date AND status IN ('PENDING','APPROVED') LIMIT 1",{employee:employeeSession.user.id,date:candidate}),
+      query("SELECT id FROM attendance_correction_requests WHERE employee_id=:employee AND attendance_date=:date AND status='PENDING' LIMIT 1",{employee:employeeSession.user.id,date:candidate})
+    ]);
+    if(existingActive[0]||existingAttendance[0]||existingLeave[0]||existingFlex[0]||existingCorrection[0])continue;
     lifecycleCandidates.push(candidate);
     lifecycleMonths.add(candidate.slice(0,7));
   }
-  assert.equal(lifecycleCandidates.length,2,'Must find two future non-fixed-holiday business dates in different months for WFH lifecycle tests.');
+  assert.equal(lifecycleCandidates.length,4,'Must find four future non-fixed-holiday business dates in different months for WFH/flex/leave conflict tests.');
 
   const concurrentWfhRequests=await Promise.all([
     request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[0],kind:'PLANNED',reason:'Concurrent WFH lifecycle request A'})}),
@@ -428,6 +456,40 @@ try {
   assert.equal(reapplyRejectedWfh.response.status,201,'Rejected WFH must release active-date uniqueness for reapplication.');
   const cancelAfterRejection=await request('/wfh/'+reapplyRejectedWfh.data.id,{method:'DELETE',headers:{Cookie:employeeSession.cookie}});
   assert.equal(cancelAfterRejection.response.status,200);
+
+  // Cross-entity submission conflicts: active flex-start is mutually exclusive with WFH and leave.
+  const flexBeforeWfh=await request('/attendance/flex-requests',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[2],startTime:'10:00',reason:'Flex conflicts with WFH and leave'})});
+  assert.equal(flexBeforeWfh.response.status,201);
+  const wfhAgainstPendingFlex=await request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[2],kind:'PLANNED',reason:'WFH conflicts with pending flex'})});
+  assert.equal(wfhAgainstPendingFlex.response.status,409,'WFH submission must recheck active flex-start requests.');
+  const leaveAgainstPendingFlex=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({type:'CASUAL',startDate:lifecycleCandidates[2],endDate:lifecycleCandidates[2],reason:'Leave conflicts with pending flex'})});
+  assert.equal(leaveAgainstPendingFlex.response.status,409,'Leave submission must recheck active flex-start requests.');
+  const rejectFlexForSubmission=await request('/admin/approvals/flex/'+flexBeforeWfh.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Cross-conflict test cleanup'})});
+  assert.equal(rejectFlexForSubmission.response.status,200);
+
+  // Approval-time backstop: a flex request appears after a WFH request was filed.
+  const wfhAgainstFlexApproval=await request('/wfh',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:lifecycleCandidates[3],kind:'PLANNED',reason:'WFH approval conflict regression'})});
+  assert.equal(wfhAgainstFlexApproval.response.status,201);
+  const flexFixtureForWfh=crypto.randomUUID();
+  await query(`INSERT INTO flex_start_requests (id,employee_id,request_date,requested_start_time,reason)
+    VALUES (:id,:employee,:date,'10:00',:reason)`,{id:flexFixtureForWfh,employee:employeeSession.user.id,date:lifecycleCandidates[3],reason:'Injected to verify approval-time conflict handling'});
+  const approveConflictingWfh=await request('/admin/approvals/wfh/'+wfhAgainstFlexApproval.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Should be blocked by flex start'})});
+  assert.equal(approveConflictingWfh.response.status,409,'WFH approval must recheck flex-start state inside the approval transaction.');
+  const rejectConflictingWfh=await request('/admin/approvals/wfh/'+wfhAgainstFlexApproval.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Conflict test cleanup'})});
+  assert.equal(rejectConflictingWfh.response.status,200);
+  await query('DELETE FROM flex_start_requests WHERE id=:id',{id:flexFixtureForWfh});
+
+  // Leave approval must independently recheck active flex requests.
+  const leaveAgainstFlexApproval=await request('/leave',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({type:'CASUAL',startDate:lifecycleCandidates[3],endDate:lifecycleCandidates[3],reason:'Leave approval conflict regression'})});
+  assert.equal(leaveAgainstFlexApproval.response.status,201);
+  const flexFixtureForLeave=crypto.randomUUID();
+  await query(`INSERT INTO flex_start_requests (id,employee_id,request_date,requested_start_time,reason)
+    VALUES (:id,:employee,:date,'10:00',:reason)`,{id:flexFixtureForLeave,employee:employeeSession.user.id,date:lifecycleCandidates[3],reason:'Injected to verify leave approval-time conflict handling'});
+  const approveConflictingLeave=await request('/admin/approvals/leave/'+leaveAgainstFlexApproval.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'APPROVED',note:'Should be blocked by flex start'})});
+  assert.equal(approveConflictingLeave.response.status,409,'Leave approval must recheck flex-start state inside the approval transaction.');
+  const rejectConflictingLeave=await request('/admin/approvals/leave/'+leaveAgainstFlexApproval.data.id,{method:'POST',headers:{Cookie:adminSession.cookie},body:JSON.stringify({decision:'REJECTED',note:'Conflict test cleanup'})});
+  assert.equal(rejectConflictingLeave.response.status,200);
+  await query('DELETE FROM flex_start_requests WHERE id=:id',{id:flexFixtureForLeave});
 
   // Sick-leave validation must identify the correct type and rule when documentation is missing.
   let sickStart='';
