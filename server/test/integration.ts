@@ -162,6 +162,9 @@ try {
   assert.equal(offPremisesCheckIn.response.status,400,'OFF_PREMISES must be checkout-only.');
 
 
+  const unauthenticatedOutboxRun = await request('/internal/email-outbox', {method:'POST',body:JSON.stringify({})});
+  assert.equal(unauthenticatedOutboxRun.response.status,401,'The background email worker endpoint must require its private bearer secret.');
+
   const adminSession = await signIn(admin.email);
 
   // Step 5 / 27-28: durable enqueue, dedupe, SMTP failure retries, recovery and concurrent delivery.
