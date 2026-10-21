@@ -204,7 +204,7 @@ test('GPS check-in falls back to approved office Wi-Fi when laptop location is u
     });
   });
   await signInDev(page, 'employee');
-  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+  await page.locator('.overview-attendance-card').getByRole('button', { name: /At the office\? Check in with office verification/ })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => attendancePostBody?.method).toBe('WIFI');
   await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
@@ -246,7 +246,7 @@ test('denied GPS permission falls back to approved office Wi-Fi with a clear rec
     });
   });
   await signInDev(page, 'employee');
-  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+  await page.locator('.overview-attendance-card').getByRole('button', { name: /At the office\? Check in with office verification/ })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => attendancePostBody?.method).toBe('WIFI');
   await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
@@ -285,7 +285,7 @@ test('slow but accurate GPS acquisition completes check-in without Wi-Fi fallbac
     });
   });
   await signInDev(page, 'employee');
-  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+  await page.locator('.overview-attendance-card').getByRole('button', { name: /At the office\? Check in with office verification/ })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => attendancePostBody?.method, { timeout: 7000 }).toBe('GPS');
   await expect(page.getByText('Check-in recorded.')).toBeVisible();
@@ -315,7 +315,7 @@ test('inaccurate indoor GPS falls back to the approved office network', async ({
     await route.fulfill({status:201,contentType:'application/json',body:JSON.stringify({ok:true,status:'ON_TIME',method:'WIFI',attendanceId:'e2e-inaccurate-gps'})});
   });
   await signInDev(page,'employee');
-  await page.locator('.overview-attendance-card').getByRole('button',{name:'Check in'})
+  await page.locator('.overview-attendance-card').getByRole('button',{name:/At the office\? Check in with office verification/})
     .evaluate((button:HTMLButtonElement)=>button.click());
   await expect.poll(()=>attendancePostBody?.method,{timeout:8000}).toBe('WIFI');
   await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
@@ -347,7 +347,7 @@ test('GPS acquisition timeout falls back to Wi-Fi instead of leaving the employe
     });
   });
   await signInDev(page, 'employee');
-  await page.locator('.overview-attendance-card').getByRole('button', { name: 'Check in' })
+  await page.locator('.overview-attendance-card').getByRole('button', { name: /At the office\? Check in with office verification/ })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => attendancePostBody?.method, { timeout: 8000 }).toBe('WIFI');
   await expect(page.getByText(/Check-in recorded using approved office Wi-Fi/i)).toBeVisible();
@@ -464,13 +464,13 @@ test('employee check-in and checkout exercise the real attendance API', async ({
   let record = await readToday();
   if (!record?.check_in_at) {
     await page.getByRole('button', { name:/Check in/i }).first().click();
-    await expect(page.getByText(/Check-in recorded\.|Check-in recorded using approved office Wi-Fi\./)).toBeVisible();
+    await expect(page.getByText(/Remote check-in recorded\.|Check-in recorded\.|Check-in recorded using approved office Wi-Fi\./)).toBeVisible();
     record = await readToday();
   }
   expect(record?.check_in_at).toBeTruthy();
   if (!record?.check_out_at) {
     await page.getByRole('button', { name:/Check out/i }).first().click();
-    await expect(page.getByText(/Check-out recorded\.|Check-out recorded using approved office Wi-Fi\./)).toBeVisible();
+    await expect(page.getByText(/Remote check-out recorded\.|Check-out recorded\.|Check-out recorded using approved office Wi-Fi\./)).toBeVisible();
     record = await readToday();
   }
   expect(record?.check_out_at).toBeTruthy();

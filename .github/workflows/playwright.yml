@@ -31,6 +31,7 @@ jobs:
       APP_ORIGIN: http://127.0.0.1:3000
       DEMO_AUTH_ENABLED: true
       HRMS_E2E_AUTH_RATE_LIMIT: 240
+      HRMS_E2E_API_RATE_LIMIT: 3000
       JWT_SECRET: ci-e2e-secret-0123456789-abcdefghijklmnopqrstuvwxyz
       DB_HOST: 127.0.0.1
       DB_PORT: 3306

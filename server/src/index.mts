@@ -65,7 +65,17 @@ app.use((req,res,next)=>{
   });
   next();
 });
-app.use('/api',rateLimit({windowMs:15*60*1000,limit:600,standardHeaders:true,legacyHeaders:false}));
+// Give browser E2E runs room to exercise repeated navigation across desktop/mobile viewports.
+// This override is accepted only for an isolated, seeded non-production test environment.
+const isolatedE2E = process.env.NODE_ENV !== 'production'
+  && process.env.HRMS_TEST_SEED_ENABLED === 'true'
+  && process.env.DEMO_AUTH_ENABLED === 'true';
+const requestedE2EApiLimit = Number(process.env.HRMS_E2E_API_RATE_LIMIT || 0);
+const apiRequestLimit = isolatedE2E && Number.isSafeInteger(requestedE2EApiLimit)
+  && requestedE2EApiLimit >= 600 && requestedE2EApiLimit <= 5000
+  ? requestedE2EApiLimit
+  : 600;
+app.use('/api',rateLimit({windowMs:15*60*1000,limit:apiRequestLimit,standardHeaders:true,legacyHeaders:false}));
 app.use('/api',(req,res,next)=>{
   if(!['POST','PUT','PATCH','DELETE'].includes(req.method))return next();
   const origin=req.get('Origin');
@@ -76,9 +86,6 @@ app.use(express.json({ limit:'100kb', strict:true }));
 app.use(cookieParser());
 // Keep production authentication throttling strict. The elevated override is accepted
 // only for the isolated, seeded demo/E2E environment and is capped to prevent abuse.
-const isolatedE2E = process.env.NODE_ENV !== 'production'
-  && process.env.HRMS_TEST_SEED_ENABLED === 'true'
-  && process.env.DEMO_AUTH_ENABLED === 'true';
 const requestedE2EAuthLimit = Number(process.env.HRMS_E2E_AUTH_RATE_LIMIT || 0);
 const authRequestLimit = isolatedE2E && Number.isSafeInteger(requestedE2EAuthLimit)
   && requestedE2EAuthLimit >= 40 && requestedE2EAuthLimit <= 300
