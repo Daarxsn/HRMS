@@ -174,7 +174,7 @@ test('WFH access outage offers retry instead of claiming access is disabled', as
 
 test('GPS check-in falls back to approved office Wi-Fi when laptop location is unavailable', async ({ page }) => {
   await stubNoHolidayCalendar(page);
-  await page.route(/\\/api\\/attendance(?:\\?.*)?$/, async (route) => route.fulfill({
+  await page.route(/\/api\/attendance(?:\?.*)?$/, async (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({ records: [] })
