@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { pool, query, transaction } from '../db.mts';
 import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { attendanceStatus, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
+import { attendanceStatus, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
 
@@ -43,8 +43,8 @@ async function effectiveAttendance(from, to) {
     const isPast=date<today;
     for(const person of people){
       if(date<person.joined_on||present.has(`${person.id}:${date}`))continue;
-      const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||'10:30';
-      const absenceCutoff=isPast||currentTime>scheduledStart;
+      const scheduledStart=approvedStartByEmployeeDate.get(`${person.id}:${date}`)||POLICY.standardStart;
+      const absenceCutoff=isPast||hasPassedAbsenceCutoff(currentTime,scheduledStart);
       const onLeave=leaves.some((item)=>item.employee_id===person.id&&item.start_date<=date&&item.end_date>=date);
       const remote=wfh.some((item)=>item.employee_id===person.id&&item.request_date===date);
       const status=onLeave?'ON_LEAVE':remote?'WFH':absenceCutoff?'ABSENT':null;
@@ -285,6 +285,10 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
   let recordDate = null;
   await transaction(async (connection) => {
     const table = { leave:'leave_requests', wfh:'wfh_requests', correction:'attendance_correction_requests', flex:'flex_start_requests' }[kind];
+    // Consistent employee-first lock order serializes approvals against submissions.
+    const [ownerRows] = await connection.execute(`SELECT employee_id FROM ${table} WHERE id=:id`, {id:req.params.id});
+    if (!ownerRows[0]) throw Object.assign(new Error('This request was not found.'), {status:404});
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', {employee:ownerRows[0].employee_id});
     const [rows] = await connection.execute(`SELECT * FROM ${table} WHERE id=:id AND status='PENDING' FOR UPDATE`, { id: req.params.id });
     if (!rows[0]) throw Object.assign(new Error('This request is no longer pending.'), { status: 409 });
     const item = rows[0];
@@ -303,6 +307,8 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       if (attendanceConflict[0]) throw Object.assign(new Error('Attendance already exists for this date. Review the attendance record before approving WFH.'), {status:409});
     }
     if (kind === 'correction' && input.decision === 'APPROVED') {
+      const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status='APPROVED' AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:item.employee_id,date:item.attendance_date});
+      if (leaveConflict[0]) throw Object.assign(new Error('This correction overlaps approved leave. Review the leave decision before adding attendance to this date.'), {status:409});
       const [existing] = await connection.execute('SELECT * FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: item.employee_id, date: item.attendance_date });
       const checkIn = item.requested_check_in_at || existing[0]?.check_in_at;
       const checkOut = item.requested_check_out_at || existing[0]?.check_out_at;
@@ -323,6 +329,10 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
     await connection.execute(`UPDATE ${table} SET status=:status,reviewed_by=:actor,reviewer_note=:note,reviewed_at=UTC_TIMESTAMP() WHERE id=:id`, { status:next, actor:req.user.id, note:input.note || null, id:req.params.id });
     if (kind === 'correction' && item.attendance_id) await connection.execute('UPDATE attendance_records SET correction_pending=FALSE WHERE id=:id', { id:item.attendance_id });
     if (kind === 'flex' && next === 'APPROVED') {
+      const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (leaveConflict[0]) throw Object.assign(new Error('This flex-start request overlaps pending or approved leave. Resolve leave before approving the flex start.'), {status:409});
+      const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1`, {employee:item.employee_id,date:item.request_date});
+      if (attendanceConflict[0]) throw Object.assign(new Error('Attendance is already recorded for this date. A flex-start approval cannot change it retroactively.'), {status:409});
       await connection.execute(`INSERT INTO employee_schedule_exceptions (id,employee_id,exception_date,approved_start_time,approved_by,reason)
         VALUES (:id,:employee,:date,:time,:actor,:reason) ON DUPLICATE KEY UPDATE approved_start_time=VALUES(approved_start_time),approved_by=VALUES(approved_by),reason=VALUES(reason)`, {
         id:crypto.randomUUID(), employee:item.employee_id, date:item.request_date, time:item.requested_start_time, actor:req.user.id, reason:item.reason

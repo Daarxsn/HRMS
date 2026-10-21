@@ -83,7 +83,7 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   if (!(req.user.wfh_enabled === true || Number(req.user.wfh_enabled) === 1)) throw Object.assign(new Error('WFH has not been enabled for this employee. Ask an administrator if your eligibility needs to change.'), { status: 403 });
   if (input.date < indiaDate()) throw Object.assign(new Error('Choose today or a future date.'), { status: 400 });
   if (input.kind === 'EMERGENCY' && input.date !== indiaDate()) throw Object.assign(new Error('Emergency WFH is for an unexpected same-day need. Use a planned request for a future date.'), { status:400 });
-  const holidayRows=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date`,{date:input.date});
+  const holidayRows=await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date=:date AND holiday_kind='FIXED'`,{date:input.date});
   if(!isScheduledWorkday(input.date,new Set(holidayRows.map((x)=>x.date)))) throw Object.assign(new Error('Choose a scheduled workday for your WFH request.'),{status:400});
   const settings = await query(`SELECT setting_value FROM system_settings WHERE setting_key='wfh_monthly_cap'`);
   const cap = Number(settings[0]?.setting_value || 4);
@@ -148,6 +148,24 @@ router.get('/calendar', asyncRoute(async (req, res) => {
   const nationalHolidays: Array<[number,number,string]> = [[1,26,'Republic Day'],[8,15,'Independence Day'],[10,2,'Gandhi Jayanti']];
   for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, {name,kind:'FIXED'});
   res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,item]) => ({ date, name:item.name, kind:item.kind })) });
+}));
+router.delete('/wfh/:id', requirePeople, asyncRoute(async (req, res) => {
+  const cancelled = await transaction(async (connection) => {
+    await connection.execute('SELECT id FROM employees WHERE id=:employee FOR UPDATE', {employee:req.user.id});
+    const [rows] = await connection.execute(`SELECT id,DATE_FORMAT(request_date,'%Y-%m-%d') AS request_date,status FROM wfh_requests WHERE id=:id AND employee_id=:employee FOR UPDATE`, {id:req.params.id,employee:req.user.id});
+    if (!rows[0] || !['PENDING','APPROVED'].includes(String(rows[0].status))) throw Object.assign(new Error('Only pending or approved WFH requests can be cancelled.'), {status:409});
+    const requestDate=String(rows[0].request_date).slice(0,10);
+    if (requestDate < indiaDate()) throw Object.assign(new Error('Past WFH records cannot be cancelled. Contact HR if a historical record needs correction.'), {status:409});
+    const [attendance] = await connection.execute('SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date LIMIT 1', {employee:req.user.id,date:requestDate});
+    if (attendance[0]) throw Object.assign(new Error('Attendance is already recorded for this date. Contact HR instead of cancelling an in-use WFH approval.'), {status:409});
+    const [updated] = await connection.execute(`UPDATE wfh_requests SET status='CANCELLED' WHERE id=:id AND employee_id=:employee AND status IN ('PENDING','APPROVED')`, {id:req.params.id,employee:req.user.id});
+    if (!updated.affectedRows) throw Object.assign(new Error('The WFH request changed before cancellation. Refresh and try again.'), {status:409});
+    return {id:String(rows[0].id),date:requestDate,previousStatus:String(rows[0].status)};
+  });
+  await audit({actorId:req.user.id,action:'WFH_REQUEST_CANCELLED',entityType:'wfh_request',entityId:cancelled.id,details:cancelled,ipAddress:req.ip});
+  try { await notifyAdmins('WFH request cancelled', req.user.full_name+' cancelled a WFH request for '+cancelled.date+'.', 'UPDATE', {type:'wfh_cancelled',id:cancelled.id}); }
+  catch (error) { console.warn(JSON.stringify({type:'wfh_cancellation_notification_failed',request_id:cancelled.id,error:String(error?.message||error)})); }
+  res.json({ok:true,id:cancelled.id,status:'CANCELLED'});
 }));
 router.post('/calendar', requireAdmin, asyncRoute(async (req, res) => {
   const input = validate(z.object({ date: dateSchema, name: z.string().trim().min(2).max(160), kind: z.enum(['FIXED','FLOATING']).default('FLOATING') }), req.body);

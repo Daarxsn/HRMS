@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
+import { attendanceStatus, distanceMeters, earnedLeaveAccrual, hasPassedAbsenceCutoff, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
@@ -17,6 +17,28 @@ test('a configurable late threshold is respected when no flex start is approved'
 test('an approved 10:30 AM flex start is respected to the minute and second', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T05:00:00Z'), '10:30:00'), 'ON_TIME');
   assert.equal(attendanceStatus(new Date('2026-10-02T05:00:01Z'), '10:30:00'), 'LATE_ENTRY');
+});
+
+test('absence cutoff follows scheduled start plus a 90-minute grace window', () => {
+  assert.equal(hasPassedAbsenceCutoff('10:29:59', '09:00'), false);
+  assert.equal(hasPassedAbsenceCutoff('10:30:00', '09:00'), false);
+  assert.equal(hasPassedAbsenceCutoff('10:30:01', '09:00'), true);
+  assert.equal(hasPassedAbsenceCutoff('11:59:59', '10:30'), false);
+  assert.equal(hasPassedAbsenceCutoff('12:00:01', '10:30'), true);
+  assert.equal(hasPassedAbsenceCutoff('10:30:01', null), true);
+});
+
+test('earned leave accrual handles probation, null probation and joining dates', () => {
+  assert.equal(earnedLeaveAccrual('2026-10-21','2025-01-10','2026-04-15',15),5);
+  assert.equal(earnedLeaveAccrual('2026-10-21','2026-01-10',null,15),8);
+  assert.equal(earnedLeaveAccrual('2026-10-21','2026-10-01',null,15),0);
+  assert.equal(earnedLeaveAccrual('2026-10-21','2026-12-01',null,15),0);
+  assert.equal(earnedLeaveAccrual('2026-10-31','2025-01-10','2024-12-31',15),10);
+});
+
+test('short shifts are not rejected and net minutes never go below zero', () => {
+  assert.equal(netWorkedMinutes('2026-10-02 03:30:00','2026-10-02 03:40:00'),0);
+  assert.equal(netWorkedMinutes('2026-10-02 03:30:00','2026-10-02 04:10:00'),10);
 });
 
 test('the Pune geofence measures metres from the configured office point', () => {

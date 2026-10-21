@@ -100,3 +100,25 @@ export function attendanceStatus(checkIn, approvedStart, lateThreshold: string =
 export function expectedShiftStart(approvedStart) {
   return approvedStart || POLICY.standardStart;
 }
+
+export function hasPassedAbsenceCutoff(currentTime: string, scheduledStart: string | null | undefined, graceMinutes = 90) {
+  const [hour, minute, second = 0] = String(currentTime).split(':').map(Number);
+  if (![hour, minute, second].every(Number.isFinite)) return false;
+  const grace = Number.isFinite(graceMinutes) ? Math.max(0, Math.round(graceMinutes)) : 90;
+  const cutoffMinutes = minutesOfTime(scheduledStart || POLICY.standardStart) + grace;
+  return hour * 60 + minute + second / 60 > cutoffMinutes;
+}
+
+export function earnedLeaveAccrual(asOfDate: string, joinedOn: string | null | undefined, probationEndDate: string | null | undefined, entitlement = POLICY.leaveEntitlements.EARNED) {
+  const accrualStart = String(probationEndDate || joinedOn || '').slice(0,10);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(asOfDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(accrualStart) || accrualStart > asOfDate) return 0;
+  const year = Number(asOfDate.slice(0,4));
+  const month = Number(asOfDate.slice(5,7));
+  const day = Number(asOfDate.slice(8,10));
+  const startYear = Number(accrualStart.slice(0,4));
+  const startMonth = Number(accrualStart.slice(5,7));
+  const firstEligibleMonth = startYear < year ? 1 : startYear > year ? 13 : startMonth + 1;
+  const lastAccrualMonth = day === new Date(year,month,0).getDate() ? month : month - 1;
+  const cap = Number.isFinite(entitlement) ? Math.max(0,entitlement) : POLICY.leaveEntitlements.EARNED;
+  return Math.max(0,Math.min(cap,lastAccrualMonth-firstEligibleMonth+1));
+}

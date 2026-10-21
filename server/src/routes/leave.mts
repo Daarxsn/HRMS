@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { indiaDate, workingDaysInclusive } from '../policy.mts';
+import { earnedLeaveAccrual, indiaDate, workingDaysInclusive } from '../policy.mts';
 import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
 
 const router = Router();
@@ -64,7 +64,7 @@ async function getLeaveBalances(employee, connection = null) {
   const execute = async (sql: string, values: any = {}): Promise<any> => connection ? (await connection.execute(sql, values))[0] : query(sql, values);
   const today = indiaDate();
   const year = Number(today.slice(0, 4));
-  const holidays = await execute(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE YEAR(holiday_date)=:year`, { year });
+  const holidays = await execute(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_kind='FIXED' AND YEAR(holiday_date)=:year`, { year });
   const holidaySet = new Set(holidays.map((row) => row.date));
   const [requests, policyRows] = await Promise.all([
     execute(`SELECT leave_type, status, SUM(days) AS days FROM leave_requests WHERE employee_id=:employee AND YEAR(start_date)=:year GROUP BY leave_type, status`, { employee, year }),
@@ -77,21 +77,12 @@ async function getLeaveBalances(employee, connection = null) {
   // A NULL probation end date means no probation end date was configured, not
   // that the employee is permanently ineligible for earned leave. In that case
   // accrue from the employee's join date using the same completed-month rule.
-  const accrualStart = String(probation || userRows[0]?.joined_on || '').slice(0, 10);
-  const currentMonth = Number(today.slice(5, 7));
-  const currentDay = Number(today.slice(8, 10));
+  // A NULL probation end date uses joining date as the accrual reference.
   const policy = Object.fromEntries((policyRows as any[]).map((row) => [row.setting_key, Number(row.setting_value)]));
   const casualEntitlement = Number.isFinite(policy.leave_casual_sl_entitlement) ? policy.leave_casual_sl_entitlement : 8;
   const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
   const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
-  let earnedAccrued = 0;
-  if (accrualStart && accrualStart <= today) {
-    const eligibleYear = Number(accrualStart.slice(0, 4));
-    const eligibleMonth = Number(accrualStart.slice(5, 7));
-    const firstEligibleMonth = eligibleYear < year ? 1 : eligibleYear > year ? 13 : eligibleMonth + 1;
-    const lastAccrualMonth = currentDay === new Date(year,currentMonth,0).getDate() ? currentMonth : currentMonth - 1;
-    earnedAccrued = Math.max(0, Math.min(earnedEntitlement, (lastAccrualMonth - firstEligibleMonth + 1)));
-  }
+  const earnedAccrued = earnedLeaveAccrual(today, userRows[0]?.joined_on, probation, earnedEntitlement);
   const sharedUsed = (byKey.get('CASUAL:APPROVED') || 0) + (byKey.get('SICK:APPROVED') || 0);
   const sharedPending = (byKey.get('CASUAL:PENDING') || 0) + (byKey.get('SICK:PENDING') || 0);
   const definitions: Array<[string,string,number]> = [
@@ -123,7 +114,7 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
   if (input.startDate > input.endDate) throw Object.assign(new Error('End date must be the same as or after the start date.'), { status: 400 });
   if (input.startDate.slice(0,4) !== input.endDate.slice(0,4)) throw Object.assign(new Error('Submit separate leave requests for each calendar year.'), { status: 400 });
   if (input.startDate < indiaDate()) throw Object.assign(new Error('Leave requests cannot start in the past. Use attendance correction for a missed record.'), { status: 400 });
-  const holidayRows = await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_date BETWEEN :from AND :to`, { from: input.startDate, to: input.endDate });
+  const holidayRows = await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date FROM company_holidays WHERE holiday_kind='FIXED' AND holiday_date BETWEEN :from AND :to`, { from: input.startDate, to: input.endDate });
   const holidaySet = new Set(holidayRows.map((row) => row.date));
   const holidayYear = Number(input.startDate.slice(0,4));
   for (const [month,day] of [[1,26],[8,15],[10,2]]) holidaySet.add(`${holidayYear}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`);

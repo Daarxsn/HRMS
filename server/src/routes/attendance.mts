@@ -6,7 +6,7 @@ import { query, transaction } from '../db.mts';
 import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
-import { attendanceStatus, distanceMeters, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
+import { attendanceStatus, distanceMeters, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
 router.use(requireAuth, (req, res, next) => {
@@ -86,8 +86,8 @@ router.get('/', asyncRoute(async (req, res) => {
   for(let d=new Date(`${date}T12:00:00Z`),end=new Date(`${to}T12:00:00Z`);d<=end;d.setUTCDate(d.getUTCDate()+1)){
     const day=d.toISOString().slice(0,10);if(day>today||holidaySet.has(day)||day<(person[0]?.joined_on||'' )||existing.has(day))continue;
     const onLeave=leaves.some((x)=>x.start_date<=day&&x.end_date>=day);const wfh=remoteDays.some((x)=>x.request_date===day);
-    const absenceCutoff=approvedStartByDate.get(day)||'10:30';
-    const absent=day<today||currentTime>absenceCutoff;const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
+    const scheduledStart=approvedStartByDate.get(day)||POLICY.standardStart;
+    const absent=day<today||hasPassedAbsenceCutoff(currentTime,scheduledStart);const status=onLeave?'ON_LEAVE':wfh?'WFH':absent?'ABSENT':null;
     if(status)display.push({id:`${req.user.id}-${day}`,attendance_date:day,check_in_at:null,check_out_at:null,check_in_method:status==='WFH'?'WFH':null,check_out_method:null,status,approved_start_time:null,correction_pending:false});
   }
   const lunchRows = await query('SELECT setting_value FROM system_settings WHERE setting_key=\'fixed_lunch_minutes\'');
