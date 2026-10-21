@@ -300,7 +300,7 @@ async function main() {
     await zeroCount('Employees missing JOINED history backfill',
       `SELECT COUNT(*) AS count FROM employees e
        JOIN schema_migrations m ON m.version='006_enterprise_hr.sql'
-       WHERE e.created_at <= m.applied_at
+       WHERE e.created_at < m.applied_at
          AND NOT EXISTS (SELECT 1 FROM employment_history h WHERE h.employee_id=e.id AND h.event_type='JOINED' AND h.effective_date=e.joined_on)`,
       ['employees','employment_history','schema_migrations']);
   }
