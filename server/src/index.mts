@@ -14,6 +14,9 @@ import workplaceRoutes from './routes/workplace.mts';
 import adminRoutes from './routes/admin.mts';
 import accountRoutes from './routes/account.mts';
 import enterpriseRoutes from './routes/enterprise.mts';
+import { getObjectStorageReadiness } from './object-storage.mts';
+import { assertProductionConfiguration } from './production-config.mts';
+import emailOutboxRoutes from './email-outbox-routes.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -28,7 +31,7 @@ app.disable('x-powered-by');
 // Trust the forwarded client IP only on Vercel, which overwrites X-Forwarded-For at its edge.
 // Local/direct deployments must not let a client-supplied forwarding header choose req.ip.
 app.set('trust proxy', process.env.VERCEL === '1' ? 1 : false);
-if(process.env.NODE_ENV==='production'){if(!process.env.JWT_SECRET||Buffer.byteLength(process.env.JWT_SECRET)<32)throw new Error('Set a private JWT_SECRET of at least 32 bytes in production.');if(!process.env.APP_ORIGIN)throw new Error('Set APP_ORIGIN to the exact production portal origin.');if(!process.env.GOOGLE_CLIENT_ID)throw new Error('Set GOOGLE_CLIENT_ID in production.');}
+assertProductionConfiguration(process.env);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 app.use((req,res,next)=>{
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(self)');
@@ -95,8 +98,15 @@ app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:authRequestLimit,standa
 const healthPayload=(res,payload,status=200)=>{res.setHeader('Cache-Control','no-store');res.status(status).json(payload);};
 app.get('/api/health/live',(req,res)=>healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}));
 app.get('/api/health/ready',async(req,res)=>{
-  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
-  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'unavailable'},503); }
+  let database='ok';
+  try { await pool.query('SELECT 1'); } catch { database='unavailable'; }
+  const storage=getObjectStorageReadiness();
+  const outboxRunnerConfigured=process.env.VERCEL!=='1'||String(process.env.EMAIL_OUTBOX_CRON_SECRET||'').length>=32;
+  const ready=database==='ok'&&storage.status==='PASS'&&outboxRunnerConfigured;
+  healthPayload(res,{status:ready?'ok':'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database,
+    private_object_storage:storage.status==='PASS'?'configured':'not_configured',
+    email_outbox_runner:outboxRunnerConfigured?'configured':'not_configured',
+    uptime_seconds:Math.floor((Date.now()-startedAt)/1000)},ready?200:503);
 });
 app.get('/api/health',async(req,res)=>{
   try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
@@ -108,6 +118,7 @@ app.use('/api/leave',leaveRoutes);
 app.use('/api',workplaceRoutes);
 app.use('/api/admin',adminRoutes);
 app.use('/api/account',accountRoutes);
+app.use('/api/internal/email-outbox',emailOutboxRoutes);
 app.use('/api/enterprise',enterpriseRoutes);
 app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
 app.use(errorHandler);

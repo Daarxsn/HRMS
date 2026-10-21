@@ -16,7 +16,9 @@ export function validate(schema, input) {
 }
 export function errorHandler(error, req, res, next) {
   if (res.headersSent) return next(error);
-  if (error instanceof ZodError) return res.status(400).json({ error: 'Please check the information and try again.' });
+  if (error?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'The uploaded file exceeds the maximum allowed size.', requestId: req.requestId });
+  if (error?.name === 'MulterError') return res.status(400).json({ error: 'The uploaded file could not be accepted.', requestId: req.requestId });
+  if (error instanceof ZodError) return res.status(400).json({ error: 'Please check the information and try again.', requestId: req.requestId });
   if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'That record already exists.' });
   const status = error.status || 500;
   if (status >= 500) console.error(JSON.stringify({type:'http_error',request_id:req.requestId,error:String(error?.message||error),method:req.method,path:req.path,status}));
