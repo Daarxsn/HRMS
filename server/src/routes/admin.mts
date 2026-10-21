@@ -295,6 +295,15 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
     employeeId = item.employee_id;
     recordDate = item.start_date || item.request_date || item.attendance_date;
     if (input.decision === 'APPROVED' && kind === 'leave') {
+      const [employmentRows] = await connection.execute(`SELECT status,
+        (SELECT DATE_FORMAT(MAX(s.last_working_date),'%Y-%m-%d') FROM separation_cases s WHERE s.employee_id=employees.id AND s.status IN ('OPEN','IN_PROGRESS','COMPLETED')) AS last_working_date
+        FROM employees WHERE id=:employee`, {employee:item.employee_id});
+      const employment = employmentRows[0];
+      if (String(employment?.status || '').toUpperCase() === 'INACTIVE') {
+        const lastWorkingDate = String(employment?.last_working_date || '').slice(0,10);
+        if (!lastWorkingDate) throw Object.assign(new Error('Cannot approve leave for an inactive employee without a recorded last working date. Resolve the employment record with HR first.'), {status:409});
+        if (String(item.end_date).slice(0,10) > lastWorkingDate) throw Object.assign(new Error('This leave extends beyond the employee’s recorded last working date.'), {status:409});
+      }
       const [wfhConflict] = await connection.execute(`SELECT id FROM wfh_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND request_date BETWEEN :start AND :end LIMIT 1`, { employee:item.employee_id, start:item.start_date, end:item.end_date });
       if (wfhConflict[0]) throw Object.assign(new Error('This leave overlaps a pending or approved WFH request. Resolve the WFH request before approving leave.'), {status:409});
       const [attendanceConflict] = await connection.execute(`SELECT id FROM attendance_records WHERE employee_id=:employee AND attendance_date BETWEEN :start AND :end LIMIT 1`, { employee:item.employee_id, start:item.start_date, end:item.end_date });

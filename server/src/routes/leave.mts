@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { earnedLeaveAccrual, indiaDate, workingDaysInclusive } from '../policy.mts';
+import { earnedLeaveAccrualForEmployment, indiaDate, workingDaysInclusive } from '../policy.mts';
 import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
 
 const router = Router();
@@ -72,7 +72,9 @@ async function getLeaveBalances(employee, connection = null) {
   ]);
   const byKey = new Map<string, number>();
   for (const row of requests as any[]) byKey.set(`${row.leave_type}:${row.status}`, Number(row.days));
-  const userRows = await execute('SELECT joined_on, probation_end_date FROM employees WHERE id=:employee', { employee });
+  const userRows = await execute(`SELECT joined_on, probation_end_date, status,
+    (SELECT DATE_FORMAT(MAX(s.last_working_date),'%Y-%m-%d') FROM separation_cases s WHERE s.employee_id=employees.id AND s.status IN ('OPEN','IN_PROGRESS','COMPLETED')) AS last_working_date
+    FROM employees WHERE id=:employee`, { employee });
   const probation = userRows[0]?.probation_end_date;
   // A NULL probation end date means no probation end date was configured, not
   // that the employee is permanently ineligible for earned leave. In that case
@@ -82,7 +84,8 @@ async function getLeaveBalances(employee, connection = null) {
   const casualEntitlement = Number.isFinite(policy.leave_casual_sl_entitlement) ? policy.leave_casual_sl_entitlement : 8;
   const earnedEntitlement = Number.isFinite(policy.leave_earned_entitlement) ? policy.leave_earned_entitlement : 15;
   const floatingEntitlement = Number.isFinite(policy.leave_floating_entitlement) ? policy.leave_floating_entitlement : 4;
-  const earnedAccrued = earnedLeaveAccrual(today, userRows[0]?.joined_on, probation, earnedEntitlement);
+  const earnedAccrual = earnedLeaveAccrualForEmployment(today, userRows[0]?.joined_on, probation, userRows[0]?.status, userRows[0]?.last_working_date, earnedEntitlement);
+  const earnedAccrued = earnedAccrual.accrued;
   const sharedUsed = (byKey.get('CASUAL:APPROVED') || 0) + (byKey.get('SICK:APPROVED') || 0);
   const sharedPending = (byKey.get('CASUAL:PENDING') || 0) + (byKey.get('SICK:PENDING') || 0);
   const definitions: Array<[string,string,number]> = [
@@ -93,7 +96,8 @@ async function getLeaveBalances(employee, connection = null) {
     const used = type === 'CASUAL' || type === 'SICK' ? sharedUsed : byKey.get(`${type}:APPROVED`) || 0;
     const pending = type === 'CASUAL' || type === 'SICK' ? sharedPending : byKey.get(`${type}:PENDING`) || 0;
     const remaining = Math.max(0, accrued - used - pending);
-    return { type, label, entitlement, accrued, used, pending, remaining, note: type === 'EARNED' ? `Accrues 1 day/month after probation, up to ${earnedEntitlement} days/year.` : type === 'CASUAL' || type === 'SICK' ? 'Casual and sick leave share one 8-day annual balance.' : null };
+    const reviewRequired = type === 'EARNED' && earnedAccrual.reviewRequired;
+    return { type, label, entitlement, accrued, used, pending, remaining, reviewRequired, note: reviewRequired ? 'HR review required: this employee is inactive but has no recorded last working date. The displayed accrual is provisional.' : type === 'EARNED' ? `Accrues 1 day/month after probation, up to ${earnedEntitlement} days/year.` : type === 'CASUAL' || type === 'SICK' ? 'Casual and sick leave share one 8-day annual balance.' : null };
   });
 }
 
@@ -145,6 +149,7 @@ router.post('/', leaveMutationLimiter, asyncRoute(async (req, res) => {
     const balanceType = input.type === 'CASUAL' || input.type === 'SICK' ? 'CASUAL' : input.type;
     const balance = balances.find((item) => item.type === balanceType);
     const balanceLabel = input.type === 'SICK' ? 'Sick leave' : balance?.label || 'leave';
+    if (input.type === 'EARNED' && balance?.reviewRequired) throw Object.assign(new Error('Earned-leave accrual needs HR review because this employee is inactive and no last working date is recorded.'), {status:409});
     if (!balance || days > balance.remaining) throw Object.assign(new Error(`This request exceeds your available ${balanceLabel} balance (${balance?.remaining || 0} day(s)).`), { status: 400 });
     await connection.execute(`INSERT INTO leave_requests (id, employee_id, leave_type, start_date, end_date, days, reason, attachment_id)
       VALUES (:id, :employee, :type, :start, :end, :days, :reason, :attachment)`, {

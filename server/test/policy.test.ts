@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceStatus, distanceMeters, earnedLeaveAccrual, hasPassedAbsenceCutoff, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
+import { attendanceStatus, distanceMeters, earnedLeaveAccrual, earnedLeaveAccrualForEmployment, hasPassedAbsenceCutoff, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, workingDaysInclusive } from '../src/policy.mts';
 
 test('9:29:59 AM is on time; 9:30:00 AM is late in Pune time', () => {
   assert.equal(attendanceStatus(new Date('2026-10-02T03:59:59Z')), 'ON_TIME');
@@ -34,6 +34,20 @@ test('earned leave accrual handles probation, null probation and joining dates',
   assert.equal(earnedLeaveAccrual('2026-10-21','2026-10-01',null,15),0);
   assert.equal(earnedLeaveAccrual('2026-10-21','2026-12-01',null,15),0);
   assert.equal(earnedLeaveAccrual('2026-10-31','2025-01-10','2024-12-31',15),10);
+});
+
+test('earned accrual respects employment status and a documented last working date', () => {
+  const active = earnedLeaveAccrualForEmployment('2026-10-21','2025-01-10','2026-04-15','ACTIVE','2026-06-15',15);
+  assert.equal(active.accrued,5);
+  assert.equal(active.reviewRequired,false);
+  const inactiveWithDate = earnedLeaveAccrualForEmployment('2026-10-21','2025-01-10','2026-04-15','INACTIVE','2026-06-15',15);
+  assert.equal(inactiveWithDate.accrued,1);
+  assert.equal(inactiveWithDate.accrualAsOf,'2026-06-15');
+  assert.equal(inactiveWithDate.reviewRequired,false);
+  const inactiveWithoutDate = earnedLeaveAccrualForEmployment('2026-10-21','2025-01-10','2026-04-15','INACTIVE',null,15);
+  assert.equal(inactiveWithoutDate.accrued,5);
+  assert.equal(inactiveWithoutDate.reviewRequired,true);
+  assert.equal(inactiveWithoutDate.accrualAsOf,null);
 });
 
 test('short shifts are not rejected and net minutes never go below zero', () => {

@@ -109,6 +109,39 @@ export function hasPassedAbsenceCutoff(currentTime: string, scheduledStart: stri
   return hour * 60 + minute + second / 60 > cutoffMinutes;
 }
 
+export function earnedLeaveAccrualForEmployment(
+  asOfDate: string,
+  joinedOn: string | null | undefined,
+  probationEndDate: string | null | undefined,
+  employmentStatus: string | null | undefined,
+  lastWorkingDate: string | null | undefined,
+  entitlement = POLICY.leaveEntitlements.EARNED
+) {
+  const status = String(employmentStatus || 'ACTIVE').toUpperCase();
+  const validLastWorkingDate = /^\d{4}-\d{2}-\d{2}$/.test(String(lastWorkingDate || '').slice(0,10))
+    ? String(lastWorkingDate).slice(0,10) : '';
+  if (status !== 'INACTIVE') {
+    return {
+      accrued: earnedLeaveAccrual(asOfDate, joinedOn, probationEndDate, entitlement),
+      reviewRequired: false,
+      accrualAsOf: asOfDate
+    };
+  }
+  if (!validLastWorkingDate) {
+    return {
+      accrued: earnedLeaveAccrual(asOfDate, joinedOn, probationEndDate, entitlement),
+      reviewRequired: true,
+      accrualAsOf: null
+    };
+  }
+  const accrualAsOf = validLastWorkingDate < asOfDate ? validLastWorkingDate : asOfDate;
+  return {
+    accrued: earnedLeaveAccrual(accrualAsOf, joinedOn, probationEndDate, entitlement),
+    reviewRequired: false,
+    accrualAsOf
+  };
+}
+
 export function earnedLeaveAccrual(asOfDate: string, joinedOn: string | null | undefined, probationEndDate: string | null | undefined, entitlement = POLICY.leaveEntitlements.EARNED) {
   const accrualStart = String(probationEndDate || joinedOn || '').slice(0,10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate) || !/^\d{4}-\d{2}-\d{2}$/.test(accrualStart) || accrualStart > asOfDate) return 0;
