@@ -48,7 +48,7 @@ export async function enqueueEmail(message: EmailMessage, dedupeKey: string) {
 
 export async function enqueueHrNotificationEmail(message: Omit<EmailMessage,'to'>, dedupeKey: string) {
   const recipient = getHrNotificationEmail();
-  if (!recipient) return {queued:false, skipped:true, id:null, status:'SKIPPED', recipient:null, recipients:0};
+  if (!recipient) return {queued:false, skipped:true, configured:false, id:null, status:'SKIPPED', recipient:null, recipients:0};
   const result = await enqueueEmail({...message,to:[recipient]},dedupeKey);
   return {...result, configured:smtpConfigured(), recipient, recipients:result.recipientCount};
 }
