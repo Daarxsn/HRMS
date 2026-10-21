@@ -14,6 +14,7 @@ import workplaceRoutes from './routes/workplace.mts';
 import adminRoutes from './routes/admin.mts';
 import accountRoutes from './routes/account.mts';
 import enterpriseRoutes from './routes/enterprise.mts';
+import { getObjectStorageReadiness } from './object-storage.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -95,8 +96,12 @@ app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:authRequestLimit,standa
 const healthPayload=(res,payload,status=200)=>{res.setHeader('Cache-Control','no-store');res.status(status).json(payload);};
 app.get('/api/health/live',(req,res)=>healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}));
 app.get('/api/health/ready',async(req,res)=>{
-  try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
-  catch { healthPayload(res,{status:'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'unavailable'},503); }
+  let database='ok';
+  try { await pool.query('SELECT 1'); } catch { database='unavailable'; }
+  const storage=getObjectStorageReadiness();
+  const ready=database==='ok'&&storage.status==='PASS';
+  healthPayload(res,{status:ready?'ok':'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database,
+    private_object_storage:storage.status==='PASS'?'configured':'not_configured',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)},ready?200:503);
 });
 app.get('/api/health',async(req,res)=>{
   try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
