@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape } from '../mailer.mts';
+import { enqueueHrNotificationEmail } from '../email-outbox.mts';
 import { attendanceStatus, distanceMeters, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
@@ -44,8 +45,8 @@ async function emailAdminRequest({ id, title, description, type, details, employ
       + '</div>'
       + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
       + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p></div></body></html>';
-    const result = await sendHrNotificationEmail({ subject:title + ' · ' + employee.name, text, html, replyTo:employee.email, fromName:'Falchion Xeniaa HRMS' });
-    return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0, type };
+    const result = await enqueueHrNotificationEmail({ subject:title + ' · ' + employee.name, text, html, replyTo:employee.email, fromName:'Falchion Xeniaa HRMS' }, 'attendance-request:' + type + ':' + id);
+    return { configured:!result.skipped, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0, type };
   } catch (error) {
     console.warn(JSON.stringify({type:'admin_request_email_failed',request_id:id,request_type:type,error:String(error?.message || error)}));
     return { configured:false, sent:0, recipients:0, type };
