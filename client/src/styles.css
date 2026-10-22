@@ -5097,3 +5097,118 @@ html[data-theme="dark"] .wfh-approved-today {
   .login-panel .login-trust span { border-right: 0; border-bottom: 1px solid rgba(229,189,98,.12); }
   .login-panel .login-trust span:last-child { border-bottom: 0; }
 }
+
+
+/* Precision pass: match the reference's near-equal split and dense editorial rhythm. */
+.login-page {
+  grid-template-columns: minmax(0, 1.03fr) minmax(0, .97fr);
+}
+.login-art {
+  padding: clamp(30px, 4.7vw, 72px) clamp(28px, 4.8vw, 74px) 30px;
+  background:
+    linear-gradient(90deg, rgba(4,7,8,.97) 0%, rgba(4,7,8,.88) 43%, rgba(4,7,8,.28) 100%),
+    linear-gradient(0deg, rgba(3,6,7,.62), transparent 34%),
+    repeating-linear-gradient(90deg, transparent 0 24.8%, rgba(206,215,220,.055) 25% 25.12%, transparent 25.25% 49.8%),
+    repeating-linear-gradient(0deg, transparent 0 21%, rgba(206,215,220,.045) 21.12% 21.24%, transparent 21.38% 42%),
+    radial-gradient(ellipse at 78% 20%, rgba(116,147,168,.35), transparent 37%),
+    linear-gradient(130deg, #0b1016 0%, #17242c 48%, #080f10 100%);
+}
+.login-art::before {
+  background:
+    linear-gradient(130deg, transparent 0 48%, rgba(242,226,190,.12) 48.1% 48.25%, transparent 48.4%),
+    linear-gradient(90deg, transparent 0 69%, rgba(255,244,221,.12) 69.15% 69.35%, transparent 69.5%),
+    radial-gradient(ellipse at 80% 56%, transparent 0 27%, rgba(229,189,98,.12) 27.1% 27.2%, transparent 27.35%);
+}
+.login-art-copy {
+  max-width: 660px;
+  margin-block: auto;
+}
+.login-art-copy .art-label {
+  margin-bottom: 30px;
+  font-size: 10px;
+  letter-spacing: .24em;
+}
+.login-art-copy h1 {
+  max-width: 620px;
+  margin-bottom: 23px;
+  font-size: clamp(50px, 5vw, 78px);
+  line-height: 1.04;
+  letter-spacing: -.045em;
+}
+.login-art-copy > p {
+  max-width: 350px;
+  margin-bottom: 30px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.login-feature-row {
+  max-width: 580px;
+  gap: 12px;
+  margin-top: 30px;
+}
+.login-feature {
+  min-height: 110px;
+  padding: 15px 13px;
+  border-radius: 14px;
+}
+.login-feature-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+}
+.login-art-footer {
+  margin-top: 28px;
+  padding-top: 18px;
+  font-size: 9px;
+  letter-spacing: .16em;
+}
+.login-panel {
+  padding: clamp(38px, 5.2vw, 80px) clamp(28px, 5.3vw, 82px);
+  justify-content: center;
+}
+.login-panel-inner {
+  width: min(100%, 480px);
+  margin-inline: auto;
+}
+.login-panel .login-access-mark {
+  margin-bottom: 36px;
+  font-size: 9px;
+  letter-spacing: .17em;
+}
+.login-panel .eyebrow {
+  margin-bottom: 17px;
+  font-size: 10px;
+  letter-spacing: .24em;
+}
+.login-panel h2 {
+  margin-bottom: 20px;
+  font-size: clamp(42px, 3.7vw, 60px);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+}
+.login-panel .login-lede {
+  max-width: 380px;
+  margin-bottom: 30px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.login-panel .login-auth-card {
+  padding: 22px;
+  border-radius: 19px;
+}
+.login-panel .login-auth-card-heading {
+  margin-bottom: 20px;
+}
+.login-panel .login-trust {
+  margin-top: 27px;
+}
+.login-panel .login-footer {
+  margin-top: 36px;
+}
+@media (max-width: 1100px) and (min-width: 821px) {
+  .login-page { grid-template-columns: minmax(0, 1fr) minmax(380px, .95fr); }
+  .login-art { padding-inline: 30px; }
+  .login-art-copy h1 { font-size: clamp(46px, 4.5vw, 62px); }
+  .login-panel { padding-inline: 32px; }
+  .login-panel .login-auth-card { padding: 18px; }
+}
