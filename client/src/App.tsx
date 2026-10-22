@@ -212,7 +212,7 @@ function Shell(){
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
   return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a>
     {mobileOpen&&<button className="mobile-scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
-    <aside id="primary-navigation" className={`sidebar${mobileOpen?' sidebar-open':''}`} aria-label="Primary navigation" aria-hidden={mobileOpen ? undefined : true}>
+    <aside id="primary-navigation" className={`sidebar${mobileOpen?' sidebar-open':''}`} aria-label="Primary navigation">
       <div className="sidebar-brand">
         <Link to={isAdmin?'/admin':'/'} className="sidebar-brand-link" aria-label="Falchion Xeniaa People Portal">
           <span className="brand-logo-wrap"><IconLogo/></span>
