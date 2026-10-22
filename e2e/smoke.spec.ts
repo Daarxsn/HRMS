@@ -8,6 +8,71 @@ async function signInDev(page: any, account: 'employee' | 'admin') {
   await page.goto('/');
 }
 
+test('login reference composition is measured and captured on desktop', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'chromium', 'Reference-sized screenshot is captured in desktop Chromium.');
+  await page.setViewportSize({ width: 1536, height: 878 });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.locator('.login-feature')).toHaveCount(3);
+  await expect(page.locator('.login-auth-card')).toBeVisible();
+  await expect(page.locator('.login-art-footer')).toContainText('CULTURE TODAY. STRONGER TOMORROW.');
+  const geometry = await page.locator('.login-page').evaluate((root) => {
+    const page = root.getBoundingClientRect();
+    const art = root.querySelector('.login-art')!.getBoundingClientRect();
+    const panel = root.querySelector('.login-panel')!.getBoundingClientRect();
+    const card = root.querySelector('.login-panel-inner')!.getBoundingClientRect();
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      page: { width: page.width, height: page.height },
+      art: { x: art.x, width: art.width, height: art.height },
+      panel: { x: panel.x, width: panel.width, height: panel.height },
+      card: { x: card.x, y: card.y, width: card.width, height: card.height },
+      overflowX: document.documentElement.scrollWidth > window.innerWidth
+    };
+  });
+  expect(geometry.art.width / geometry.page.width).toBeGreaterThan(0.57);
+  expect(geometry.art.width / geometry.page.width).toBeLessThan(0.62);
+  expect(geometry.panel.x).toBeGreaterThan(geometry.art.width - 1);
+  expect(geometry.art.height).toBe(878);
+  expect(geometry.overflowX).toBe(false);
+  await testInfo.attach('login-reference-desktop-1536x878.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+  await testInfo.attach('login-reference-desktop-geometry.json', {
+    body: Buffer.from(JSON.stringify(geometry, null, 2)),
+    contentType: 'application/json'
+  });
+});
+
+test('login reference composition is captured and readable on mobile', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile reference screenshot is captured in mobile Chromium.');
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.locator('.login-feature')).toHaveCount(3);
+  await expect(page.locator('.login-auth-card')).toBeVisible();
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    documentHeight: document.documentElement.scrollHeight,
+    artHeight: document.querySelector('.login-art')!.getBoundingClientRect().height,
+    panelHeight: document.querySelector('.login-panel')!.getBoundingClientRect().height
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.artHeight).toBeGreaterThan(500);
+  expect(layout.panelHeight).toBeGreaterThan(500);
+  await testInfo.attach('login-reference-mobile.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+  await testInfo.attach('login-reference-mobile-geometry.json', {
+    body: Buffer.from(JSON.stringify(layout, null, 2)),
+    contentType: 'application/json'
+  });
+});
+
 function todayInIndia() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',

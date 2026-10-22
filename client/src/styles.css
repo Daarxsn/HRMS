@@ -5903,7 +5903,7 @@ html[data-theme="dark"] .wfh-approved-today {
 .login-page {
   min-height: 100svh !important;
   height: 100svh;
-  grid-template-columns: minmax(0, 52fr) minmax(0, 48fr) !important;
+  grid-template-columns: minmax(0, 59.5fr) minmax(0, 40.5fr) !important;
   background: #080b0b !important;
 }
 .login-art {
@@ -5963,7 +5963,7 @@ html[data-theme="dark"] .wfh-approved-today {
 .login-trust span {font-size:9px!important;line-height:1.6!important;padding:0 9px!important}
 .login-footer {font-size:9px!important}
 @media (min-width:1500px) {
- .login-page {grid-template-columns:minmax(0,52fr) minmax(0,48fr)!important}
+ .login-page {grid-template-columns:minmax(0,59.5fr) minmax(0,40.5fr)!important}
  .login-art-copy h1 {font-size:clamp(72px,5.1vw,96px)!important}
  .login-panel-inner {width:min(100%,470px)!important}
 }
@@ -5989,4 +5989,15 @@ html[data-theme="dark"] .wfh-approved-today {
 @media (prefers-reduced-motion:reduce) {
  .fx-window-glow,.fx-eagle-watermark,.login-panel-inner {animation:none!important}
  .login-feature {transition:none!important}
+}
+
+
+/* Reference QA correction: the supplied desktop composition uses a ~59.5/40.5 split. */
+@media (min-width: 901px) {
+  .login-page { grid-template-columns: minmax(0, 59.5fr) minmax(0, 40.5fr) !important; }
+  .login-art { padding-left: clamp(28px, 5.1vw, 74px) !important; padding-right: clamp(24px, 4.4vw, 66px) !important; }
+  .login-panel { padding: clamp(24px, 3.9vw, 54px) !important; }
+}
+@media (max-width: 900px) {
+  .login-page { grid-template-columns: minmax(0, 1fr) !important; }
 }
