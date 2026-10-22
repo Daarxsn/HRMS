@@ -1,5 +1,7 @@
 # Falchion Xeniaa Employee Management System
 
+> **Current production topology:** Vercel-hosted frontend/API services with Aiven MySQL. The historical Cloud Run/Cloud SQL/GCS workflows and phase documents are legacy/provider-specific artifacts and must not be treated as the current production release or backup path. See [`docs/VERCEL_AIVEN_OPERATIONS_RUNBOOK.md`](docs/VERCEL_AIVEN_OPERATIONS_RUNBOOK.md) for the reviewed Vercel + Aiven procedure.
+
 A responsive employee and administrator workplace portal built with the locked stack: **React + TypeScript, Node.js + TypeScript, MySQL, Google Cloud and Vercel**. The React app uses Vite; the API uses Express on Node.js; production data is stored in MySQL on Cloud SQL; the API is designed for Cloud Run; and the frontend is a static Vite build for Vercel.
 
 ## What is implemented
