@@ -1,14 +1,17 @@
-name: Production Smoke Test
+name: Production Smoke Test (read-only)
+
+# Read-only public HTTP checks only. This workflow never signs in or mutates HRMS data.
+# Intended for Vercel + Aiven URLs; it does not invoke Cloud SQL/GCP commands.
 
 on:
   workflow_dispatch:
     inputs:
       portal_url:
-        description: "Public HRMS portal URL"
+        description: "Public Vercel portal URL (HTTPS)"
         required: true
         type: string
       api_url:
-        description: "Public HRMS API URL"
+        description: "Public Vercel API URL (HTTPS; /api base origin)"
         required: true
         type: string
 
