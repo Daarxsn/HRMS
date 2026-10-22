@@ -1,14 +1,17 @@
-name: Production Smoke Test
+name: Production Smoke Test (read-only)
+
+# Read-only public HTTP checks only. This workflow never signs in or mutates HRMS data.
+# Intended for Vercel + Aiven URLs; it does not invoke Cloud SQL/GCP commands.
 
 on:
   workflow_dispatch:
     inputs:
       portal_url:
-        description: "Public HRMS portal URL"
+        description: "Public Vercel portal URL (HTTPS)"
         required: true
         type: string
       api_url:
-        description: "Public HRMS API URL"
+        description: "Public Vercel API URL (HTTPS; /api base origin)"
         required: true
         type: string
 
@@ -76,11 +79,18 @@ jobs:
       - name: Check security headers
         env:
           API_URL: ${{ inputs.api_url }}
+          PORTAL_URL: ${{ inputs.portal_url }}
         run: |
           set -euo pipefail
-          headers="$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null "${API_URL}/api/health/live")"
-          printf '%s\n' "${headers}" | grep -qi '^x-content-type-options:'
-          printf '%s\n' "${headers}" | grep -qi '^x-frame-options:'
+          api_headers="$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null "${API_URL}/api/health/live")"
+          portal_headers="$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null "${PORTAL_URL}/")"
+          printf '%s\n' "${api_headers}" | grep -qi '^x-content-type-options:'
+          printf '%s\n' "${api_headers}" | grep -qi '^x-frame-options:'
+          printf '%s\n' "${api_headers}" | grep -qi '^permissions-policy:'
+          grep -qi 'geolocation=(self)' <<<"${api_headers}"
+          printf '%s\n' "${portal_headers}" | grep -qi '^content-security-policy:'
+          printf '%s\n' "${portal_headers}" | grep -qi '^permissions-policy:'
+          printf '%s\n' "${portal_headers}" | grep -qi '^referrer-policy:'
 
       - name: Write smoke summary
         run: |
