@@ -5638,3 +5638,133 @@ html[data-theme="dark"] .wfh-approved-today {
 @media (max-width: 1100px) and (min-width: 821px) {
   .login-panel-inner { padding: 30px 24px 26px; }
 }
+
+
+/* Final composition pass based on the supplied browser screenshot. */
+.login-page {
+  grid-template-columns: 51.35% 48.65%;
+  background: #080b0c;
+}
+.login-art {
+  background-position: center center;
+  background-size: cover;
+}
+.login-art::before {
+  background:
+    linear-gradient(90deg, rgba(3,6,7,.94) 0%, rgba(3,6,7,.72) 39%, rgba(3,6,7,.08) 100%),
+    linear-gradient(0deg, rgba(2,5,6,.66), transparent 42%);
+  animation: none;
+}
+.login-art-copy {
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+.login-art-copy .art-label {
+  margin-bottom: 28px;
+  font-size: 10px;
+  letter-spacing: .2em;
+}
+.login-art-copy h1 {
+  font-size: clamp(49px, 4.35vw, 72px);
+  line-height: 1.02;
+  letter-spacing: -.035em;
+  font-weight: 420;
+}
+.login-art-copy > p {
+  margin-bottom: 28px;
+  padding-left: 13px;
+  border-left: 2px solid rgba(224,187,95,.68);
+}
+.login-feature-row { margin-top: 30px; gap: 12px; }
+.login-feature {
+  min-height: 112px;
+  padding: 14px 12px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(7,11,12,.84), rgba(18,23,24,.62));
+}
+.login-art-footer { padding-top: 16px; margin-top: 24px; }
+.login-panel {
+  justify-content: center;
+  padding: 30px clamp(32px, 4vw, 64px);
+  background:
+    radial-gradient(ellipse at 88% 10%, rgba(126,130,132,.13), transparent 36%),
+    linear-gradient(145deg, #151819, #090c0d 72%);
+}
+.login-panel::before {
+  inset: 6% 5%;
+  border-color: rgba(230,192,105,.025);
+}
+.login-panel-inner {
+  width: min(100%, 435px);
+  padding: 34px 30px 28px;
+  transform: translateY(-24px);
+  border-radius: 22px;
+  border-color: rgba(215,177,94,.68);
+  background: linear-gradient(145deg, rgba(35,38,39,.97), rgba(12,15,16,.98));
+  box-shadow: 0 24px 70px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.055);
+}
+.login-panel .login-access-mark {
+  margin-bottom: 29px !important;
+  gap: 12px !important;
+  font-size: 9px;
+  letter-spacing: .17em;
+}
+.login-panel .login-access-icon {
+  width: 32px !important;
+  height: 36px !important;
+  flex-basis: 32px !important;
+  min-width: 32px !important;
+}
+.login-panel .eyebrow {
+  margin-bottom: 16px;
+  font-size: 9px;
+  letter-spacing: .23em;
+}
+.login-panel h2 {
+  margin-bottom: 20px;
+  font-size: clamp(43px, 3.55vw, 55px);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+}
+.login-panel .login-lede {
+  margin-bottom: 28px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.login-panel .login-auth-card {
+  padding: 15px 14px 13px;
+  border: 1px solid rgba(225,187,97,.16);
+  border-radius: 14px;
+  background: rgba(7,10,11,.28);
+}
+.login-panel .login-auth-card-heading { margin-bottom: 13px; }
+.login-panel .login-google-g {
+  width: 39px;
+  height: 39px;
+  border-radius: 10px;
+}
+.login-panel .login-auth-card-heading b { font-size: 12px; }
+.login-panel .login-auth-card-heading small { font-size: 10px; }
+.login-panel .google-login-wrap { margin-bottom: 12px; }
+.login-panel .login-auth-assurance { font-size: 9px; }
+.login-panel .login-trust {
+  margin-top: 27px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.login-panel .login-trust span {
+  min-height: 70px;
+  padding-inline: 5px;
+  gap: 10px;
+  font-size: 9px;
+}
+.login-panel .login-footer { margin-top: 10px; font-size: 10px; }
+@media (max-width: 1100px) and (min-width: 821px) {
+  .login-panel-inner { transform: translateY(-10px); padding: 28px 23px 24px; }
+  .login-panel { padding-inline: 24px; }
+}
+@media (max-width: 820px) {
+  .login-panel-inner { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-panel-inner { animation: none !important; }
+}
