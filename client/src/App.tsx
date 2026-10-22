@@ -147,7 +147,7 @@ function LoginScreen() {
         <div className="login-feature-row" aria-label="People portal features">
           <div className="login-feature"><span className="login-feature-icon"><CalendarDays size={17}/></span><span><b>Your time</b><small>Attendance & leave</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
-          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Private by design</small></span></div>
+          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Secure by design</small></span></div>
         </div>
         <div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/>
         
