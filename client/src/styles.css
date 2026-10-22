@@ -5780,3 +5780,20 @@ html[data-theme="dark"] .wfh-approved-today {
 .login-art > * {
   visibility: visible !important;
 }
+
+
+/* Reference-matched brand artwork: a self-contained, supplied visual panel. */
+.login-art {
+  background-image: url('/login-reference-panel.webp') !important;
+  background-position: center center !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  padding: 0 !important;
+  border-right: 1px solid rgba(214, 177, 97, .35) !important;
+  overflow: hidden !important;
+}
+.login-art::before, .login-art::after { content: none !important; display: none !important; }
+.login-art > * { display: none !important; }
+@media (max-width: 820px) {
+  .login-art { min-height: min(112vw, 920px) !important; background-position: center top !important; }
+}
