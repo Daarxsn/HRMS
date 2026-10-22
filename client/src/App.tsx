@@ -139,6 +139,15 @@ function LoginScreen() {
   };
   return <div className="login-page">
     <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
+      <div className="fx-architecture" aria-hidden="true">
+        <div className="fx-window"><div className="fx-window-glow"/><div className="fx-skyline"><i/><i/><i/><i/><i/></div></div>
+        <div className="fx-grid-lines"/>
+        <svg className="fx-eagle-watermark" viewBox="0 0 240 220" role="presentation">
+          <path d="M120 203 104 162 64 141 24 95 78 111 43 54 97 88 120 18 143 88 197 54 162 111 216 95 176 141 136 162Z" fill="currentColor" opacity=".11" stroke="currentColor" strokeWidth="3"/>
+          <path d="M120 72 104 113 120 102 136 113Z M120 102 111 150 120 141 129 150Z" fill="currentColor" opacity=".42"/>
+        </svg>
+        <div className="fx-plant"><i/><i/><i/><i/><i/><i/><b/></div>
+      </div>
       <div className="login-art-top"><img className="login-reference-brand" src="/falchion-xeniaa-horizontal.svg" alt="Falchion Xeniaa"/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
       <div className="login-art-copy">
         <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
