@@ -5770,28 +5770,13 @@ html[data-theme="dark"] .wfh-approved-today {
 }
 
 
-/* Use the supplied reference artwork itself for the brand panel.
-   The reference image includes the wordmark, headline, feature cards and footer,
-   so hide duplicate live overlays in this panel only. The sign-in panel remains live. */
+/* Keep the original live brand-panel composition until the reference artwork
+   is stored and served as a verified image asset. Never stretch a corrupt asset. */
 .login-art {
-  background-image: url('/login-reference-panel.webp') !important;
-  background-position: center center !important;
-  background-size: 100% 100% !important;
-  background-repeat: no-repeat !important;
-  padding: 0 !important;
-  border-right: 1px solid rgba(214, 177, 97, .35) !important;
-}
-.login-art::before,
-.login-art::after {
-  display: none !important;
-  content: none !important;
+  background-image: none !important;
+  background-size: cover;
+  background-position: center;
 }
 .login-art > * {
-  visibility: hidden !important;
-}
-@media (max-width: 820px) {
-  .login-art {
-    min-height: min(112vw, 920px) !important;
-    background-size: 100% 100% !important;
-  }
+  visibility: visible !important;
 }
