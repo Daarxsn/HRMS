@@ -6001,3 +6001,38 @@ html[data-theme="dark"] .wfh-approved-today {
 @media (max-width: 900px) {
   .login-page { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+
+/* Login QA: keep the OAuth-unconfigured state visually consistent with the dark, premium auth card. */
+.login-auth-card .setup-note {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 11px !important;
+  margin-top: 14px !important;
+  padding: 13px 14px !important;
+  border: 1px solid rgba(214, 174, 82, .24) !important;
+  border-radius: 11px !important;
+  background: linear-gradient(135deg, rgba(215, 174, 80, .075), rgba(255, 255, 255, .025)) !important;
+  color: #c9c6bd !important;
+  font-size: 11px !important;
+  line-height: 1.65 !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .035) !important;
+}
+.login-auth-card .setup-note svg {
+  flex: 0 0 auto !important;
+  margin-top: 1px !important;
+  color: #dfb653 !important;
+}
+.login-auth-card .setup-note span {
+  min-width: 0 !important;
+}
+.login-auth-card .setup-note strong,
+.login-auth-card .setup-note b {
+  color: #f0d18a !important;
+}
+@media (max-width: 520px) {
+  .login-auth-card .setup-note {
+    padding: 11px 12px !important;
+    font-size: 10px !important;
+  }
+}
