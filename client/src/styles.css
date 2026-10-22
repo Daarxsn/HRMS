@@ -6178,3 +6178,69 @@ html[data-theme="dark"] .wfh-approved-today {
   .login-feature-row,
   .login-auth-card { animation: none !important; }
 }
+
+
+/* Final visual QA refinements against the supplied login reference. */
+.login-page::before {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+.login-art { border-radius: 0 !important; }
+.login-feature::after,
+.login-feature::before {
+  content: none !important;
+  display: none !important;
+}
+.login-art-copy h1 {
+  font-size: clamp(58px, 4.45vw, 68px) !important;
+  line-height: 1.01 !important;
+  margin: 26px 0 18px !important;
+  letter-spacing: -.055em !important;
+  font-weight: 500 !important;
+}
+.login-panel-inner {
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+.login-trust {
+  width: min(100%, 470px) !important;
+  margin: 26px auto 0 !important;
+  padding: 0 !important;
+  border-top: 0 !important;
+  justify-content: space-between !important;
+}
+.login-trust span {
+  min-height: 56px !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  padding: 0 14px !important;
+}
+.login-trust span + span {
+  border-left: 1px solid rgba(207, 173, 94, .17) !important;
+}
+@media (min-width: 901px) {
+  .login-panel { padding: clamp(24px, 3vw, 44px) !important; }
+  .login-trust { margin-top: 25px !important; }
+}
+@media (max-width: 900px) {
+  .login-art { border-radius: 0 !important; }
+  .login-art-copy h1 {
+    font-size: clamp(48px, 8.5vw, 64px) !important;
+    margin: 24px 0 17px !important;
+  }
+  .login-panel-inner { margin: 0 !important; }
+}
+@media (max-width: 520px) {
+  .login-trust {
+    width: min(100%, 470px) !important;
+    gap: 0 !important;
+    margin-top: 22px !important;
+  }
+  .login-trust span {
+    padding: 0 8px !important;
+    font-size: 8px !important;
+  }
+}
