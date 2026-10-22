@@ -16,7 +16,9 @@
     "test": "node --experimental-strip-types --test test/policy.test.ts test/production-contract.test.ts test/object-storage.test.ts test/security.test.ts test/email-outbox.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:migration-rehearsal": "node --experimental-strip-types test/migration-rehearsal.ts",
-    "test:backup-restore": "node --experimental-strip-types test/backup-restore-rehearsal.ts"
+    "test:backup-restore": "node --experimental-strip-types test/backup-restore-rehearsal.ts",
+    "bench:db-pool": "node --experimental-strip-types test/connection-pool-benchmark.ts",
+    "bench:admin-overview": "node --experimental-strip-types test/admin-overview-benchmark.ts"
   },
   "overrides": {
     "uuid": "11.1.1"
