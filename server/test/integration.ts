@@ -804,6 +804,100 @@ try {
   const acknowledgedPolicy = acknowledgedPolicies.data.policies.find((policy) => policy.id === draftPolicy.data.id);
   assert.equal(Number(acknowledgedPolicy?.acknowledged), 1, 'Acknowledgement status must persist after a fresh request.');
 
+  // Step 6 / 30: exercise runtime API reads for settings, reports, calendar, audit, and onboarding lifecycle.
+  const employeeCalendarRead = await request('/calendar?year=2099',{headers:{Cookie:employeeSession.cookie}});
+  assert.equal(employeeCalendarRead.response.status,200,'Employee calendar access must work against MySQL.');
+  assert.ok(Array.isArray(employeeCalendarRead.data.holidays));
+  const employeeLeaveBalances = await request('/leave/balances',{headers:{Cookie:employeeSession.cookie}});
+  assert.equal(employeeLeaveBalances.response.status,200);
+  assert.ok(Array.isArray(employeeLeaveBalances.data.balances));
+  const employeeLeaveHistory = await request('/leave',{headers:{Cookie:employeeSession.cookie}});
+  assert.equal(employeeLeaveHistory.response.status,200);
+  assert.ok(Array.isArray(employeeLeaveHistory.data.requests));
+  const employeeWfh = await request('/wfh',{headers:{Cookie:employeeSession.cookie}});
+  assert.equal(employeeWfh.response.status,200);
+  assert.ok(Array.isArray(employeeWfh.data.requests));
+  const employeeCalendarMutation = await request('/calendar',{method:'POST',headers:{Cookie:employeeSession.cookie},body:JSON.stringify({date:'2099-12-30',name:'Employee calendar denial',kind:'FLOATING'})});
+  assert.equal(employeeCalendarMutation.response.status,403);
+  const adminSettingsBefore = await request('/admin/settings',{headers:{Cookie:adminSession.cookie}});
+  assert.equal(adminSettingsBefore.response.status,200);
+  assert.ok(adminSettingsBefore.data.settings);
+  const settingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:35})});
+  assert.equal(settingsUpdate.response.status,200,'Settings updates must persist through the real API: '+JSON.stringify(settingsUpdate.data));
+  const persistedSetting = await query("SELECT setting_value FROM system_settings WHERE setting_key='fixed_lunch_minutes'");
+  assert.equal(persistedSetting[0]?.setting_value,'35');
+  const restoreSetting = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:30})});
+  assert.equal(restoreSetting.response.status,200);
+  const report = await request('/admin/leave-report?from=2026-01-01&to=2099-12-31',{headers:{Cookie:adminSession.cookie}});
+  assert.equal(report.response.status,200);
+  assert.ok(report.data.summary);
+  assert.ok(Array.isArray(report.data.requests));
+  const auditBefore = await request('/admin/audit',{headers:{Cookie:adminSession.cookie}});
+  assert.equal(auditBefore.response.status,200);
+  assert.ok(Array.isArray(auditBefore.data.logs));
+
+  // Onboarding task creation is also atomic with its audit row.
+  const createRollbackTaskId=crypto.randomUUID();
+  const createRollbackTrigger='hrms_step6_fail_onboarding_create_audit';
+  try {
+    await pool.query(`CREATE TRIGGER ${createRollbackTrigger} BEFORE INSERT ON audit_logs FOR EACH ROW
+      BEGIN
+        IF NEW.action='ONBOARDING_TASK_CREATED' AND JSON_UNQUOTE(JSON_EXTRACT(NEW.details_json,'$.title'))='Injected create rollback' THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected onboarding-create audit failure';
+        END IF;
+      END`);
+    const failedCreate=await request('/enterprise/admin/employees/'+employeeSession.user.id+'/onboarding',{
+      method:'POST',headers:{Cookie:adminSession.cookie},
+      body:JSON.stringify({title:'Injected create rollback',category:'PROFILE'})
+    });
+    assert.equal(failedCreate.response.status,500,'Onboarding task creation should fail when its audit insert fails.');
+    const partialTask=await query("SELECT id FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
+    assert.equal(partialTask.length,0,'Onboarding task insert must roll back when audit insertion fails.');
+  } finally {
+    await pool.query('DROP TRIGGER IF EXISTS '+createRollbackTrigger);
+    await query("DELETE FROM onboarding_tasks WHERE employee_id=:employee AND title='Injected create rollback'",{employee:employeeSession.user.id});
+  }
+
+  // Onboarding updates and their audit rows must commit or roll back together.
+  const onboardingTaskId=crypto.randomUUID();
+  await query("INSERT INTO onboarding_tasks (id,employee_id,title,category,status,created_by) VALUES (:id,:employee,'Step 6 rollback fixture','PROFILE','PENDING',:admin)",{id:onboardingTaskId,employee:employeeSession.user.id,admin:adminSession.user.id});
+  const rollbackTriggerName='hrms_step6_fail_onboarding_audit';
+  try {
+    await pool.query(`CREATE TRIGGER ${rollbackTriggerName} BEFORE INSERT ON audit_logs FOR EACH ROW
+      BEGIN
+        IF NEW.action='ONBOARDING_TASK_UPDATED' AND NEW.entity_id='${onboardingTaskId}' THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Step 6 injected audit failure';
+        END IF;
+      END`);
+    const failedTaskUpdate=await request('/enterprise/admin/onboarding/'+onboardingTaskId,{
+      method:'PATCH',headers:{Cookie:adminSession.cookie},
+      body:JSON.stringify({status:'COMPLETED',notes:'This update must roll back when audit insertion fails.'})
+    });
+    assert.equal(failedTaskUpdate.response.status,500,'Injected audit failure should fail the onboarding update.');
+    const taskAfterFailure=await query('SELECT status,completed_at,completed_by FROM onboarding_tasks WHERE id=:id',{id:onboardingTaskId});
+    assert.equal(taskAfterFailure[0]?.status,'PENDING','Task status must roll back when the audit insert fails.');
+    assert.equal(taskAfterFailure[0]?.completed_at,null,'Completion timestamp must roll back with the task.');
+    const auditAfterFailure=await query("SELECT id FROM audit_logs WHERE action='ONBOARDING_TASK_UPDATED' AND entity_id=:id",{id:onboardingTaskId});
+    assert.equal(auditAfterFailure.length,0,'A failed onboarding mutation must not leave an audit row.');
+  } finally {
+    await pool.query('DROP TRIGGER IF EXISTS '+rollbackTriggerName);
+    await query('DELETE FROM onboarding_tasks WHERE id=:id',{id:onboardingTaskId});
+  }
+  const successfulTaskId=crypto.randomUUID();
+  await query("INSERT INTO onboarding_tasks (id,employee_id,title,category,status,created_by) VALUES (:id,:employee,'Step 6 success fixture','PROFILE','PENDING',:admin)",{id:successfulTaskId,employee:employeeSession.user.id,admin:adminSession.user.id});
+  const successfulTaskUpdate=await request('/enterprise/admin/onboarding/'+successfulTaskId,{
+    method:'PATCH',headers:{Cookie:adminSession.cookie},
+    body:JSON.stringify({status:'COMPLETED',notes:'Successful transaction must record task and audit together.'})
+  });
+  assert.equal(successfulTaskUpdate.response.status,200);
+  const successfulTask=await query('SELECT status,completed_at,completed_by FROM onboarding_tasks WHERE id=:id',{id:successfulTaskId});
+  assert.equal(successfulTask[0]?.status,'COMPLETED');
+  assert.ok(successfulTask[0]?.completed_at);
+  const successfulAudit=await query("SELECT id FROM audit_logs WHERE action='ONBOARDING_TASK_UPDATED' AND entity_id=:id",{id:successfulTaskId});
+  assert.equal(successfulAudit.length,1,'Successful onboarding updates must persist exactly one audit event.');
+  await query("DELETE FROM audit_logs WHERE action='ONBOARDING_TASK_UPDATED' AND entity_id=:id",{id:successfulTaskId});
+  await query('DELETE FROM onboarding_tasks WHERE id=:id',{id:successfulTaskId});
+
   const adminHealth = await request('/admin/system-health', {
     headers: { Cookie: adminSession.cookie }
   });
