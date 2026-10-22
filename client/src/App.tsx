@@ -169,7 +169,6 @@ function LoginScreen() {
         </div>
       </div>
       <div className="login-trust"><span aria-label="Secure Google sign-in"><ShieldCheck size={14}/> Secure sign-in</span><span><LockKeyholeIcon/> Encrypted data</span><span><MapPin size={14}/> Location only when you check in</span></div>
-      </div>
       <div className="login-footer"><span>Need access?</span> Contact your Falchion Xeniaa administrator.</div>
     </section>
   </div>;
