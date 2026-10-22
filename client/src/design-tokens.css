@@ -1,0 +1,30 @@
+/* Semantic design tokens — canonical shared palette for new and migrated components. */
+:root {
+  --color-bg: #f4f6f4;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-text: #17262d;
+  --color-text-muted: #596a70;
+  --color-border: #d9e2de;
+  --color-primary: #236b57;
+  --color-primary-contrast: #ffffff;
+  --color-success: #176b45;
+  --color-warning: #805500;
+  --color-danger: #a12e32;
+  --focus-ring: #176bba;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0e1412;
+  --color-surface: #151d1a;
+  --color-surface-raised: #1b2621;
+  --color-text: #edf4ef;
+  --color-text-muted: #bdcbc2;
+  --color-border: #34443b;
+  --color-primary: #75c6a7;
+  --color-primary-contrast: #10251d;
+  --color-success: #83d5a9;
+  --color-warning: #f0c56c;
+  --color-danger: #ff9b9b;
+  --focus-ring: #8ac9ff;
+}

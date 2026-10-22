@@ -8,6 +8,7 @@ import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
+import { getEmailOutboxSummary, retryFailedEmail } from '../email-outbox.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -106,6 +107,21 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
   });
   res.json({ date: today, officeHoliday, holidayName, stats: { employees: Number(people[0].active || 0), present: Number(attendance[0].total || 0), onTime: Number(attendance[0].on_time || 0), late: Number(attendance[0].late || 0), stillIn: Number(attendance[0].still_in || 0), pending: Number(pending[0].total || 0), outNow: out.length, absent:absenceCount, onLeave:leaveCount, approvedWfh:approvedWfhCount }, temporaryExits:out, recent });
 }));
+router.get('/email-outbox', adminMutationLimiter, asyncRoute(async (req,res) => {
+  const summary=await getEmailOutboxSummary();
+  const failed=await query(`SELECT id,dedupe_key,subject,attempts,max_attempts,last_error,created_at,updated_at
+    FROM email_outbox WHERE status='FAILED' ORDER BY updated_at DESC LIMIT 50`);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({summary,failed});
+}));
+
+router.post('/email-outbox/:id/retry', adminMutationLimiter, asyncRoute(async (req,res) => {
+  const retried=await retryFailedEmail(String(req.params.id));
+  if(!retried)throw Object.assign(new Error('A failed outbox message with this ID was not found.'),{status:404});
+  await audit({actorId:req.user.id,action:'EMAIL_OUTBOX_RETRY_REQUESTED',entityType:'email_outbox',entityId:String(req.params.id),details:{reset_attempts:true},ipAddress:req.ip});
+  res.status(202).json({ok:true,id:String(req.params.id),status:'PENDING'});
+}));
+
 router.get('/email-status', asyncRoute(async (req,res)=>{
   res.setHeader('Cache-Control','private, no-store');
   res.json({
@@ -249,15 +265,12 @@ router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
   res.setHeader('Content-Type',photo.profile_photo_content_type||'image/jpeg');
   res.setHeader('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(photo.profile_photo_filename||'profile-photo'));
   res.setHeader('Cache-Control','private, no-store');
-  if (file.kind === 'buffer') {
-    res.send(file.buffer);
-  } else {
-    file.stream
-      .on('error', () => {
-        if (!res.headersSent) res.status(404).end();
-      })
-      .pipe(res);
-  }
+  if (file.kind === 'buffer') res.send(file.buffer);
+  else file.stream.on('error', () => {
+    console.error(JSON.stringify({type:'admin_profile_photo_stream_failed',request_id:req.requestId}));
+    if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
+    else res.destroy();
+  }).pipe(res);
 }));
 router.get('/attendance', asyncRoute(async (req, res) => {
   const from = String(req.query.from || indiaDate());

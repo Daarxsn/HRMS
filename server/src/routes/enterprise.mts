@@ -4,12 +4,14 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
-import { audit, notify, requireAuth } from '../security.mts';
+import { audit, notify, requireAuth, requireAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
-import { saveObject, deleteObject, readObject } from '../object-storage.mts';
+import { saveObject, deleteObject, readObject, getObjectStorageReadiness } from '../object-storage.mts';
 
 const router = Router();
 router.use(requireAuth);
+// Central protection applies to every current and future /admin enterprise endpoint.
+router.use('/admin', requireAdmin);
 const adminLimiter = rateLimit({ windowMs:15*60*1000, limit:160, standardHeaders:true, legacyHeaders:false, keyGenerator:(req)=>`enterprise:${req.user.id}` });
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -40,7 +42,15 @@ router.get('/employee/documents/:id', asyncRoute(async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(rows[0].original_filename||'document')}`);
   res.setHeader('Cache-Control','private, no-store');
-  if(file.kind==='buffer') res.send(file.buffer); else file.stream.pipe(res);
+  if (file.kind === 'buffer') {
+    res.send(file.buffer);
+  } else {
+    file.stream.on('error', () => {
+      console.error(JSON.stringify({type:'private_document_stream_failed',request_id:req.requestId}));
+      if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
+      else res.destroy();
+    }).pipe(res);
+  }
 }));
 
 router.get('/policies', asyncRoute(async(req,res)=>{
@@ -147,7 +157,15 @@ router.post('/admin/employees/:id/documents',adminLimiter,upload.single('documen
 router.get('/admin/documents/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const rows=await query('SELECT object_key,original_filename,content_type FROM employee_documents WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]?.object_key) return res.status(404).end();
   const file=await readObject(rows[0].object_key); res.setHeader('Content-Type',rows[0].content_type||file.contentType||'application/octet-stream'); res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(rows[0].original_filename||'document')}`); res.setHeader('Cache-Control','private, no-store');
-  if(file.kind==='buffer') res.send(file.buffer); else file.stream.pipe(res);
+  if (file.kind === 'buffer') {
+    res.send(file.buffer);
+  } else {
+    file.stream.on('error', () => {
+      console.error(JSON.stringify({type:'private_document_stream_failed',request_id:req.requestId}));
+      if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
+      else res.destroy();
+    }).pipe(res);
+  }
 }));
 
 router.get('/admin/assets',adminLimiter,asyncRoute(async(req,res)=>{
@@ -246,6 +264,8 @@ router.get('/admin/readiness',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const checks=[]; const add=(key,status,detail)=>checks.push({key,status,detail});
   const checksMap=[['database','SELECT 1','Database is reachable.'],['employee_directory','SELECT COUNT(*) total FROM employees','Employee directory is queryable.'],['audit_trail','SELECT COUNT(*) total FROM audit_logs','Audit log is queryable.'],['hr_documents','SELECT COUNT(*) total FROM employee_documents','HR document storage metadata is queryable.'],['policy_center','SELECT COUNT(*) total FROM company_policies','Policy center is queryable.'],['asset_register','SELECT COUNT(*) total FROM company_assets','Asset register is queryable.']];
   for(const item of checksMap){try{await query(item[1]);add(item[0],'PASS',item[2]);}catch{add(item[0],'FAIL',item[2].replace('is queryable','is unavailable').replace('is reachable','connectivity check failed.'));}}
+  const storage=getObjectStorageReadiness();
+  add('private_object_storage',storage.status,storage.detail);
   res.json({status:checks.every((x)=>x.status==='PASS')?'READY':'DEGRADED',checks,checkedAt:new Date().toISOString()});
 }));
 
