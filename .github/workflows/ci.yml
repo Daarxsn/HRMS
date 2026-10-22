@@ -82,6 +82,19 @@ jobs:
         run: npm run test:migration-rehearsal --workspace server
       - name: Run backend unit and contract tests
         run: npm test
+      - name: Install MySQL client tools for logical backup and restore
+        run: sudo apt-get update && sudo apt-get install --yes mysql-client
+      - name: Run isolated MySQL backup and restore rehearsal
+        env:
+          CI: 'true'
+          HRMS_BACKUP_RESTORE_REHEARSAL: 'true'
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+        run: npm run test:backup-restore --workspace server
       - name: Apply MySQL migrations in CI
         env:
           DB_HOST: 127.0.0.1
@@ -111,6 +124,22 @@ jobs:
           npm run db:seed
           npm run db:verify --workspace server
           HRMS_DB_AUDIT_TARGET=ci npm run db:audit --workspace server
+      - name: Benchmark MySQL pool and admin overview SQL baseline
+        env:
+          CI: 'true'
+          HRMS_BENCHMARK: 'true'
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: falchion_hrms_ci
+          DB_USER: root
+          DB_PASSWORD: root
+          BENCH_POOL_SIZE: 10
+          BENCH_CONCURRENCY: 32
+          BENCH_ITERATIONS: 120
+        run: |
+          npm run bench:db-pool --workspace server
+          npm run bench:admin-overview --workspace server
 
   api-integration:
     name: API integration smoke

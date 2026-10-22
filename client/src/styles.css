@@ -4211,3 +4211,80 @@ html[data-theme="dark"] .wfh-approved-today {
 @media(max-width:600px) {
   .wfh-approved-today .button { flex: 1 1 100%; width: 100%; justify-content: center; }
 }
+
+
+/* Step 7: semantic theme tokens and resilient table/accessibility defaults.
+   Kept as a final override layer while legacy selectors are migrated incrementally. */
+:root {
+  color-scheme: light;
+  --color-bg: #f4f6f4;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-text: #17262d;
+  --color-text-muted: #596a70;
+  --color-border: #d9e2de;
+  --color-primary: #236b57;
+  --color-primary-contrast: #ffffff;
+  --color-success: #176b45;
+  --color-warning: #805500;
+  --color-danger: #a12e32;
+  --focus-ring: #176bba;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0e1412;
+  --color-surface: #151d1a;
+  --color-surface-raised: #1b2621;
+  --color-text: #edf4ef;
+  --color-text-muted: #bdcbc2;
+  --color-border: #34443b;
+  --color-primary: #75c6a7;
+  --color-primary-contrast: #10251d;
+  --color-success: #83d5a9;
+  --color-warning: #f0c56c;
+  --color-danger: #ff9b9b;
+  --focus-ring: #8ac9ff;
+}
+html[data-theme] body { background-color: var(--color-bg); color: var(--color-text); }
+html[data-theme] .card,
+html[data-theme] .table-card,
+html[data-theme] .modal-card,
+html[data-theme] .command-palette,
+html[data-theme] .notification-popover,
+html[data-theme] .person-drawer,
+html[data-theme] .people-toolbar,
+html[data-theme] .person-card {
+  border-color: var(--color-border);
+}
+html[data-theme] input,
+html[data-theme] select,
+html[data-theme] textarea,
+html[data-theme] .text-input {
+  border-color: var(--color-border);
+}
+html[data-theme] :is(a,button,input,select,textarea,[tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+html[data-theme] :is(.table-card,.people-table-card,.table-wrap,.data-table-wrap) {
+  max-width: 100%;
+}
+html[data-theme] :is(.table-card,.people-table-card,.table-wrap,.data-table-wrap) table {
+  min-width: 640px;
+}
+html[data-theme] :is(.table-card,.people-table-card,.table-wrap,.data-table-wrap) {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+html[data-theme] :is(.status-success,.status-approved,.badge-success) { color: var(--color-success); }
+html[data-theme] :is(.status-warning,.status-pending,.badge-warning) { color: var(--color-warning); }
+html[data-theme] :is(.status-danger,.status-rejected,.badge-danger) { color: var(--color-danger); }
+@media (max-width: 720px) {
+  html[data-theme] :is(.table-card,.people-table-card,.table-wrap,.data-table-wrap) {
+    -webkit-overflow-scrolling: touch;
+  }
+  html[data-theme] :is(.table-card,.people-table-card) table { min-width: 620px; }
+}
+@media (forced-colors: active) {
+  :is(a,button,input,select,textarea,[tabindex]):focus-visible { outline: 2px solid CanvasText; }
+}
