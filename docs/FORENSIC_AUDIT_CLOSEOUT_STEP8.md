@@ -8,9 +8,9 @@
 
 This report uses the defect register below as the sole source of status totals. Each numbered finding has exactly one current status. Totals are calculated from the 10 register entries:
 
-- **Fixed in source / docs:** 4
+- **Fixed in source / docs:** 3
 - **Verified by automated CI/E2E evidence:** 2
-- **Open / requires further evidence or implementation:** 4
+- **Open / requires further evidence or implementation:** 5
 - **Not applicable:** 0
 - **Total findings:** 10
 
