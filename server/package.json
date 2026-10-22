@@ -18,7 +18,8 @@
     "test:migration-rehearsal": "node --experimental-strip-types test/migration-rehearsal.ts",
     "test:backup-restore": "node --experimental-strip-types test/backup-restore-rehearsal.ts",
     "bench:db-pool": "node --experimental-strip-types test/connection-pool-benchmark.ts",
-    "bench:admin-overview": "node --experimental-strip-types test/admin-overview-benchmark.ts"
+    "bench:admin-overview": "node --experimental-strip-types test/admin-overview-benchmark.ts",
+    "test:ui-contract": "node --experimental-strip-types --test test/ui-contract.test.ts"
   },
   "overrides": {
     "uuid": "11.1.1"
