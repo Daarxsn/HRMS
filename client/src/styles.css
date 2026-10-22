@@ -6244,3 +6244,22 @@ html[data-theme="dark"] .wfh-approved-today {
     font-size: 8px !important;
   }
 }
+
+
+/* Prevent the access footer from overlapping the trust row in either viewport. */
+.login-footer {
+  position: static !important;
+  flex: 0 0 auto !important;
+  width: min(100%, 470px) !important;
+  margin: 17px auto 0 !important;
+  padding: 0 8px !important;
+  text-align: center !important;
+  line-height: 1.6 !important;
+}
+@media (min-width: 901px) {
+  .login-art-copy { transform: translateY(-22px) !important; }
+}
+@media (max-width: 900px) {
+  .login-art-copy { transform: none !important; }
+  .login-footer { margin-top: 18px !important; }
+}

@@ -18,6 +18,11 @@ test('login reference composition is measured and captured on desktop', async ({
   await expect(page.locator('.login-auth-card')).toBeVisible();
   await expect(page.locator('.login-art-footer')).toContainText('CULTURE TODAY. STRONGER TOMORROW.');
   await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
+  const desktopTrustBox = await page.locator('.login-trust').boundingBox();
+  const desktopFooterBox = await page.locator('.login-footer').boundingBox();
+  expect(desktopTrustBox).not.toBeNull();
+  expect(desktopFooterBox).not.toBeNull();
+  expect(desktopFooterBox!.y).toBeGreaterThanOrEqual(desktopTrustBox!.y + desktopTrustBox!.height - 1);
   const desktopBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
   expect(desktopBackground).toContain('login-architectural-scene.webp');
   await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
@@ -60,6 +65,11 @@ test('login reference composition is captured and readable on mobile', async ({ 
   await expect(page.locator('.login-feature')).toHaveCount(3);
   await expect(page.locator('.login-auth-card')).toBeVisible();
   await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
+  const mobileTrustBox = await page.locator('.login-trust').boundingBox();
+  const mobileFooterBox = await page.locator('.login-footer').boundingBox();
+  expect(mobileTrustBox).not.toBeNull();
+  expect(mobileFooterBox).not.toBeNull();
+  expect(mobileFooterBox!.y).toBeGreaterThanOrEqual(mobileTrustBox!.y + mobileTrustBox!.height - 1);
   const mobileBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
   expect(mobileBackground).toContain('login-architectural-scene.webp');
   await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
