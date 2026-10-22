@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { deleteObject } from '../src/object-storage.mts';
+import { enqueueEmail, processEmailOutboxBatch, retryFailedEmail } from '../src/email-outbox.mts';
 import { pool, query } from '../src/db.mts';
 
 const port = 8090;
@@ -161,7 +162,88 @@ try {
   assert.equal(offPremisesCheckIn.response.status,400,'OFF_PREMISES must be checkout-only.');
 
 
+  const unauthenticatedOutboxRun = await request('/internal/email-outbox', {method:'POST',body:JSON.stringify({})});
+  assert.equal(unauthenticatedOutboxRun.response.status,401,'The background email worker endpoint must require its private bearer secret.');
+
   const adminSession = await signIn(admin.email);
+
+  // Step 5 / 27-28: durable enqueue, dedupe, SMTP failure retries, recovery and concurrent delivery.
+  const emailDedupeKey = 'integration-email-outbox:' + crypto.randomUUID();
+  const queuedFirst = await enqueueEmail({
+    to:['outbox-test@example.test'],
+    subject:'Outbox retry regression test',
+    text:'Synthetic message for integration recovery checks.',
+    html:'<p>Synthetic message for integration recovery checks.</p>',
+    fromName:'HRMS Integration'
+  }, emailDedupeKey);
+  assert.equal(queuedFirst.queued,true);
+  assert.equal(queuedFirst.status,'PENDING');
+  const queuedDuplicate = await enqueueEmail({
+    to:['outbox-test@example.test'],
+    subject:'A duplicate with a changed body must not replace the first message',
+    text:'second body',
+    html:'<p>second body</p>'
+  }, emailDedupeKey);
+  assert.equal(queuedDuplicate.id,queuedFirst.id,'A duplicate event key must return the original durable outbox item.');
+  let outboxRows = await query('SELECT status,attempts,last_error,max_attempts FROM email_outbox WHERE id=:id LIMIT 1',{id:queuedFirst.id});
+  assert.equal(Number(outboxRows[0]?.attempts),0);
+  assert.equal(Number(outboxRows[0]?.max_attempts),8);
+
+  const failureCases = [
+    {message:'SMTP server response timed out.',kind:'timeout'},
+    {message:'connect ECONNREFUSED 127.0.0.1:2525',kind:'connection'},
+    {message:'SMTP authentication failed (535 invalid credentials)',kind:'credentials'}
+  ];
+  for (const failure of failureCases) {
+    await query('UPDATE email_outbox SET available_at=UTC_TIMESTAMP(3) WHERE id=:id',{id:queuedFirst.id});
+    const result = await processEmailOutboxBatch({outboxId:queuedFirst.id,send:async()=>{throw new Error(failure.message);}});
+    assert.equal(result.claimed,1,'The selected test outbox entry must be claimed for the '+failure.kind+' failure.');
+    assert.equal(result.retried,1,'Transient SMTP '+failure.kind+' errors must be recorded and retried.');
+    outboxRows = await query('SELECT status,attempts,last_error FROM email_outbox WHERE id=:id LIMIT 1',{id:queuedFirst.id});
+    assert.equal(outboxRows[0]?.status,'PENDING');
+    assert.equal(Number(outboxRows[0]?.attempts),failureCases.indexOf(failure)+1);
+    assert.match(String(outboxRows[0]?.last_error||''),new RegExp(failure.kind==='credentials'?'535':failure.kind==='connection'?'ECONNREFUSED':'timed out','i'));
+  }
+
+  await query('UPDATE email_outbox SET available_at=UTC_TIMESTAMP(3) WHERE id=:id',{id:queuedFirst.id});
+  let actualSendCount=0;
+  const sentMessageIds:string[]=[];
+  const recoveredSender=async(message)=> {
+    actualSendCount+=1;
+    sentMessageIds.push(String(message.messageId||''));
+    await new Promise((resolve)=>setTimeout(resolve,50));
+    return {sent:true,skipped:false};
+  };
+  const concurrentResults=await Promise.all([
+    processEmailOutboxBatch({outboxId:queuedFirst.id,send:recoveredSender}),
+    processEmailOutboxBatch({outboxId:queuedFirst.id,send:recoveredSender})
+  ]);
+  assert.equal(actualSendCount,1,'Concurrent worker claims must not deliver the same pending outbox item twice.');
+  assert.equal(concurrentResults.reduce((total,result)=>total+result.sent,0),1);
+  assert.ok(sentMessageIds[0]?.startsWith('<')&&sentMessageIds[0]?.endsWith('@hrms.fxcoworks.com>'),'Delivered retries must preserve a stable Message-ID.');
+  outboxRows=await query('SELECT status,attempts,sent_at,last_error FROM email_outbox WHERE id=:id LIMIT 1',{id:queuedFirst.id});
+  assert.equal(outboxRows[0]?.status,'SENT','The worker must record eventual recovery.');
+  assert.equal(Number(outboxRows[0]?.attempts),4);
+  assert.ok(outboxRows[0]?.sent_at);
+  assert.equal(outboxRows[0]?.last_error,null);
+
+  const exhaustedKey='integration-email-outbox-terminal:'+crypto.randomUUID();
+  const exhausted=await enqueueEmail({
+    to:['outbox-test@example.test'],subject:'Terminal retry test',text:'terminal',html:'<p>terminal</p>'
+  },exhaustedKey);
+  await query('UPDATE email_outbox SET attempts=max_attempts-1,available_at=UTC_TIMESTAMP(3) WHERE id=:id',{id:exhausted.id});
+  const exhaustedResult=await processEmailOutboxBatch({outboxId:exhausted.id,send:async()=>{throw new Error('SMTP authentication failed (535 invalid credentials)');}});
+  assert.equal(exhaustedResult.failed,1,'Exhausted notification deliveries must become visible FAILED records.');
+  outboxRows=await query('SELECT status,attempts,last_error FROM email_outbox WHERE id=:id LIMIT 1',{id:exhausted.id});
+  assert.equal(outboxRows[0]?.status,'FAILED');
+  assert.equal(Number(outboxRows[0]?.attempts),8);
+  assert.match(String(outboxRows[0]?.last_error||''),/535/);
+  assert.equal(await retryFailedEmail(exhausted.id),true,'An administrator retry action must reset an exhausted message.');
+  outboxRows=await query('SELECT status,attempts,last_error FROM email_outbox WHERE id=:id LIMIT 1',{id:exhausted.id});
+  assert.equal(outboxRows[0]?.status,'PENDING');
+  assert.equal(Number(outboxRows[0]?.attempts),0);
+
+  await query('DELETE FROM email_outbox WHERE id IN (:first,:second)',{first:queuedFirst.id,second:exhausted.id});
 
   // Step 4 / 22: document self-service, IDOR denial, and administrative access are tested independently.
   const otherEmployee = demoUsers.data.users.find((user) => user.role === 'EMPLOYEE' && user.email !== employee.email);

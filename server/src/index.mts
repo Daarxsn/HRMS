@@ -16,6 +16,7 @@ import accountRoutes from './routes/account.mts';
 import enterpriseRoutes from './routes/enterprise.mts';
 import { getObjectStorageReadiness } from './object-storage.mts';
 import { assertProductionConfiguration } from './production-config.mts';
+import emailOutboxRoutes from './email-outbox-routes.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
@@ -100,9 +101,12 @@ app.get('/api/health/ready',async(req,res)=>{
   let database='ok';
   try { await pool.query('SELECT 1'); } catch { database='unavailable'; }
   const storage=getObjectStorageReadiness();
-  const ready=database==='ok'&&storage.status==='PASS';
+  const outboxRunnerConfigured=process.env.VERCEL!=='1'||String(process.env.EMAIL_OUTBOX_CRON_SECRET||'').length>=32;
+  const ready=database==='ok'&&storage.status==='PASS'&&outboxRunnerConfigured;
   healthPayload(res,{status:ready?'ok':'unavailable',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database,
-    private_object_storage:storage.status==='PASS'?'configured':'not_configured',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)},ready?200:503);
+    private_object_storage:storage.status==='PASS'?'configured':'not_configured',
+    email_outbox_runner:outboxRunnerConfigured?'configured':'not_configured',
+    uptime_seconds:Math.floor((Date.now()-startedAt)/1000)},ready?200:503);
 });
 app.get('/api/health',async(req,res)=>{
   try { await pool.query('SELECT 1'); healthPayload(res,{status:'ok',service:'falchion-xeniaa-api',version:APP_VERSION,build:BUILD_SHA,database:'ok',uptime_seconds:Math.floor((Date.now()-startedAt)/1000)}); }
@@ -114,6 +118,7 @@ app.use('/api/leave',leaveRoutes);
 app.use('/api',workplaceRoutes);
 app.use('/api/admin',adminRoutes);
 app.use('/api/account',accountRoutes);
+app.use('/api/internal/email-outbox',emailOutboxRoutes);
 app.use('/api/enterprise',enterpriseRoutes);
 app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
 app.use(errorHandler);
