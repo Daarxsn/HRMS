@@ -139,20 +139,20 @@ function LoginScreen() {
   };
   return <div className="login-page">
     <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
-      <div className="login-art-top"><IconLogo/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
+      <div className="login-art-top"><img className="login-reference-brand" src="/falchion-xeniaa-horizontal.svg" alt="Falchion Xeniaa"/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
       <div className="login-art-copy">
         <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
-        <h1>The workplace<br/>builds <em>people.</em></h1>
-        <p>A modern HR platform for teams that aim higher — bringing people, time, and workplace operations together.</p>
+        <h1>THE<br/>WORKPLACE<br/>BUILDS<br/><em>PEOPLE.</em></h1>
+        <p>A modern HR platform for teams that aim higher.</p>
         <div className="login-feature-row" aria-label="People portal features">
           <div className="login-feature"><span className="login-feature-icon"><CalendarDays size={17}/></span><span><b>Your time</b><small>Attendance & leave</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Private by design</small></span></div>
         </div>
         <div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/>
-        <div className="art-note"><Sparkles size={15}/> Culture today. Stronger tomorrow.</div>
+        
       </div>
-      <div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div>
+      <div className="login-art-footer"><span>CULTURE TODAY. STRONGER TOMORROW.</span><span>EST. PUNE · INDIA</span></div>
     </section>
     <section className="login-panel" aria-label="Sign in">
       <div className="login-panel-inner">
