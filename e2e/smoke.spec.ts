@@ -17,6 +17,10 @@ test('login reference composition is measured and captured on desktop', async ({
   await expect(page.locator('.login-feature')).toHaveCount(3);
   await expect(page.locator('.login-auth-card')).toBeVisible();
   await expect(page.locator('.login-art-footer')).toContainText('CULTURE TODAY. STRONGER TOMORROW.');
+  const desktopBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(desktopBackground).toContain('login-architectural-scene.webp');
+  await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
+  await expect(page.locator('.art-orbit')).toHaveCount(0);
   const geometry = await page.locator('.login-page').evaluate((root) => {
     const page = root.getBoundingClientRect();
     const art = root.querySelector('.login-art')!.getBoundingClientRect();
@@ -53,6 +57,10 @@ test('login reference composition is captured and readable on mobile', async ({ 
   await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
   await expect(page.locator('.login-feature')).toHaveCount(3);
   await expect(page.locator('.login-auth-card')).toBeVisible();
+  const mobileBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(mobileBackground).toContain('login-architectural-scene.webp');
+  await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
+  await expect(page.locator('.art-orbit')).toHaveCount(0);
   const layout = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     documentWidth: document.documentElement.scrollWidth,

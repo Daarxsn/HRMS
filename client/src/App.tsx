@@ -139,64 +139,6 @@ function LoginScreen() {
   };
   return <div className="login-page">
     <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
-      <div className="fx-architecture" aria-hidden="true">
-        <svg className="fx-architectural-scene" viewBox="0 0 900 1200" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <linearGradient id="fxStone" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#111a20"/><stop offset=".48" stopColor="#303237"/><stop offset="1" stopColor="#101415"/></linearGradient>
-            <linearGradient id="fxWindow" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#fff0d2"/><stop offset=".48" stopColor="#d5b4a1"/><stop offset="1" stopColor="#35485a"/></linearGradient>
-            <linearGradient id="fxGold" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff0a5"/><stop offset=".38" stopColor="#d6a849"/><stop offset=".7" stopColor="#fff0b1"/><stop offset="1" stopColor="#8e6326"/></linearGradient>
-            <linearGradient id="fxFloor" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#2d2a25"/><stop offset="1" stopColor="#050808"/></linearGradient>
-            <radialGradient id="fxWarmGlow"><stop stopColor="#f8c879" stopOpacity=".85"/><stop offset="1" stopColor="#f8c879" stopOpacity="0"/></radialGradient>
-            <pattern id="fxStoneGrid" width="210" height="150" patternUnits="userSpaceOnUse"><path d="M0 0H210V150H0Z" fill="none" stroke="#080c0e" strokeWidth="5"/><path d="M3 3H207M3 4V147" fill="none" stroke="#aab0b2" strokeOpacity=".12" strokeWidth="2"/><path d="M12 12H198V138H12Z" fill="none" stroke="#d4d1c7" strokeOpacity=".035"/></pattern>
-            <filter id="fxShadow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="13"/></filter>
-          </defs>
-          <rect x="350" y="0" width="550" height="1030" fill="url(#fxStone)"/>
-          <rect x="350" y="0" width="550" height="1030" fill="url(#fxStoneGrid)"/>
-          <path d="M350 0H900V55L824 75 754 42 688 67 612 39 535 62 463 39 350 60Z" fill="#0b1014" opacity=".55"/>
-          <rect x="690" y="0" width="210" height="1000" fill="#070b0d" opacity=".5"/>
-          <rect x="716" y="0" width="15" height="1000" fill="url(#fxGold)" opacity=".56"/>
-          <rect x="731" y="0" width="169" height="1000" fill="url(#fxWindow)"/>
-          <rect x="731" y="0" width="169" height="1000" fill="url(#fxWarmGlow)" opacity=".65"/>
-          <path d="M731 0H900V42L731 170Z" fill="#fff4d9" opacity=".72"/>
-          <path d="M731 0L802 0 900 490 900 920 810 930Z" fill="#fff2d9" opacity=".22"/>
-          <path d="M731 0H745V1000H731Z" fill="#f8dfaa" opacity=".52"/>
-          <g fill="#17212a" opacity=".92">
-            <path d="M737 820 756 744 771 820Z"/><path d="M748 1000V795L774 754 791 1000Z"/>
-            <path d="M784 1000V690L807 610 828 1000Z"/><path d="M818 1000V788L842 732 859 1000Z"/>
-            <path d="M851 1000V858L875 809 900 1000Z"/>
-          </g>
-          <g fill="#f1c16d" opacity=".48"><path d="M758 840h5v8h-5zM778 872h5v9h-5zM806 735h5v10h-5zM832 825h5v8h-5zM864 885h5v8h-5zM845 921h5v8h-5z"/></g>
-          <path d="M350 0H900V1200H350Z" fill="none" stroke="#c7a057" strokeOpacity=".22" strokeWidth="2"/>
-          <g transform="translate(515 205)" filter="url(#fxShadow)" opacity=".72"><path d="M100 190 77 143 35 121 0 80 51 96 23 43 75 72 100 0 125 72 177 43 149 96 200 80 165 121 123 143Z" fill="#000"/></g>
-          <g transform="translate(515 190)" stroke="#3c2a13" strokeWidth="8" strokeLinejoin="round">
-            <path d="M100 190 77 143 35 121 0 80 51 96 23 43 75 72 100 0 125 72 177 43 149 96 200 80 165 121 123 143Z" fill="url(#fxGold)"/>
-            <path d="M100 72 81 111 100 99 119 111Z" fill="#171514" strokeWidth="3"/>
-            <path d="M100 99 89 148 100 139 111 148Z" fill="url(#fxGold)" strokeWidth="3"/>
-            <path d="M76 85 89 111 100 120 111 111 124 85" fill="none" stroke="#fff0b1" strokeWidth="3"/>
-          </g>
-          <g opacity=".88">
-            <path d="M350 850H900V1200H350Z" fill="url(#fxFloor)"/>
-            <path d="M350 850 900 820M350 980 900 920M350 1100 900 1045" stroke="#c49b51" strokeOpacity=".34" strokeWidth="4"/>
-            <path d="M460 1200 620 850M700 1200 735 850M350 1030 900 1000" stroke="#b9a27b" strokeOpacity=".12" strokeWidth="2"/>
-            <path d="M350 880H900" stroke="#f7d38d" strokeOpacity=".8" strokeWidth="8" filter="url(#fxShadow)"/>
-            <path d="M350 875H900" stroke="#f4c86c" strokeOpacity=".55" strokeWidth="3"/>
-          </g>
-          <g transform="translate(500 690)">
-            <path d="M28 168 40 76 52 168" stroke="#24372a" strokeWidth="7" fill="none"/>
-            <g fill="#3e583b" stroke="#75805a" strokeWidth="2">
-              <path d="M42 106Q-7 91 2 57Q34 65 42 106Z"/><path d="M44 88Q85 53 92 24Q51 37 44 88Z"/>
-              <path d="M41 129Q-3 124 -16 91Q21 91 41 129Z"/><path d="M48 135Q90 103 101 73Q61 83 48 135Z"/>
-              <path d="M42 69Q14 35 24 3Q49 29 42 69Z"/><path d="M51 94Q76 63 69 40Q47 60 51 94Z"/>
-              <path d="M38 149Q8 133 7 112Q34 120 38 149Z"/>
-            </g>
-            <path d="M12 158H83L72 202H23Z" fill="#171c1b" stroke="#7c6948" strokeWidth="3"/>
-            <path d="M16 163H79" stroke="#b89a60" strokeWidth="3"/>
-          </g>
-          <rect width="900" height="1200" fill="url(#fxWarmGlow)" opacity=".04"/>
-        </svg>
-        <div className="fx-grid-lines"/>
-        <div className="fx-plant"><i/><i/><i/><i/><i/><i/><b/></div>
-      </div>
       <div className="login-art-top"><img className="login-reference-brand" src="/falchion-xeniaa-horizontal.svg" alt="Falchion Xeniaa"/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
       <div className="login-art-copy">
         <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
@@ -207,7 +149,7 @@ function LoginScreen() {
           <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Secure by design</small></span></div>
         </div>
-        <div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/>
+
         
       </div>
       <div className="login-art-footer"><span>CULTURE TODAY. STRONGER TOMORROW.</span><span>EST. PUNE · INDIA</span></div>

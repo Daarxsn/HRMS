@@ -6036,3 +6036,145 @@ html[data-theme="dark"] .wfh-approved-today {
     font-size: 10px !important;
   }
 }
+
+
+/* Photorealistic Falchion login background — authoritative overrides after legacy login styles. */
+.login-page {
+  min-height: 100svh !important;
+  grid-template-columns: minmax(0, 59.5fr) minmax(0, 40.5fr) !important;
+  background: #070909 !important;
+}
+.login-art {
+  display: flex !important;
+  position: relative !important;
+  isolation: isolate !important;
+  min-width: 0 !important;
+  min-height: 100svh !important;
+  height: 100svh !important;
+  overflow: hidden !important;
+  background-color: #050607 !important;
+  background-image:
+    linear-gradient(90deg,
+      rgba(2, 4, 6, .94) 0%,
+      rgba(2, 4, 6, .82) 30%,
+      rgba(2, 4, 6, .48) 52%,
+      rgba(2, 4, 6, .08) 100%),
+    linear-gradient(0deg,
+      rgba(2, 3, 4, .58) 0%,
+      rgba(2, 3, 4, .16) 24%,
+      transparent 48%,
+      rgba(2, 3, 4, .12) 100%),
+    url('/login-architectural-scene.webp') !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-position: center center !important;
+}
+.login-art::before,
+.login-art::after,
+.login-art-copy::before,
+.login-art-copy::after {
+  content: none !important;
+  display: none !important;
+}
+.login-art .fx-architecture,
+.login-art .fx-grid-lines,
+.login-art .fx-plant,
+.login-art .fx-window,
+.login-art .fx-eagle-watermark,
+.login-art .art-orbit,
+.login-art .orbit-one,
+.login-art .orbit-two {
+  display: none !important;
+}
+.login-art-top,
+.login-art-copy,
+.login-art-footer {
+  position: relative !important;
+  z-index: 2 !important;
+}
+.login-art-top {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  border-bottom: 1px solid rgba(226, 190, 103, .32) !important;
+  padding-bottom: 18px !important;
+}
+.login-art-copy {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: 650px !important;
+  margin: auto 0 !important;
+  padding: 3vh 0 !important;
+  transform: none !important;
+}
+.login-art-copy h1 {
+  color: #fbfaf6 !important;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, .62) !important;
+}
+.login-art-copy h1 em {
+  color: #edc15e !important;
+}
+.login-art-copy > p {
+  color: rgba(250, 247, 240, .9) !important;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .8) !important;
+}
+.login-feature {
+  background: linear-gradient(145deg, rgba(5, 8, 9, .86), rgba(8, 10, 10, .62)) !important;
+  border-color: rgba(218, 181, 96, .42) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .07), 0 12px 30px rgba(0, 0, 0, .25) !important;
+  backdrop-filter: blur(13px) saturate(115%) !important;
+}
+.login-art-footer {
+  flex: 0 0 auto !important;
+  border-top: 1px solid rgba(228, 194, 119, .42) !important;
+  padding-top: 13px !important;
+  color: rgba(238, 222, 180, .9) !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .85) !important;
+}
+@media (min-width: 1500px) {
+  .login-art {
+    background-position: center center !important;
+    padding-left: clamp(34px, 4.8vw, 74px) !important;
+    padding-right: clamp(28px, 3.6vw, 56px) !important;
+  }
+}
+@media (min-width: 901px) and (max-height: 800px) {
+  .login-art { padding-top: 22px !important; padding-bottom: 18px !important; }
+  .login-art-top { padding-bottom: 12px !important; }
+  .login-art-copy { padding-block: 1vh !important; }
+  .login-art-copy h1 { font-size: clamp(48px, 4.7vw, 72px) !important; margin-block: 19px 14px !important; }
+  .login-feature-row { margin-top: 22px !important; }
+  .login-feature { min-height: 102px !important; }
+}
+@media (max-width: 900px) {
+  .login-page {
+    height: auto !important;
+    min-height: 100svh !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .login-art {
+    height: auto !important;
+    min-height: 760px !important;
+    background-position: 58% center !important;
+  }
+  .login-panel { min-height: 720px !important; }
+}
+@media (max-width: 520px) {
+  .login-art {
+    min-height: 740px !important;
+    padding: 22px 20px 20px !important;
+    background-image:
+      linear-gradient(90deg, rgba(2, 4, 6, .91) 0%, rgba(2, 4, 6, .77) 58%, rgba(2, 4, 6, .32) 100%),
+      linear-gradient(0deg, rgba(2, 3, 4, .68) 0%, transparent 49%),
+      url('/login-architectural-scene.webp') !important;
+    background-position: 58% center !important;
+  }
+  .login-art-copy { padding-block: 3vh !important; }
+  .login-feature-row { gap: 7px !important; }
+  .login-feature { min-height: 105px !important; padding: 10px 8px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-art-copy h1,
+  .login-art-copy > p,
+  .login-feature-row,
+  .login-auth-card { animation: none !important; }
+}
