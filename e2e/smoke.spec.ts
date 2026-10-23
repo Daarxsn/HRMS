@@ -122,10 +122,49 @@ test('employee can sign in and reach the action center', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Attendance/i }).first()).toBeVisible();
 });
 
-test('administrator can sign in and reach workplace pulse', async ({ page }) => {
+test('administrator overview is readable and captured on desktop', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'chromium', 'Admin overview reference screenshot is captured on desktop Chromium.');
+  await page.setViewportSize({ width: 1536, height: 1000 });
   await signInDev(page, 'admin');
+  await expect(page.locator('.admin-overview-page')).toBeVisible();
   await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Your workplace, in one calm view\.|Office holiday|Workplace metrics are temporarily unavailable/i })).toBeVisible();
+  await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
+  await expect(page.locator('.admin-overview-page .admin-hero')).toBeVisible();
   await expect(page.getByRole('complementary').getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
+  const layout = await page.locator('.admin-overview-page').evaluate((root) => {
+    const hero = root.querySelector('.admin-hero')!.getBoundingClientRect();
+    const stats = root.querySelector('.stat-grid')!.getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, documentWidth: document.documentElement.scrollWidth, heroWidth: hero.width, statsWidth: stats.width };
+  });
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.heroWidth).toBeGreaterThan(900);
+  expect(layout.statsWidth).toBeGreaterThan(900);
+  await testInfo.attach('admin-overview-desktop-1536x1000.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+});
+
+test('administrator overview is readable on mobile', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Admin overview responsive checks run on mobile Chromium.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInDev(page, 'admin');
+  await expect(page.locator('.admin-overview-page')).toBeVisible();
+  await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
+  await expect(page.locator('.admin-overview-page .admin-mobile-command-strip')).toBeVisible();
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    statColumns: getComputedStyle(document.querySelector('.admin-overview-page .stat-grid')!).gridTemplateColumns
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.statColumns.split(' ').length).toBe(2);
+  await testInfo.attach('admin-overview-mobile.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
 });
 
 test('mobile navigation opens and remains usable', async ({ page }, testInfo) => {
