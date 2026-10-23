@@ -6908,3 +6908,40 @@ html[data-theme="dark"] .admin-overview-page .table-card td { border-color: #263
 @media (prefers-reduced-motion: reduce) {
   .admin-overview-page .stat-card { transition: none; }
 }
+
+
+/* Theme-safe executive hero correction: outrank legacy theme surface rules. */
+html[data-theme] .admin-overview-page .admin-hero {
+  color: #f8f7f1 !important;
+  border: 1px solid rgba(215, 173, 88, .32) !important;
+  background:
+    radial-gradient(ellipse at 78% 18%, rgba(213, 172, 87, .12), transparent 32%),
+    linear-gradient(125deg, #0b2019 0%, #15392b 54%, #102b22 100%) !important;
+  box-shadow: 0 14px 36px rgba(13, 40, 30, .12) !important;
+}
+html[data-theme] .admin-overview-page .admin-hero :is(h1,h2,p,span,small,b,strong) {
+  color: inherit;
+}
+html[data-theme] .admin-overview-page .admin-hero-copy h2 {
+  color: #f8f7f1 !important;
+}
+html[data-theme] .admin-overview-page .admin-hero-copy p {
+  color: #c3d3c8 !important;
+}
+html[data-theme] .admin-overview-page .admin-hero-kicker,
+html[data-theme] .admin-overview-page .admin-hero-score > span {
+  color: #d4dfd5 !important;
+}
+html[data-theme] .admin-overview-page .admin-hero-kicker small,
+html[data-theme] .admin-overview-page .admin-hero-score > small {
+  color: #c2d1c5 !important;
+}
+html[data-theme] .admin-overview-page .admin-hero-score > b {
+  color: #f1ce7d !important;
+}
+.admin-overview-page > .page-title .page-title-action .button {
+  background: #15392b !important;
+  border-color: rgba(215, 173, 88, .55) !important;
+  color: #faf8f1 !important;
+  box-shadow: 0 7px 18px rgba(16, 54, 39, .15) !important;
+}

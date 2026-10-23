@@ -131,6 +131,10 @@ test('administrator overview is readable and captured on desktop', async ({ page
   await expect(page.getByRole('heading', { name: /Your workplace, in one calm view\.|Office holiday|Workplace metrics are temporarily unavailable/i })).toBeVisible();
   await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
   await expect(page.locator('.admin-overview-page .admin-hero')).toBeVisible();
+  const heroTextColor = await page.locator('.admin-overview-page .admin-hero').evaluate((hero) => getComputedStyle(hero).color);
+  const heroHeadingColor = await page.locator('.admin-overview-page .admin-hero-copy h2').evaluate((heading) => getComputedStyle(heading).color);
+  expect(heroTextColor).toBe('rgb(248, 247, 241)');
+  expect(heroHeadingColor).toBe('rgb(248, 247, 241)');
   await expect(page.getByRole('complementary').getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
   const layout = await page.locator('.admin-overview-page').evaluate((root) => {
     const hero = root.querySelector('.admin-hero')!.getBoundingClientRect();
@@ -154,6 +158,8 @@ test('administrator overview is readable on mobile', async ({ page }, testInfo) 
   await expect(page.getByText('Workplace pulse')).toBeVisible();
   await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
   await expect(page.locator('.admin-overview-page .admin-mobile-command-strip')).toBeVisible();
+  const mobileHeroTextColor = await page.locator('.admin-overview-page .admin-hero').evaluate((hero) => getComputedStyle(hero).color);
+  expect(mobileHeroTextColor).toBe('rgb(248, 247, 241)');
   const layout = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     documentWidth: document.documentElement.scrollWidth,
