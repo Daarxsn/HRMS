@@ -521,11 +521,6 @@ function AdminHome(){
       {label:'Needs your attention',value:stats.pending,meta:'Requests waiting for review',icon:ClipboardCheck,tone:'gold',to:'/admin/approvals'},
       {label:'Late entries today',value:stats.late,meta:'After 9:30 AM',icon:Clock3,tone:'rose',to:'/admin/attendance'}
     ].map((item)=><Link to={item.to} className="admin-stat-link" key={item.label} aria-label={"Open "+item.label.toLowerCase()+" details"}><Card className={"stat-card stat-card-interactive stat-card-"+item.tone}><div className={"stat-icon stat-"+item.tone}><item.icon size={18}/></div><div className="stat-label">{item.label}</div><div className="stat-value">{loading||!adminSections.dashboard?'—':item.value??0}</div><div className="stat-meta">{item.meta}</div><span className="admin-stat-open" aria-hidden="true"><ArrowUpRight size={14}/></span></Card></Link>)}</div>
-      {label:'Team members',value:stats.employees,meta:'Across employees & interns',icon:Users,tone:'blue'},
-      {label:'Checked in today',value:stats.present,meta:`${stats.employees?Math.round((stats.present/stats.employees)*100):0}% of active team`,icon:Fingerprint,tone:'green'},
-      {label:'Needs your attention',value:stats.pending,meta:'Requests waiting for review',icon:ClipboardCheck,tone:'gold'},
-      {label:'Late entries today',value:stats.late,meta:'After 9:30 AM',icon:Clock3,tone:'rose'}
-    ].map((item)=><Card className="stat-card" key={item.label}><div className={`stat-icon stat-${item.tone}`}><item.icon size={18}/></div><div className="stat-label">{item.label}</div><div className="stat-value">{loading||!adminSections.dashboard?'—':item.value??0}</div><div className="stat-meta">{item.meta}</div></Card>)}</div>
     <div className="admin-pulse-grid">
       <Card className="admin-pulse-card"><CardHeading title="Workplace pulse" subtitle="A simple read on today’s working pattern."/><div className="admin-pulse-metrics">
         <div><span className="pulse-metric-icon pulse-green"><Fingerprint size={16}/></span><small>IN OFFICE</small><b>{loading?'—':stats.present||0}</b><em>checked in</em></div>
