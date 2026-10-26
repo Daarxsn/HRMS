@@ -13,6 +13,7 @@ async function signInDev(page: any, account: 'employee' | 'admin' | 'superadmin'
   const response = await page.request.post(`${apiBase}/auth/demo`, { data: { email } });
   expect(response.ok()).toBeTruthy();
   await page.goto('/');
+  await page.locator('.loading-screen').waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
 }
 
 test('login reference composition is measured and captured on desktop', async ({ page }, testInfo) => {

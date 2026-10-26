@@ -4806,3 +4806,79 @@ tr:hover td {
   pointer-events: none;
   color: var(--color-text-muted, #71717a);
 }
+
+/* Photorealistic Falchion login background & geometry overrides */
+.login-page {
+  min-height: 100svh !important;
+  background: #070909 !important;
+}
+.login-art {
+  display: flex !important;
+  position: relative !important;
+  isolation: isolate !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  background-color: #050607 !important;
+  background-image:
+    linear-gradient(90deg,
+      rgba(2, 4, 6, .94) 0%,
+      rgba(2, 4, 6, .82) 30%,
+      rgba(2, 4, 6, .48) 52%,
+      rgba(2, 4, 6, .08) 100%),
+    linear-gradient(0deg,
+      rgba(2, 3, 4, .58) 0%,
+      rgba(2, 3, 4, .16) 24%,
+      transparent 48%,
+      rgba(2, 3, 4, .12) 100%),
+    url('/login-architectural-scene.webp') !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-position: center center !important;
+}
+
+@media (min-width: 901px) {
+  .login-page {
+    grid-template-columns: minmax(0, 59.5fr) minmax(0, 40.5fr) !important;
+  }
+  .login-art {
+    min-height: 100svh !important;
+    height: 100svh !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr !important;
+  }
+  .login-art {
+    display: flex !important;
+    min-height: 520px !important;
+    height: auto !important;
+    padding: 32px 24px 28px !important;
+  }
+  .login-panel {
+    min-height: 520px !important;
+  }
+}
+
+.login-art::before,
+.login-art::after,
+.login-art-copy::before,
+.login-art-copy::after {
+  content: none !important;
+  display: none !important;
+}
+.login-art .fx-architecture,
+.login-art .fx-grid-lines,
+.login-art .fx-plant,
+.login-art .fx-window,
+.login-art .fx-eagle-watermark,
+.login-art .art-orbit,
+.login-art .orbit-one,
+.login-art .orbit-two {
+  display: none !important;
+}
+.login-feature::after {
+  content: none !important;
+  display: none !important;
+}
