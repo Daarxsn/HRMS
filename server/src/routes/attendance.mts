@@ -127,6 +127,9 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     if (gpsProvided && input.accuracy <= Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) {
       distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
       if (distance <= Number(settings.geofence_meters || POLICY.geofenceMeters)) {
+        // Browser coordinates are client-controlled. Corroborate the geofence
+        // with the server-observed approved office egress IP before accepting GPS.
+        verifyOfficeNetwork(req);
         method = 'GPS';
         locationAccuracy = input.accuracy;
       } else {

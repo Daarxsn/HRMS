@@ -6,11 +6,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
-const { default: app } = await import('../src/index.mts');
-const { pool } = await import('../src/db.mts');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, '../../client/dist');
+const distIndex = path.join(distDir, 'index.html');
+const createdFixture = !fs.existsSync(distIndex);
+if (createdFixture) {
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(distIndex, '<!doctype html><html><head><title>Falchion Xeniaa HRMS</title></head><body><div id="root"></div></body></html>');
+}
+
+const { default: app } = await import('../src/index.mts');
+const { pool } = await import('../src/db.mts');
 const appTsx = fs.readFileSync(path.resolve(__dirname, '../../client/src/App.tsx'), 'utf8');
 const viteConfig = fs.readFileSync(path.resolve(__dirname, '../../client/vite.config.ts'), 'utf8');
 const vercelJson = fs.readFileSync(path.resolve(__dirname, '../../vercel.json'), 'utf8');
