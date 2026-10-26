@@ -1,16 +1,66 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X } from 'lucide-react';
+import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X, GraduationCap, ShieldAlert, Award, Sparkles, Filter, ChevronRight, Eye, CheckCircle2 } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
 
 const adminTabs: [string, string, React.ElementType][] = [
-  ['overview','Command center',Activity], ['people','Lifecycle',Users], ['onboarding','Onboarding',Check],
-  ['assets','Assets',Laptop], ['policies','Policies',FileText], ['offboarding','Offboarding',BriefcaseBusiness], ['security','Security',LockKeyhole]
+  ['overview','Command center',Activity],
+  ['people','Lifecycle',Users],
+  ['onboarding','Onboarding',Check],
+  ['assets','Assets',Laptop],
+  ['policies','Policies',FileText],
+  ['learning','L&D Claims',GraduationCap],
+  ['grievances','Grievances & PoSH',ShieldAlert],
+  ['encashments','EL Encashments',CalendarClock],
+  ['offboarding','Offboarding',BriefcaseBusiness],
+  ['security','Security',LockKeyhole]
 ];
 
-function Modal({ title, children, close }) {
+function Modal({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => {
+      const focusable = modalRef.current?.querySelectorAll('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])') as NodeListOf<HTMLElement> | undefined;
+      if (focusable && focusable.length > 1) {
+        focusable[1].focus();
+      } else {
+        closeRef.current?.focus();
+      }
+    });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key === 'Tab' && modalRef.current) {
+        const focusable = Array.from(modalRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')) as HTMLElement[];
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+      if (previous instanceof HTMLElement) previous.focus();
+      window.scrollTo(0, scrollY);
+    };
+  }, [close]);
   return <div className="modal-backdrop" onMouseDown={(e)=>e.target===e.currentTarget&&close()}>
-    <div className="modal enterprise-modal" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="modal-head"><div><div className="eyebrow">PEOPLE OPERATIONS</div><h2>{title}</h2></div><button className="icon-button" onClick={close} aria-label="Close"><X size={18}/></button></div>
+    <div ref={modalRef} className="modal enterprise-modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="modal-head"><div><div className="eyebrow">PEOPLE OPERATIONS</div><h2>{title}</h2></div><button ref={closeRef} className="icon-button" onClick={close} aria-label="Close dialog"><X size={18}/></button></div>
       <div className="modal-body">{children}</div>
     </div>
   </div>;
@@ -30,7 +80,21 @@ function documentExpiry(value) {
 }
 
 export default function EnterpriseHRPage() {
-  const [tab,setTab]=useState('overview'), [data,setData]=useState(null), [error,setError]=useState(''), [loading,setLoading]=useState(true), [selectedId,setSelectedId]=useState(''), [lifecycle,setLifecycle]=useState(null), [modal,setModal]=useState(null), [notice,setNotice]=useState('');
+  const [tab, setTabState] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('tab');
+      return q && ['overview','people','onboarding','assets','policies','learning','grievances','encashments','offboarding','security'].includes(q) ? q : 'overview';
+    } catch { return 'overview'; }
+  });
+  const setTab = (nextTab: string) => {
+    setTabState(nextTab);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', nextTab);
+      window.history.replaceState(null, '', url.pathname + url.search);
+    } catch {}
+  };
+  const [data,setData]=useState(null), [error,setError]=useState(''), [loading,setLoading]=useState(true), [selectedId,setSelectedId]=useState(''), [lifecycle,setLifecycle]=useState(null), [modal,setModal]=useState(null), [notice,setNotice]=useState('');
   const people=data?.people||[];
   const load=async()=>{
     setLoading(true);setError('');
@@ -75,6 +139,9 @@ export default function EnterpriseHRPage() {
     {tab==='onboarding'&&<Onboarding people={people} reload={load} runAction={act} />}
     {tab==='assets'&&<Assets assets={data.assets||[]} people={people} reload={load} runAction={act}/>}
     {tab==='policies'&&<Policies policies={data.policies||[]} reload={load} runAction={act}/>}
+    {tab==='learning'&&<AdminLearningClaimsTab runAction={act}/>}
+    {tab==='grievances'&&<AdminGrievancesTab runAction={act}/>}
+    {tab==='encashments'&&<AdminLeaveEncashmentsTab runAction={act}/>}
     {tab==='offboarding'&&<Offboarding rows={data.separations||[]} people={people} reload={load} runAction={act}/>}
     {tab==='security'&&<Security security={data.security} people={people} readiness={data.readiness} reload={load} runAction={act}/>}
     {modal==='history'&&<HistoryModal employee={lifecycle?.employee} save={(body)=>act(()=>post('/enterprise/admin/employees/'+selectedId+'/history',body))} close={()=>setModal(null)}/>}
@@ -178,7 +245,7 @@ function Policies({policies,reload,runAction}) {
   const save=async()=>{if(!form.title.trim()||form.body.trim().length<20||busy)return;setBusy(true);try{await runAction(async()=>{const payload={...form,title:form.title.trim(),category:form.category.trim()||'People',version:form.version.trim()||'1.0',body:form.body.trim()};if(editingId)await patch('/enterprise/admin/policies/'+editingId,payload);else await post('/enterprise/admin/policies',payload);reset();});}finally{setBusy(false)}};
   const edit=(p)=>{setEditingId(p.id);setForm({title:p.title||'',category:p.category||'People',version:p.version||'1.0',body:p.body||''});};
   return <div className="enterprise-grid"><section className="card enterprise-wide"><div className="card-heading"><div><h2>Policy library</h2><p>Versioned policies with publication and acknowledgement coverage.</p></div><span className="enterprise-heading-actions">{filteredPolicies.length} policies</span></div><div className="enterprise-toolbar"><input className="input" aria-label="Search policies" placeholder="Search title, category, version or status" value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="policy-list">{filteredPolicies.map(p=><div className="policy-row" key={p.id}><div><b>{p.title}</b><small>{p.category} · v{p.version} · {Number(p.acknowledgements||0)}/{Number(p.active_people||0)} acknowledged</small></div><Status value={p.status}/><div className="policy-row-actions"><button className="button button-secondary button-sm" type="button" disabled={p.status==='PUBLISHED'||Number(p.acknowledgements||0)>0} title={p.status==='PUBLISHED'||Number(p.acknowledgements||0)>0?'Published or acknowledged policies are immutable; create a new version instead.':'Edit draft policy'} onClick={()=>edit(p)}>Edit</button><button className="button button-secondary button-sm" type="button" onClick={()=>runAction(()=>patch('/enterprise/admin/policies/'+p.id,{status:p.status==='PUBLISHED'?'ARCHIVED':'PUBLISHED'}))}>{p.status==='PUBLISHED'?'Archive':p.status==='ARCHIVED'?'Republish':'Publish'}</button></div></div>)}{!filteredPolicies.length&&<div className="enterprise-empty-row">{policies.length?'No policies match your search.':'No policies yet. Create a draft to start the policy library.'}</div>}</div></section>
-  <section className="card"><div className="card-heading"><div><h2>{editingId?'Edit policy':'Create policy'}</h2><p>{editingId?'Update the selected policy while preserving its publication state.':'Create a draft. Publish only after the content has been reviewed.'}</p></div>{editingId&&<button className="button button-secondary button-sm" type="button" onClick={reset}>Cancel</button>}</div><div className="form-stack"><label className="enterprise-field-label">Policy title<input className="input" placeholder="e.g. Information Security Policy" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></label><div className="enterprise-form-pair"><label className="enterprise-field-label">Category<input className="input" placeholder="People" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/></label><label className="enterprise-field-label">Version<input className="input" placeholder="1.0" value={form.version} onChange={e=>setForm({...form,version:e.target.value})}/></label></div><label className="enterprise-field-label">Policy content<textarea className="input enterprise-textarea" placeholder="Write clear policy guidance (at least 20 characters)." value={form.body} onChange={e=>setForm({...form,body:e.target.value})}/><small>{form.body.length}/20,000 characters · minimum 20</small></label><button className="button button-primary" type="button" disabled={busy||!form.title.trim()||form.body.trim().length<20} onClick={save}>{busy?'Saving…':editingId?'Save changes':'Create draft'}</button></div></section></div>;
+  <section className="card"><div className="card-heading"><div><h2>{editingId?'Edit policy':'Create policy'}</h2><p>{editingId?'Update the selected policy while preserving its publication state.':'Create a draft. Publish only after the content has been reviewed.'}</p></div>{editingId&&<button className="button button-secondary button-sm" type="button" onClick={reset}>Cancel</button>}</div><div className="form-stack"><label className="enterprise-field-label">Policy title<input aria-label="Policy title" className="input" placeholder="e.g. Information Security Policy" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></label><div className="enterprise-form-pair"><label className="enterprise-field-label">Category<input aria-label="Category" className="input" placeholder="People" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/></label><label className="enterprise-field-label">Version<input aria-label="Version" className="input" placeholder="1.0" value={form.version} onChange={e=>setForm({...form,version:e.target.value})}/></label></div><label className="enterprise-field-label">Policy content<textarea aria-label="Policy content" className="input enterprise-textarea" placeholder="Write clear policy guidance (at least 20 characters)." value={form.body} onChange={e=>setForm({...form,body:e.target.value})}/><small>{form.body.length}/20,000 characters · minimum 20</small></label><button className="button button-primary" type="button" disabled={busy||!form.title.trim()||form.body.trim().length<20} onClick={save}>{busy?'Saving…':editingId?'Save changes':'Create draft'}</button></div></section></div>;
 }
 
 function Offboarding({rows,people,reload,runAction}) {
@@ -208,7 +275,7 @@ function DocumentModal({save,close}) {
   const [file,setFile]=useState(null),[type,setType]=useState('ID_PROOF'),[title,setTitle]=useState(''),[issued,setIssued]=useState(''),[expires,setExpires]=useState('');
   const invalidDates=Boolean(issued&&expires&&expires<issued);
   const submit=()=>{if(!file||!title.trim()||invalidDates)return;const form=new FormData();form.append('document',file);form.append('documentType',type);form.append('title',title.trim());if(issued)form.append('issuedOn',issued);if(expires)form.append('expiresOn',expires);save(form);};
-  return <Modal title="Upload HR document" close={close}><div className="form-stack"><label className="enterprise-field-label">Document title<input className="input" placeholder="e.g. Employment agreement" maxLength={180} value={title} onChange={e=>setTitle(e.target.value)}/></label><label className="enterprise-field-label">Document type<select className="input" value={type} onChange={e=>setType(e.target.value)}><option value="ID_PROOF">Identity proof</option><option value="CONTRACT">Employment contract</option><option value="OFFER_LETTER">Offer letter</option><option value="CERTIFICATE">Certificate</option><option value="OTHER">Other</option></select></label><div className="enterprise-form-pair"><label className="enterprise-field-label">Issue date<input className="input" type="date" max={expires||undefined} value={issued} onChange={e=>setIssued(e.target.value)}/></label><label className="enterprise-field-label">Expiry date<input className="input" type="date" min={issued||undefined} value={expires} onChange={e=>setExpires(e.target.value)}/></label></div>{invalidDates&&<p className="form-error" role="alert">Expiry date cannot be earlier than the issue date.</p>}<label className="enterprise-field-label">File (PDF, JPG, PNG or WebP; max 10 MB)<input className="input" type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/>{file&&<small>{file.name} · {(file.size/1024/1024).toFixed(2)} MB</small>}</label><button className="button button-primary" disabled={!file||!title.trim()||invalidDates||file.size>10*1024*1024} onClick={submit}>Upload securely</button></div></Modal>;
+  return <Modal title="Upload HR document" close={close}><div className="form-stack"><label className="enterprise-field-label">Document title<input aria-label="Document title" className="input" placeholder="e.g. Employment agreement" maxLength={180} value={title} onChange={e=>setTitle(e.target.value)}/></label><label className="enterprise-field-label">Document type<select aria-label="Document type" className="input" value={type} onChange={e=>setType(e.target.value)}><option value="ID_PROOF">Identity proof</option><option value="CONTRACT">Employment contract</option><option value="OFFER_LETTER">Offer letter</option><option value="CERTIFICATE">Certificate</option><option value="OTHER">Other</option></select></label><div className="enterprise-form-pair"><label className="enterprise-field-label">Issue date<input aria-label="Issue date" className="input" type="date" max={expires||undefined} value={issued} onChange={e=>setIssued(e.target.value)}/></label><label className="enterprise-field-label">Expiry date<input aria-label="Expiry date" className="input" type="date" min={issued||undefined} value={expires} onChange={e=>setExpires(e.target.value)}/></label></div>{invalidDates&&<p className="form-error" role="alert">Expiry date cannot be earlier than the issue date.</p>}<label className="enterprise-field-label">File (PDF, JPG, PNG or WebP; max 10 MB)<input aria-label="File (PDF, JPG, PNG or WebP; max 10 MB)" className="input" type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/>{file&&<small>{file.name} · {(file.size/1024/1024).toFixed(2)} MB</small>}</label><button className="button button-primary" disabled={!file||!title.trim()||invalidDates||file.size>10*1024*1024} onClick={submit}>Upload securely</button></div></Modal>;
 }
 
 
@@ -228,90 +295,707 @@ export function EmployeeDocumentsPage() {
     {error&&<div className="inline-error" role="alert">{error}</div>}
     <section className="card">
       <div className="card-heading"><div><h2>Personal documents</h2><p>Only documents assigned to your employee profile are shown here.</p></div><span className="mini-status">{documents.length} document{documents.length===1?'':'s'}</span></div>
-      {loading?<div className="empty-state"><p>Loading your documents…</p></div>:documents.length===0?<div className="empty-state"><span className="empty-icon"><FileText size={21}/></span><h3>No documents available yet</h3><p>Documents shared by HR will appear here. Contact HR if you need a copy of a contract or payslip.</p></div>:<div className="table-scroll"><table><thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Issued</th><th>Expires</th><th>Access</th></tr></thead><tbody>{documents.map((doc)=><tr key={doc.id}><td><b>{doc.title}</b>{doc.description&&<div className="table-subline">{doc.description}</div>}</td><td>{String(doc.document_type||'OTHER').replaceAll('_',' ')}</td><td><Status value={doc.status}/></td><td>{doc.issued_on?formatDate(doc.issued_on):'—'}</td><td>{doc.expires_on?formatDate(doc.expires_on):'—'}</td><td><a className="button button-soft" href={assetUrl('/enterprise/employee/documents/'+encodeURIComponent(doc.id))} target="_blank" rel="noreferrer">Download</a></td></tr>)}</tbody></table></div>}
+      {loading?<div className="empty-state"><p>Loading your documents…</p></div>:documents.length===0?<div className="empty-state"><span className="empty-icon"><FileText size={21}/></span><h3>No documents available yet</h3><p>Documents shared by HR will appear here. Contact HR if you need a copy of a contract or payslip.</p></div>:<div className="table-scroll"><table aria-label="Employee documents library"><thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Issued</th><th scope="col">Expires</th><th scope="col">Access</th></tr></thead><tbody>{documents.map((doc)=><tr key={doc.id}><td><b>{doc.title}</b>{doc.description&&<div className="table-subline">{doc.description}</div>}</td><td>{String(doc.document_type||'OTHER').replaceAll('_',' ')}</td><td><Status value={doc.status}/></td><td>{doc.issued_on?formatDate(doc.issued_on):'—'}</td><td>{doc.expires_on?formatDate(doc.expires_on):'—'}</td><td><a className="button button-soft" href={assetUrl('/enterprise/employee/documents/'+encodeURIComponent(doc.id))} target="_blank" rel="noreferrer">Download</a></td></tr>)}</tbody></table></div>}
     </section>
   </div>;
 }
 
+function AdminLearningClaimsTab({ runAction }: { runAction: (fn: () => Promise<any>) => Promise<void> }) {
+  const [claims, setClaims] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('ALL');
+  const [rejectionModal, setRejectionModal] = useState<any>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await get('/enterprise/admin/learning/claims' + (filter !== 'ALL' ? `?status=${filter}` : ''));
+      setClaims(res.claims || []);
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, [filter]);
+
+  const review = async (id: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+    await runAction(async () => {
+      await post(`/enterprise/admin/learning/claims/${id}/review`, { status, rejection_reason: reason });
+      await load();
+      setRejectionModal(null);
+      setRejectionReason('');
+    });
+  };
+
+  return (
+    <div className="enterprise-grid">
+      <section className="card enterprise-wide">
+        <div className="card-heading">
+          <div>
+            <h2>Learning & Development Reimbursement Claims</h2>
+            <p>Review course, certification, and workshop claims against the ₹24,000/yr annual allowance.</p>
+          </div>
+          <div className="enterprise-toolbar-chips" style={{ display: 'flex', gap: '8px' }}>
+            {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((s) => (
+              <button key={s} type="button" className={`button button-small ${filter === s ? 'button-primary' : 'button-soft'}`} onClick={() => setFilter(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+        {loading ? <div className="loading-panel"><span className="spinner" /> Loading claims…</div> : claims.length === 0 ? (
+          <div className="enterprise-empty-row">No learning reimbursement claims found.</div>
+        ) : (
+          <div className="table-scroll">
+            <table aria-label="Learning reimbursement claims queue">
+              <thead>
+                <tr>
+                  <th scope="col">Employee</th>
+                  <th scope="col">Title & Provider</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Invoice</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map((c) => (
+                  <tr key={c.id}>
+                    <td><b>{c.full_name}</b><div className="table-subline">{c.employee_code} · {c.department || 'General'}</div></td>
+                    <td><b>{c.title}</b><div className="table-subline">{c.provider}{c.notes ? ` · Note: ${c.notes}` : ''}</div></td>
+                    <td><b style={{ color: 'var(--fx-gold, #DAAF51)' }}>₹{Number(c.amount_inr).toLocaleString('en-IN')}</b></td>
+                    <td>
+                      {c.invoice_attachment_id ? (
+                        <a className="button button-soft button-small" href={assetUrl(`/workplace/files/${c.invoice_attachment_id}`)} target="_blank" rel="noreferrer">View receipt</a>
+                      ) : <span className="table-subline">None attached</span>}
+                    </td>
+                    <td><Status value={c.status} /></td>
+                    <td>{formatDate(c.created_at)}</td>
+                    <td>
+                      {c.status === 'PENDING' ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="button button-primary button-small" type="button" onClick={() => void review(c.id, 'APPROVED')}>Approve</button>
+                          <button className="button button-secondary button-small" type="button" onClick={() => { setRejectionModal(c); setRejectionReason(''); }}>Reject</button>
+                        </div>
+                      ) : <span className="table-subline">{c.status === 'APPROVED' ? `Reviewed ${formatDate(c.reviewed_at)}` : c.rejection_reason || 'Rejected'}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {rejectionModal && (
+        <Modal title={`Reject L&D Claim · ${rejectionModal.title}`} close={() => setRejectionModal(null)}>
+          <div className="form-stack">
+            <p>Provide a rejection reason so <b>{rejectionModal.full_name}</b> understands why the claim could not be processed:</p>
+            <textarea className="input" placeholder="e.g. Receipt unreadable, non-accredited provider, or beyond eligible scope." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="button button-soft" type="button" onClick={() => setRejectionModal(null)}>Cancel</button>
+              <button className="button button-danger" type="button" onClick={() => void review(rejectionModal.id, 'REJECTED', rejectionReason)}>Confirm rejection</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function AdminGrievancesTab({ runAction }: { runAction: (fn: () => Promise<any>) => Promise<void> }) {
+  const [grievances, setGrievances] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<any>(null);
+  const [statusVal, setStatusVal] = useState('OPEN');
+  const [notesVal, setNotesVal] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await get('/enterprise/admin/grievances');
+      setGrievances(res.grievances || []);
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const openReview = (g: any) => {
+    setSelected(g);
+    setStatusVal(g.status || 'OPEN');
+    setNotesVal(g.resolution_notes || '');
+  };
+
+  const update = async () => {
+    if (!selected) return;
+    await runAction(async () => {
+      await patch(`/enterprise/admin/grievances/${selected.id}`, {
+        status: statusVal,
+        resolution_notes: notesVal
+      });
+      await load();
+      setSelected(null);
+    });
+  };
+
+  return (
+    <div className="enterprise-grid">
+      <section className="card enterprise-wide">
+        <div className="card-heading">
+          <div>
+            <h2>Confidential Grievance & PoSH Incident Desk</h2>
+            <p>Protected investigation console for PoSH, Good Samaritan whistleblowing, and workplace integrity complaints.</p>
+          </div>
+          <button className="button button-soft button-small" type="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>
+        </div>
+
+        {loading ? <div className="loading-panel"><span className="spinner" /> Loading reports…</div> : grievances.length === 0 ? (
+          <div className="enterprise-empty-row">No confidential grievances recorded.</div>
+        ) : (
+          <div className="table-scroll">
+            <table aria-label="Confidential grievances investigation log">
+              <thead>
+                <tr>
+                  <th scope="col">Ref Code</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Reporter</th>
+                  <th scope="col">Subject</th>
+                  <th scope="col">ICC Routing</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Filed</th>
+                  <th scope="col">Review</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grievances.map((g) => (
+                  <tr key={g.id}>
+                    <td><code style={{ fontWeight: 700, color: 'var(--fx-gold, #DAAF51)' }}>{g.reference_code}</code></td>
+                    <td>
+                      <span style={{
+                        display: 'inline-flex', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
+                        background: g.category === 'POSH' ? 'rgba(147, 19, 20, 0.15)' : 'rgba(218, 175, 81, 0.15)',
+                        color: g.category === 'POSH' ? 'var(--fx-red, #931314)' : 'var(--fx-gold, #DAAF51)'
+                      }}>
+                        {g.category.replaceAll('_', ' ')}
+                      </span>
+                    </td>
+                    <td>{g.is_anonymous ? <i>Anonymous</i> : <b>{g.reporter_name}</b>}</td>
+                    <td><b>{g.subject}</b><div className="table-subline">{g.description.slice(0, 60)}…</div></td>
+                    <td>{g.assigned_to_icc ? <span style={{ color: 'var(--fx-red, #931314)', fontWeight: 700 }}>Assigned to ICC</span> : 'HR General'}</td>
+                    <td><Status value={g.status} /></td>
+                    <td>{formatDate(g.created_at)}</td>
+                    <td>
+                      <button className="button button-soft button-small" type="button" onClick={() => openReview(g)}>Inspect & update</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {selected && (
+        <Modal title={`Confidential Case · ${selected.reference_code}`} close={() => setSelected(null)}>
+          <div className="form-stack">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--color-surface-2, rgba(0,0,0,0.03))', padding: '12px', borderRadius: '8px' }}>
+              <div><small>Category</small><br /><b>{selected.category}</b></div>
+              <div><small>Reporter</small><br /><b>{selected.is_anonymous ? 'Protected Anonymous' : `${selected.reporter_name} (${selected.reporter_email})`}</b></div>
+              <div><small>Date Submitted</small><br /><b>{formatDate(selected.created_at)}</b></div>
+              <div><small>Routing</small><br /><b>{selected.assigned_to_icc ? 'Internal Complaints Committee (ICC)' : 'General HR'}</b></div>
+            </div>
+
+            <div>
+              <label className="enterprise-field-label">Subject</label>
+              <div style={{ fontWeight: 700, fontSize: '15px' }}>{selected.subject}</div>
+            </div>
+
+            <div>
+              <label className="enterprise-field-label">Full Report Statement</label>
+              <div style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg, #fff)', padding: '12px', border: '1px solid var(--color-border, #ddd)', borderRadius: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                {selected.description}
+              </div>
+            </div>
+
+            <label className="enterprise-field-label">
+              Investigation Status
+              <select className="input" value={statusVal} onChange={(e) => setStatusVal(e.target.value)}>
+                <option value="OPEN">OPEN</option>
+                <option value="UNDER_INVESTIGATION">UNDER INVESTIGATION</option>
+                <option value="RESOLVED">RESOLVED</option>
+                <option value="CLOSED">CLOSED</option>
+              </select>
+            </label>
+
+            <label className="enterprise-field-label">
+              Confidential Investigation Notes / Resolution
+              <textarea className="input enterprise-textarea" placeholder="Record findings, witness consultations, or resolution measures (visible to reporter via tracker)." value={notesVal} onChange={(e) => setNotesVal(e.target.value)} />
+            </label>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="button button-soft" type="button" onClick={() => setSelected(null)}>Cancel</button>
+              <button className="button button-primary" type="button" onClick={() => void update()}>Save case progress</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function AdminLeaveEncashmentsTab({ runAction }: { runAction: (fn: () => Promise<any>) => Promise<void> }) {
+  const [encashments, setEncashments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rejectionModal, setRejectionModal] = useState<any>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await get('/leave/admin/encashments');
+      setEncashments(res.encashments || []);
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const review = async (id: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+    await runAction(async () => {
+      await post(`/leave/admin/encashments/${id}/review`, { status, rejection_reason: reason });
+      await load();
+      setRejectionModal(null);
+      setRejectionReason('');
+    });
+  };
+
+  return (
+    <div className="enterprise-grid">
+      <section className="card enterprise-wide">
+        <div className="card-heading">
+          <div>
+            <h2>Earned Leave (EL) Encashment Applications</h2>
+            <p>Annual encashment applications for confirmed employees with 12+ months service.</p>
+          </div>
+          <button className="button button-soft button-small" type="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>
+        </div>
+
+        {loading ? <div className="loading-panel"><span className="spinner" /> Loading applications…</div> : encashments.length === 0 ? (
+          <div className="enterprise-empty-row">No leave encashment requests found.</div>
+        ) : (
+          <div className="table-scroll">
+            <table aria-label="Leave encashment review queue">
+              <thead>
+                <tr>
+                  <th scope="col">Employee</th>
+                  <th scope="col">Days Requested</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {encashments.map((e) => (
+                  <tr key={e.id}>
+                    <td><b>{e.full_name}</b><div className="table-subline">{e.employee_code} · {e.department || 'General'}</div></td>
+                    <td><b style={{ fontSize: '15px', color: 'var(--fx-gold, #DAAF51)' }}>{e.days} day(s)</b></td>
+                    <td>{e.reason || <span className="table-subline">None specified</span>}</td>
+                    <td><Status value={e.status} /></td>
+                    <td>{formatDate(e.created_at)}</td>
+                    <td>
+                      {e.status === 'PENDING' ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="button button-primary button-small" type="button" onClick={() => void review(e.id, 'APPROVED')}>Approve</button>
+                          <button className="button button-secondary button-small" type="button" onClick={() => { setRejectionModal(e); setRejectionReason(''); }}>Reject</button>
+                        </div>
+                      ) : <span className="table-subline">{e.status === 'APPROVED' ? `Approved ${formatDate(e.reviewed_at)}` : e.rejection_reason || 'Rejected'}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {rejectionModal && (
+        <Modal title={`Reject Encashment · ${rejectionModal.full_name}`} close={() => setRejectionModal(null)}>
+          <div className="form-stack">
+            <p>Provide a reason for rejecting the encashment request for <b>{rejectionModal.days} day(s)</b>:</p>
+            <textarea className="input" placeholder="e.g. Encashment quota exceeded, or insufficient earned balance." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="button button-soft" type="button" onClick={() => setRejectionModal(null)}>Cancel</button>
+              <button className="button button-danger" type="button" onClick={() => void review(rejectionModal.id, 'REJECTED', rejectionReason)}>Confirm rejection</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export function EmployeePoliciesPage() {
-  const [policies,setPolicies]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [loadError,setLoadError]=useState('');
-  const [actionError,setActionError]=useState('');
-  const [successMessage,setSuccessMessage]=useState('');
-  const [busyId,setBusyId]=useState(null);
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
   const policyRequest=useRef(0);
 
-  const load=async()=>{
-    const requestId=++policyRequest.current;
+  const load = async () => {
+    const requestId = ++policyRequest.current;
     setLoading(true);
     setLoadError('');
     setActionError('');
     setSuccessMessage('');
     try {
-      const result=await get('/enterprise/policies');
-      if(requestId!==policyRequest.current)return;
-      setPolicies(Array.isArray(result.policies)?result.policies:[]);
-    } catch(e) {
-      if(requestId===policyRequest.current)setLoadError(e.message||'Could not load published policies.');
+      const result = await get('/enterprise/policies');
+      if (requestId !== policyRequest.current) return;
+      setPolicies(Array.isArray(result.policies) ? result.policies : []);
+    } catch (e: any) {
+      if (requestId === policyRequest.current) setLoadError(e.message || 'Could not load published policies.');
     } finally {
-      if(requestId===policyRequest.current)setLoading(false);
+      if (requestId === policyRequest.current) setLoading(false);
     }
   };
 
-  useEffect(()=>{
+  useEffect(() => {
     void load();
-    return ()=>{policyRequest.current+=1;};
-  },[]);
+    return () => { policyRequest.current += 1; };
+  }, []);
 
-  const acknowledged=(policy)=>policy.acknowledged===true||Number(policy.acknowledged)===1;
-  const pendingCount=policies.filter((policy)=>!acknowledged(policy)).length;
+  const acknowledged = (policy: any) => policy.acknowledged === true || Number(policy.acknowledged) === 1;
+  const pendingCount = policies.filter((policy) => !acknowledged(policy)).length;
 
-  const ack=async(id)=>{
-    if(busyId)return;
-    setBusyId(id);setActionError('');setSuccessMessage('');
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const p of policies) if (p.category) cats.add(p.category);
+    return ['ALL', ...Array.from(cats).sort()];
+  }, [policies]);
+
+  const filtered = useMemo(() => {
+    if (selectedCategory === 'ALL') return policies;
+    return policies.filter((p) => p.category === selectedCategory);
+  }, [policies, selectedCategory]);
+
+  const ack = async (id: string) => {
+    if (busyId) return;
+    setBusyId(id); setActionError(''); setSuccessMessage('');
     try {
-      await post('/enterprise/policies/'+id+'/acknowledge');
+      await post('/enterprise/policies/' + id + '/acknowledge');
       setPolicies((current)=>current.map((policy)=>policy.id===id?{...policy,acknowledged:1}:policy));
-      setSuccessMessage('Your acknowledgement has been recorded.');
-    } catch(e) {
-      setActionError(e.message||'Could not acknowledge this policy. Please try again.');
+      setSuccessMessage('Your digital policy signature has been recorded with timestamp and IP audit trail.');
+    } catch (e: any) {
+      setActionError(e.message || 'Could not acknowledge this policy. Please try again.');
     } finally {
       setBusyId(null);
     }
   };
 
-  return <div className="enterprise-page employee-policy-page">
-    <section className="enterprise-hero employee-policy-hero">
-      <div><div className="eyebrow">PEOPLE · POLICY CENTER</div><h1>Policies that stay clear.</h1><p>Read current company policies, see the latest version, and acknowledge what requires your attention.</p></div>
-      <div className="employee-policy-hero-mark" aria-hidden="true"><ShieldCheck size={34}/><span>PEOPLE<br/>· TRUST ·</span></div>
-    </section>
+  return (
+    <div className="enterprise-page employee-policy-page">
+      <section className="enterprise-hero employee-policy-hero">
+        <div>
+          <div className="eyebrow" style={{ color: 'var(--fx-gold, #DAAF51)' }}>PEOPLE · 14 OFFICIAL POLICIES</div>
+          <h1>Policies that protect and empower.</h1>
+          <p>Read current company policies across ethics, attendance, safety, benefits, and workplace standards. Provide your digital acknowledgement with verified legal authenticity.</p>
+        </div>
+        <div className="employee-policy-hero-mark" aria-hidden="true">
+          <ShieldCheck size={34} />
+          <span>FALCHION<br />XENIAA</span>
+        </div>
+      </section>
 
-    <section className="card employee-policies-panel" aria-busy={loading}>
-      <div className="employee-policy-panel-head">
-        <div><div className="eyebrow">YOUR POLICY LIBRARY</div><h2>Published policies</h2><p>Current guidance from your HR team, in one place.</p></div>
-        <button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading||busyId!==null}><RefreshCw size={15}/> Refresh</button>
+      <section className="card employee-policies-panel" aria-busy={loading}>
+        <div className="employee-policy-panel-head">
+          <div>
+            <div className="eyebrow">POLICY DIRECTORY</div>
+            <h2>Company Policies ({policies.length})</h2>
+            <p>14 official governance, safety, and operational standards.</p>
+          </div>
+          <button className="button button-soft button-small" type="button" onClick={() => void load()} disabled={loading || busyId !== null}>
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
+
+        {!loading && !loadError && (
+          <div className="employee-policy-summary" aria-label="Policy summary">
+            <div><span>Total Policies</span><b>{policies.length}</b><small>Official corporate standards</small></div>
+            <div><span>Awaiting Signature</span><b style={{ color: pendingCount > 0 ? 'var(--fx-red, #931314)' : undefined }}>{pendingCount}</b><small>{pendingCount === 1 ? 'One policy' : 'Policies'} pending review</small></div>
+            <div><span>Signed & Verified</span><b>{policies.length - pendingCount}</b><small>Digital signature recorded</small></div>
+          </div>
+        )}
+
+        {/* Category Filter Chips */}
+        {!loading && categories.length > 1 && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '16px 0 20px' }}>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`button button-small ${selectedCategory === cat ? 'button-primary' : 'button-soft'}`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat.replaceAll('_', ' ')}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {loadError && (
+          <div className="employee-policy-error" role="alert">
+            <span className="employee-policy-error-icon"><CircleAlert size={20} /></span>
+            <div>
+              <h2>We couldn’t load your policies</h2>
+              <p>{loadError}</p>
+              <p className="employee-policy-error-help">Retry the request. If the problem continues, share the error reference with your HR administrator.</p>
+              <button className="button button-soft button-small" type="button" onClick={() => void load()} disabled={loading}>
+                <RefreshCw size={14} /> Try again
+              </button>
+            </div>
+          </div>
+        )}
+        {actionError && <div className="employee-policy-inline-error" role="alert"><CircleAlert size={16} /><span>{actionError}</span></div>}
+        {successMessage && <div className="employee-policy-inline-success" role="status"><Check size={16} /><span>{successMessage}</span></div>}
+
+        {loading ? (
+          <div className="loading-panel employee-policy-loading" role="status"><span className="spinner" /><p>Loading official policies…</p></div>
+        ) : !loadError && filtered.length ? (
+          <div className="employee-policy-list">
+            {filtered.map((p) => {
+              const isAck = acknowledged(p);
+              return (
+                <article className="employee-policy-card" key={p.id}>
+                  <div className="employee-policy-content">
+                    <div className="employee-policy-meta">
+                      <span className="eyebrow" style={{ color: 'var(--fx-gold, #DAAF51)' }}>{p.category || 'POLICY'}</span>
+                      <span className="policy-version">v{p.version || '2026.1'}</span>
+                    </div>
+                    <h2>{p.title}</h2>
+                    <p className="policy-body" style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{p.body}</p>
+                    <div style={{ marginTop: '12px', display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--color-text-muted, #777)' }}>
+                      {p.published_at && <span>Published: {formatDate(p.published_at)}</span>}
+                      {isAck && p.acknowledged_at && (
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                          ✓ Digitally signed on {formatDate(p.acknowledged_at)}{p.ip_address ? ` · IP: ${p.ip_address}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="policy-actions" style={{ minWidth: '160px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                    {isAck ? (
+                      <span className="employee-policy-acknowledged" style={{ background: 'rgba(22, 163, 74, 0.1)', color: '#16a34a', padding: '8px 14px', borderRadius: '8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Check size={16} /> Signed
+                      </span>
+                    ) : (
+                      <button className="button button-primary" type="button" disabled={busyId === p.id || busyId !== null} aria-busy={busyId === p.id || undefined} onClick={() => void ack(p.id)}>
+                        {busyId === p.id ? <><span className="spinner" /> Signing…</> : 'Acknowledge & Sign'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : !loadError ? (
+          <div className="empty-state employee-policy-empty">
+            <span className="empty-icon"><FileText size={21} /></span>
+            <h3>No policies found in this category</h3>
+            <button className="button button-soft button-small" type="button" onClick={() => setSelectedCategory('ALL')}>View all policies</button>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+export function GrievancePage() {
+  const [category, setCategory] = useState<'POSH' | 'GOOD_SAMARITAN' | 'GENERAL_GRIEVANCE'>('POSH');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+
+  // Tracking
+  const [trackCode, setTrackCode] = useState('');
+  const [tracking, setTracking] = useState(false);
+  const [trackError, setTrackError] = useState('');
+  const [trackedRecord, setTrackedRecord] = useState<any>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || description.trim().length < 10 || submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const res = await post('/enterprise/grievances', {
+        category,
+        subject: subject.trim(),
+        description: description.trim(),
+        is_anonymous: isAnonymous
+      });
+      setSubmittedRef(res.reference_code);
+      setSubject('');
+      setDescription('');
+    } catch (err: any) {
+      setSubmitError(err.message || 'Could not submit report. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trackCode.trim() || tracking) return;
+    setTracking(true);
+    setTrackError('');
+    setTrackedRecord(null);
+    try {
+      const res = await get(`/enterprise/grievances/track/${encodeURIComponent(trackCode.trim())}`);
+      setTrackedRecord(res.grievance);
+    } catch (err: any) {
+      setTrackError(err.message || 'Grievance reference code not found.');
+    } finally {
+      setTracking(false);
+    }
+  };
+
+  return (
+    <div className="enterprise-page grievance-page">
+      <section className="enterprise-hero grievance-hero">
+        <div>
+          <div className="eyebrow" style={{ color: 'var(--fx-gold, #DAAF51)' }}>SECURITY · POSH & WHISTLEBLOWER CHANNELS</div>
+          <h1>Speak up with cryptographic trust.</h1>
+          <p>Falchion Xeniaa is committed to an ethical, safe, and transparent workplace. Submit confidential concerns directly to the Internal Complaints Committee (ICC) or HR leadership with optional end-to-end anonymity.</p>
+        </div>
+        <div className="employee-policy-hero-mark" aria-hidden="true">
+          <ShieldAlert size={36} color="var(--fx-red, #931314)" />
+          <span>ZERO<br />TOLERANCE</span>
+        </div>
+      </section>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+        {/* Submission Form */}
+        <section className="card">
+          <div className="card-heading">
+            <div>
+              <h2>Submit a Confidential Report</h2>
+              <p>Protected by the POSH Act 2013 and Falchion Xeniaa Good Samaritan Whistleblower safeguards.</p>
+            </div>
+          </div>
+
+          {submittedRef ? (
+            <div style={{ padding: '24px', background: 'rgba(218, 175, 81, 0.08)', borderRadius: '12px', border: '1px solid var(--fx-gold, #DAAF51)', textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: 'var(--fx-gold, #DAAF51)', color: '#111', marginBottom: '14px' }}>
+                <Check size={28} />
+              </div>
+              <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Report Securely Filed</h3>
+              <p style={{ color: 'var(--color-text-muted, #666)', marginBottom: '16px' }}>Your report has been received. Save this unique reference code to check investigation progress anonymously:</p>
+              <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--fx-red, #931314)', padding: '12px 20px', background: 'var(--color-surface, #fff)', border: '2px dashed var(--fx-gold, #DAAF51)', borderRadius: '8px', display: 'inline-block', marginBottom: '18px' }}>
+                {submittedRef}
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted, #777)', marginBottom: '20px' }}>
+                The ICC and HR leadership review every submission. No metadata tying back to your identity is retained when submitted anonymously.
+              </p>
+              <button className="button button-soft" type="button" onClick={() => setSubmittedRef(null)}>Submit another report</button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="form-stack">
+              {submitError && <div className="inline-error" role="alert">{submitError}</div>}
+
+              <label className="enterprise-field-label">
+                Complaint Category
+                <select className="input" value={category} onChange={(e) => setCategory(e.target.value as any)}>
+                  <option value="POSH">Prevention of Sexual Harassment (PoSH) · Routed to ICC</option>
+                  <option value="GOOD_SAMARITAN">Good Samaritan · Whistleblower / Financial / Ethical</option>
+                  <option value="GENERAL_GRIEVANCE">General Grievance · Workplace Conduct / Management</option>
+                </select>
+              </label>
+
+              <label className="enterprise-field-label">
+                Subject
+                <input className="input" placeholder="Brief summary of the issue or incident" maxLength={180} required value={subject} onChange={(e) => setSubject(e.target.value)} />
+              </label>
+
+              <label className="enterprise-field-label">
+                Detailed Statement & Evidence
+                <textarea className="input enterprise-textarea" placeholder="Describe the incident, dates, locations, persons involved, or any relevant details. (Minimum 10 characters)" rows={6} required value={description} onChange={(e) => setDescription(e.target.value)} />
+              </label>
+
+              <div style={{ padding: '14px', background: 'var(--color-surface-2, rgba(0,0,0,0.03))', borderRadius: '8px', border: '1px solid var(--color-border, #eee)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} style={{ width: '18px', height: '18px' }} />
+                  Submit Anonymously
+                </label>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-muted, #666)', margin: '6px 0 0 28px' }}>
+                  {isAnonymous
+                    ? 'Your identity, employee ID, and contact details will NOT be linked to this submission. Keep your tracking reference code to check updates.'
+                    : 'Your name and company email will be visible only to the authorized ICC committee / HR leadership.'}
+                </p>
+              </div>
+
+              <button className="button button-primary" type="submit" disabled={submitting || !subject.trim() || description.trim().length < 10}>
+                {submitting ? 'Submitting securely…' : 'Submit Confidential Report'}
+              </button>
+            </form>
+          )}
+        </section>
+
+        {/* Tracker Panel */}
+        <section className="card">
+          <div className="card-heading">
+            <div>
+              <h2>Track Report Status</h2>
+              <p>Check the active status of any previously submitted report.</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleTrack} className="form-stack" style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input className="input" placeholder="e.g. FX-GRIEV-XXXX-XXXX" value={trackCode} onChange={(e) => setTrackCode(e.target.value)} required />
+              <button className="button button-primary" type="submit" disabled={tracking || !trackCode.trim()}>
+                {tracking ? 'Checking…' : 'Track'}
+              </button>
+            </div>
+          </form>
+
+          {trackError && <div className="inline-error" role="alert">{trackError}</div>}
+
+          {trackedRecord && (
+            <div style={{ padding: '18px', background: 'var(--color-surface-2, rgba(0,0,0,0.03))', borderRadius: '10px', border: '1px solid var(--color-border, #ddd)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <code style={{ fontWeight: 800, color: 'var(--fx-gold, #DAAF51)' }}>{trackedRecord.reference_code}</code>
+                <Status value={trackedRecord.status} />
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <small style={{ color: 'var(--color-text-muted, #666)' }}>Category:</small> <b>{trackedRecord.category.replaceAll('_', ' ')}</b>
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <small style={{ color: 'var(--color-text-muted, #666)' }}>Subject:</small> <b>{trackedRecord.subject}</b>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <small style={{ color: 'var(--color-text-muted, #666)' }}>Filed on:</small> {formatDate(trackedRecord.created_at)}
+              </div>
+              {trackedRecord.resolution_notes ? (
+                <div style={{ padding: '12px', background: 'var(--color-bg, #fff)', border: '1px solid var(--color-border, #ccc)', borderRadius: '8px' }}>
+                  <b style={{ fontSize: '13px', display: 'block', marginBottom: '4px', color: 'var(--fx-red, #931314)' }}>ICC / HR Case Notes:</b>
+                  <p style={{ margin: 0, fontSize: '13px', whiteSpace: 'pre-wrap' }}>{trackedRecord.resolution_notes}</p>
+                  {trackedRecord.resolved_at && <small style={{ color: '#888', display: 'block', marginTop: '6px' }}>Resolved on {formatDate(trackedRecord.resolved_at)}</small>}
+                </div>
+              ) : (
+                <p style={{ fontSize: '13px', color: 'var(--color-text-muted, #777)', fontStyle: 'italic', margin: 0 }}>
+                  Case is currently under active review. Further updates will be reflected here.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
       </div>
-
-      {!loading&&!loadError&&<div className="employee-policy-summary" aria-label="Policy summary">
-        <div><span>Published</span><b>{policies.length}</b><small>Current company policies</small></div>
-        <div><span>Needs acknowledgement</span><b>{pendingCount}</b><small>{pendingCount===1?'One policy':'Policies'} awaiting your review</small></div>
-        <div><span>Completed</span><b>{policies.length-pendingCount}</b><small>Already acknowledged</small></div>
-      </div>}
-
-      {loadError&&<div className="employee-policy-error" role="alert">
-        <span className="employee-policy-error-icon"><CircleAlert size={20}/></span>
-        <div><h2>We couldn’t load your policies</h2><p>{loadError}</p><p className="employee-policy-error-help">Retry the request. If the problem continues, share the error reference with your HR administrator.</p><button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Try again</button></div>
-      </div>}
-      {actionError&&<div className="employee-policy-inline-error" role="alert"><CircleAlert size={16}/><span>{actionError}</span></div>}
-      {successMessage&&<div className="employee-policy-inline-success" role="status"><Check size={16}/><span>{successMessage}</span></div>}
-
-      {loading?<div className="loading-panel employee-policy-loading" role="status"><span className="spinner"/><p>Loading published policies…</p></div>
-      :!loadError&&policies.length? <div className="employee-policy-list">{policies.map((p)=><article className="employee-policy-card" key={p.id}>
-          <div className="employee-policy-content"><div className="employee-policy-meta"><span className="eyebrow">{p.category||'COMPANY POLICY'}</span><span className="policy-version">Version {p.version||'1'}</span></div><h2>{p.title}</h2><p className="policy-body">{p.body}</p>{p.published_at&&<small className="employee-policy-published">Published {formatDate(p.published_at)}</small>}</div>
-          <div className="policy-actions">{acknowledged(p)?<span className="employee-policy-acknowledged"><Check size={15}/> Acknowledged</span>:<button className="button button-primary" type="button" disabled={busyId===p.id||busyId!==null} aria-busy={busyId===p.id||undefined} onClick={()=>void ack(p.id)}>{busyId===p.id?<><span className="spinner"/> Saving…</>:'Acknowledge'}</button>}</div>
-        </article>)}</div>
-      :!loadError?<div className="empty-state employee-policy-empty"><span className="empty-icon"><FileText size={21}/></span><h3>No published policies</h3><p>Your HR team has not published a policy yet. When a policy is shared, it will appear here for you to read and acknowledge.</p><button className="button button-soft button-small" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh policies</button></div>:null}
-    </section>
-  </div>;
+    </div>
+  );
 }

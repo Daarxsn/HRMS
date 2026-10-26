@@ -1,0 +1,99 @@
+/* Semantic design tokens — canonical shared palette for new and migrated components. */
+:root {
+  /* Brand Guidelines: Falchion Xeniaa */
+  --fx-gold: #DAAF51;
+  --fx-gold-hover: #E2BB61;
+  --fx-gold-active: #C49839;
+  --fx-gold-subtle: rgba(218, 175, 81, 0.12);
+  --fx-gold-border: rgba(218, 175, 81, 0.35);
+
+  --fx-saffron: #931314;
+  --fx-saffron-hover: #AA1718;
+  --fx-saffron-active: #7A0F10;
+  --fx-saffron-subtle: rgba(147, 19, 20, 0.08);
+
+  --fx-charcoal: #111111;
+  --fx-charcoal-surface: #18181B;
+  --fx-charcoal-muted: #27272A;
+
+  --fx-platinum: #F4F4F5;
+  --fx-canvas: #F4F4F5;
+  --fx-card: #FFFFFF;
+  --fx-card-border: #E4E4E7;
+
+  /* Typography */
+  --font-display: 'Sansation', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+
+  /* Neutral Spectrum */
+  --fx-neutral-50: #FAFAFA;
+  --fx-neutral-100: #F4F4F5;
+  --fx-neutral-200: #E4E4E7;
+  --fx-neutral-300: #D4D4D8;
+  --fx-neutral-400: #A1A1AA;
+  --fx-neutral-500: #71717A;
+  --fx-neutral-600: #52525B;
+  --fx-neutral-700: #3F3F46;
+  --fx-neutral-800: #27272A;
+  --fx-neutral-900: #18181B;
+  --fx-neutral-950: #09090B;
+
+  /* Core UI Tokens (Maintained for existing component contracts) */
+  --color-bg: #F4F4F5;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFFFFF;
+  --color-text: #18181B;
+  --color-text-muted: #52525B;
+  --color-border: #E4E4E7;
+  --color-primary: #DAAF51;
+  --color-primary-contrast: #111111;
+  --color-brand-red: #931314;
+  --color-success: #15803D;
+  --color-warning: #B45309;
+  --color-danger: #B91C1C;
+  --focus-ring: #DAAF51;
+
+  /* Accessible Status Badge Tokens (>4.5:1 WCAG AA) */
+  --badge-active-bg: #ECFDF5;
+  --badge-active-text: #065F46;
+  --badge-pending-bg: #FFFBEB;
+  --badge-pending-text: #92400E;
+  --badge-danger-bg: #FEF2F2;
+  --badge-danger-text: #991B1B;
+  --badge-info-bg: #EFF6FF;
+  --badge-info-text: #1E40AF;
+  --badge-neutral-bg: #F4F4F5;
+  --badge-neutral-text: #52525B;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --fx-canvas: #09090B;
+  --fx-card: #18181B;
+  --fx-card-border: #27272A;
+
+  --color-bg: #09090B;
+  --color-surface: #18181B;
+  --color-surface-raised: #27272A;
+  --color-text: #F4F4F5;
+  --color-text-muted: #A1A1AA;
+  --color-border: #27272A;
+  --color-primary: #DAAF51;
+  --color-primary-contrast: #111111;
+  --color-brand-red: #EF4444;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --focus-ring: #DAAF51;
+
+  --badge-active-bg: rgba(34, 197, 94, 0.16);
+  --badge-active-text: #86EFAC;
+  --badge-pending-bg: rgba(245, 158, 11, 0.16);
+  --badge-pending-text: #FDE68A;
+  --badge-danger-bg: rgba(239, 68, 68, 0.16);
+  --badge-danger-text: #FCA5A5;
+  --badge-info-bg: rgba(59, 130, 246, 0.16);
+  --badge-info-text: #93C5FD;
+  --badge-neutral-bg: rgba(113, 113, 122, 0.20);
+  --badge-neutral-text: #D4D4D8;
+}

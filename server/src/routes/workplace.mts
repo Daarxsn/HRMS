@@ -1,18 +1,21 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, requireAuth, requireAdmin, requirePeople, notifyAdmins } from '../security.mts';
-import { htmlEscape, sendHrNotificationEmail } from '../mailer.mts';
+import { htmlEscape } from '../mailer.mts';
+import { enqueueHrNotificationEmail } from '../email-outbox.mts';
+import { dispatchWorkflowRequestEmails } from '../email-routing.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { indiaDate, isScheduledWorkday } from '../policy.mts';
 import { saveObject, deleteObject, readObject } from '../object-storage.mts';
 
 const router = Router();
-router.use(requireAuth);
+router.use(['/files', '/wfh', '/calendar'], requireAuth);
 const uploadLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024, files: 1 }, fileFilter: (req, file, cb) => {
   const allowed = ['application/pdf','image/jpeg','image/png'];
@@ -21,19 +24,32 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 *
 
 router.post('/files', requirePeople, uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) throw Object.assign(new Error('Choose a PDF, JPG, or PNG file up to 4 MB.'), { status: 400 });
-  const signatures={
-    'application/pdf':Buffer.from('%PDF-'),
-    'image/jpeg':Buffer.from([0xff,0xd8,0xff]),
-    'image/png':Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])
+  const signatures: Record<string, Buffer> = {
+    'application/pdf': Buffer.from('%PDF-'),
+    'image/jpeg': Buffer.from([0xff, 0xd8, 0xff]),
+    'image/png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
   };
-  if(!req.file.buffer.subarray(0,signatures[req.file.mimetype].length).equals(signatures[req.file.mimetype]))throw Object.assign(new Error('The file contents do not match the selected document type.'),{status:400});
+  const expectedSig = signatures[req.file.mimetype];
+  if (!expectedSig || req.file.buffer.length < expectedSig.length || !req.file.buffer.subarray(0, expectedSig.length).equals(expectedSig)) {
+    throw Object.assign(new Error('The file contents do not match the selected document type.'), { status: 400 });
+  }
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const allowedExts: Record<string, string[]> = {
+    'application/pdf': ['.pdf'],
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/png': ['.png']
+  };
+  if (!allowedExts[req.file.mimetype]?.includes(ext)) {
+    throw Object.assign(new Error('The file extension does not match its detected MIME type.'), { status: 400 });
+  }
   const id = crypto.randomUUID();
   const suffix = req.file.mimetype === 'application/pdf' ? '.pdf' : req.file.mimetype === 'image/jpeg' ? '.jpg' : '.png';
   const key = `${req.user.id}/${id}${suffix}`;
+  const safeFilename = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 255) || 'attachment';
   try {
     await saveObject(key, req.file.buffer, req.file.mimetype);
     await query(`INSERT INTO attachments (id, uploaded_by, original_filename, object_key, content_type, size_bytes)
-      VALUES (:id, :owner, :name, :key, :type, :size)`, { id, owner: req.user.id, name: path.basename(req.file.originalname).slice(0,255), key, type: req.file.mimetype, size: req.file.size });
+      VALUES (:id, :owner, :name, :key, :type, :size)`, { id, owner: req.user.id, name: safeFilename, key, type: req.file.mimetype, size: req.file.size });
   } catch (error) {
     try {
       await deleteObject(key);
@@ -43,7 +59,7 @@ router.post('/files', requirePeople, uploadLimiter, upload.single('file'), async
     throw error;
   }
   await audit({ actorId: req.user.id, action: 'PRIVATE_ATTACHMENT_UPLOADED', entityType: 'attachment', entityId: id, details: { content_type: req.file.mimetype, size_bytes: req.file.size }, ipAddress: req.ip });
-  res.status(201).json({ id, filename: path.basename(req.file.originalname) });
+  res.status(201).json({ id, filename: safeFilename });
 }));
 
 router.get('/files/:id', asyncRoute(async (req, res) => {
@@ -56,7 +72,7 @@ router.get('/files/:id', asyncRoute(async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const object = await readObject(file.object_key);
   if (object.kind === 'buffer') {
-    res.send(object.buffer);
+    Readable.from(object.buffer).pipe(res);
   } else {
     object.stream
       .on('error', () => {
@@ -116,29 +132,30 @@ router.post('/wfh', requirePeople, asyncRoute(async (req, res) => {
   await audit({ actorId: req.user.id, action: 'WFH_REQUESTED', entityType: 'wfh_request', entityId: id, details: { date: input.date, kind: input.kind }, ipAddress: req.ip });
   await notifyAdmins('WFH request needs review', `${req.user.full_name} requested WFH on ${input.date}.`, 'REQUEST', { type:'wfh', id });
   const emailDelivery = await (async () => {
-    const approvalUrl = String(process.env.APP_ORIGIN || '').replace(/\/$/, '') + '/admin/approvals';
     try {
-      const subject = 'WFH request · ' + req.user.full_name + ' · ' + input.date;
-      const text = ['Falchion Xeniaa HRMS', '', 'A new WFH request has been submitted.', 'Employee: ' + req.user.full_name + ' (' + req.user.employee_code + ')', 'Email: ' + req.user.email, 'Request: ' + input.kind, 'Date: ' + input.date, 'Reason: ' + input.reason, 'Review: ' + approvalUrl].join('\n');
-      const html = '<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111"><div style="max-width:640px;margin:0 auto;padding:24px">'
-        + '<p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#931314;font-weight:700">FALCHION XENIAA · HRMS</p>'
-        + '<h1 style="margin:0 0 8px;font-size:28px">New WFH request</h1>'
-        + '<p style="color:#555">A new work-from-home request has been submitted for administrator review.</p>'
-        + '<div style="border:1px solid #e5e5e5;border-radius:14px;padding:18px">'
-        + '<p><strong>Employee</strong><br>' + htmlEscape(req.user.full_name) + ' · ' + htmlEscape(req.user.employee_code) + '</p>'
-        + '<p><strong>Email</strong><br>' + htmlEscape(req.user.email) + '</p>'
-        + '<p><strong>Type</strong><br>' + htmlEscape(input.kind) + '</p>'
-        + '<p><strong>Date</strong><br>' + htmlEscape(input.date) + '</p>'
-        + '<p><strong>Reason</strong><br>' + htmlEscape(input.reason) + '</p>'
-        + '</div>'
-        + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
-        + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p>'
-        + '</div></body></html>';
-      const result = await sendHrNotificationEmail({ subject, text, html, replyTo:req.user.email, fromName:'Falchion Xeniaa HRMS' });
-      return { configured:!result.skipped, sent:result.sent ? 1 : 0, recipients:result.recipient ? 1 : 0 };
+      const delivery = await dispatchWorkflowRequestEmails({
+        requestId: id,
+        requestType: 'wfh',
+        employeeId: req.user.id,
+        title: 'Work From Home Request', // New WFH request notification
+        summaryDetails: [
+          { label: 'Remote Date', value: input.date },
+          { label: 'Request Type', value: input.kind === 'EMERGENCY' ? 'Emergency / Same-Day' : 'Planned' }
+        ],
+        reason: input.reason,
+        portalRoute: '/wfh'
+      });
+      return {
+        configured: true,
+        sent: 0,
+        queued: Boolean(delivery.managerEmail?.queued || delivery.confirmationEmail?.queued),
+        status: delivery.managerEmail?.status || 'QUEUED',
+        outboxId: delivery.managerEmail?.id || delivery.confirmationEmail?.id || null,
+        recipients: (delivery.managerEmail?.recipientCount || 0) + (delivery.confirmationEmail?.recipientCount || 0)
+      };
     } catch (error) {
-      console.warn(JSON.stringify({type:'wfh_request_email_failed',request_id:id,error:String(error?.message || error)}));
-      return { configured:false, sent:0, recipients:0 };
+      console.error(JSON.stringify({ type: 'wfh_request_email_enqueue_failed', request_id: id, error: String((error as any)?.message || error) }));
+      return { configured: false, sent: 0, queued: false, status: 'ENQUEUE_FAILED', outboxId: null, recipients: 0 };
     }
   })();
   res.status(201).json({ ok: true, id, emailDelivery });
@@ -148,10 +165,22 @@ router.get('/calendar', asyncRoute(async (req, res) => {
   const year = Number(req.query.year || indiaDate().slice(0,4));
   if (!Number.isInteger(year) || year < 2020 || year > 2100) throw Object.assign(new Error('Choose a valid year.'), { status: 400 });
   const rows = await query(`SELECT DATE_FORMAT(holiday_date,'%Y-%m-%d') AS date, name, holiday_kind AS kind FROM company_holidays WHERE YEAR(holiday_date)=:year`, { year });
-  const holidays = new Map<string, {name:string,kind:'FIXED'|'FLOATING'}>(rows.map((row: any) => [String(row.date), {name:String(row.name), kind:row.kind==='FLOATING'?'FLOATING':'FIXED'}]));
+  const holidays = new Map<string, {name:string,kind:'FIXED'|'FLOATING',isPolicy?:boolean}>(rows.map((row: any) => [String(row.date), {name:String(row.name), kind:row.kind==='FLOATING'?'FLOATING':'FIXED', isPolicy:false}]));
   const nationalHolidays: Array<[number,number,string]> = [[1,26,'Republic Day'],[8,15,'Independence Day'],[10,2,'Gandhi Jayanti']];
-  for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, {name,kind:'FIXED'});
-  res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,item]) => ({ date, name:item.name, kind:item.kind })) });
+  for (const [month, day, name] of nationalHolidays) holidays.set(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, {name,kind:'FIXED',isPolicy:true});
+  res.json({ year, holidays: [...holidays.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([date,item]) => ({ date, name:item.name, kind:item.kind, isPolicy:Boolean(item.isPolicy) })) });
+}));
+
+router.delete('/calendar/:date', requireAdmin, asyncRoute(async (req, res) => {
+  const date = String(req.params.date || '').slice(0, 10);
+  if (!dateSchema.safeParse(date).success) throw Object.assign(new Error('Choose a valid date to delete.'), { status: 400 });
+  const year = Number(date.slice(0, 4));
+  const nationalHolidays = [[1,26],[8,15],[10,2]].map(([m,d]) => `${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  if (nationalHolidays.includes(date)) throw Object.assign(new Error('National statutory holidays cannot be deleted.'), { status: 400 });
+  const result: any = await query('DELETE FROM company_holidays WHERE holiday_date = :date', { date });
+  if (!result.affectedRows) throw Object.assign(new Error('Holiday record not found.'), { status: 404 });
+  await audit({ actorId: req.user.id, action: 'HOLIDAY_DELETED', entityType: 'holiday', details: { date }, ipAddress: req.ip });
+  res.json({ ok: true, date });
 }));
 router.delete('/wfh/:id', requirePeople, asyncRoute(async (req, res) => {
   const cancelled = await transaction(async (connection) => {

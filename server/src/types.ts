@@ -1,10 +1,13 @@
+export type EmployeeRole = 'SUPER_ADMIN' | 'ADMIN' | 'EMPLOYEE' | 'INTERN';
+export type EmployeeUserType = 'SUPER_ADMIN' | 'ADMIN' | 'EMPLOYEE' | 'INTERN';
+
 export interface AuthenticatedUser {
   id: string;
   employee_code: string;
   full_name: string;
   email: string;
-  role: 'ADMIN' | 'EMPLOYEE';
-  user_type: 'EMPLOYEE' | 'INTERN';
+  role: EmployeeRole;
+  user_type: EmployeeUserType;
   status: 'ACTIVE' | 'INACTIVE';
   title: string;
   phone: string | null;

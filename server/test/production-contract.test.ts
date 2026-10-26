@@ -13,6 +13,12 @@ const migrate=fs.readFileSync(path.join(root,'src/migrate.ts'),'utf8');
 const attendance=fs.readFileSync(path.join(root,'src/routes/attendance.mts'),'utf8');
 const leave=fs.readFileSync(path.join(root,'src/routes/leave.mts'),'utf8');
 const email=fs.readFileSync(path.join(root,'src/mailer.mts'),'utf8');
+const emailOutbox=fs.readFileSync(path.join(root,'src/email-outbox.mts'),'utf8');
+const emailOutboxRoutes=fs.readFileSync(path.join(root,'src/email-outbox-routes.mts'),'utf8');
+const emailOutboxWorker=fs.readFileSync(path.join(root,'src/email-outbox-worker.mts'),'utf8');
+const emailOutboxMigration=fs.readFileSync(path.join(root,'migrations/010_email_outbox.sql'),'utf8');
+const emailOutboxWorkflow=fs.readFileSync(path.join(root,'../.github/workflows/email-outbox-worker.yml'),'utf8');
+
 const workplace=fs.readFileSync(path.join(root,'src/routes/workplace.mts'),'utf8');
 const admin=fs.readFileSync(path.join(root,'src/routes/admin.mts'),'utf8');
 const enterprise=fs.readFileSync(path.join(root,'src/routes/enterprise.mts'),'utf8');
@@ -28,6 +34,8 @@ const integration=fs.readFileSync(path.join(root,'test/integration.ts'),'utf8');
 const seed=fs.readFileSync(path.join(root,'src/seed.ts'),'utf8');
 const vite=fs.readFileSync(path.join(root,'../client/vite.config.ts'),'utf8');
 const objectStorage=fs.readFileSync(path.join(root,'src/object-storage.mts'),'utf8');
+const vercel=fs.readFileSync(path.join(root,'../vercel.json'),'utf8');
+const productionConfig=fs.readFileSync(path.join(root,'src/production-config.mts'),'utf8');
 const playwright=fs.readFileSync(path.join(root,'../playwright.config.ts'),'utf8');
 const preflight=fs.readFileSync(path.join(root,'../.github/workflows/production-preflight.yml'),'utf8');
 const productionSmoke=fs.readFileSync(path.join(root,'../.github/workflows/production-smoke.yml'),'utf8');
@@ -73,16 +81,16 @@ assert.match(attendance,/OFFICE_NETWORK_IPS/);
 assert.doesNotMatch(attendance,/verifyQr|qrToken|'QR'/);
 assert.match(leave,/leaveMutationLimiter/);
 assert.match(leave,/emailLeaveRequestToAdmin/);
-assert.match(leave,/sendHrNotificationEmail/);
-assert.match(leave,/replyTo:request\.employeeEmail/);
+assert.match(leave,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(leave,/replyTo:request\.employeeEmail|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(leave,/gmailAccessToken|sendEmployeeHrEmail/);
-assert.match(attendance,/sendHrNotificationEmail/);
-assert.match(attendance,/replyTo:employee\.email/);
+assert.match(attendance,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(attendance,/replyTo:employee\.email|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(attendance,/gmailAccessToken|sendEmployeeHrEmail/);
 assert.match(attendance,/Attendance correction request/);
 assert.match(attendance,/Flexible start request/);
-assert.match(workplace,/sendHrNotificationEmail/);
-assert.match(workplace,/replyTo:req\.user\.email/);
+assert.match(workplace,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(workplace,/replyTo:req\.user\.email|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(workplace,/gmailAccessToken|sendEmployeeHrEmail/);
 assert.match(workplace,/New WFH request/);
 assert.match(workplace,/DATE_FORMAT\(request_date,'%Y-%m-%d'\) AS request_date/);
@@ -179,6 +187,41 @@ assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await api\('\/workplace\/
 assert.doesNotMatch(app,/requestGmailAccess\(\)\s*;?\s*await post\('\/attendance\/(corrections|flex-requests)/);
 assert.doesNotMatch(main,/gmail\.send|GmailAccessBridge|useGoogleLogin/);
 assert.match(index,/Permissions-Policy/);
+assert.match(index,/assertProductionConfiguration\(process\.env\)/);
+assert.match(productionConfig,/Set a private JWT_SECRET of at least 32 bytes in production/);
+assert.match(index,/private_object_storage/);
+assert.match(objectStorage,/getObjectStorageReadiness/);
+assert.match(objectStorage,/BLOB_READ_WRITE_TOKEN/);
+assert.match(objectStorage,/access:'private'|access: 'private'/);
+assert.match(enterprise,/router\.use\('\/admin', requireAdmin\)/);
+assert.match(enterprise,/add\('private_object_storage'/);
+assert.match(enterprise,/employee_documents WHERE id=:id AND employee_id=:employee/);
+assert.match(validate,/LIMIT_FILE_SIZE/);
+assert.match(auth,/googleLoginLimiter/);
+assert.match(auth,/claims\.email_verified !== true/);
+assert.match(emailOutboxMigration,/uq_email_outbox_dedupe_key/);
+assert.match(emailOutbox,/FOR UPDATE SKIP LOCKED/);
+assert.match(emailOutbox,/lease_until/);
+assert.match(emailOutbox,/EMAIL_OUTBOX_MAX_ATTEMPTS/);
+assert.match(emailOutbox,/retryBackoffMs/);
+assert.match(emailOutbox,/SMTP delivery is not configured/);
+assert.match(emailOutbox,/messageIdFor/);
+assert.match(emailOutboxRoutes,/EMAIL_OUTBOX_CRON_SECRET/);
+assert.match(emailOutboxMigration,/CREATE TABLE IF NOT EXISTS email_outbox/);
+assert.match(emailOutboxMigration,/UNIQUE KEY uq_email_outbox_dedupe_key/);
+assert.match(emailOutboxWorker,/processEmailOutboxBatch/);
+assert.match(emailOutboxWorkflow,/cron: '.*\/5 \* \* \* \*'/);
+assert.match(leave,/outboxId/);
+assert.match(workplace,/outboxId/);
+assert.match(attendance,/outboxId/);
+assert.doesNotMatch(app,/https:\/\/www\.googleapis\.com\/auth\/gmail\.send/i);
+assert.doesNotMatch(main,/scope=[^\n]*gmail\.send/i);
+assert.match(security,/httpOnly: true/);
+assert.match(security,/secure: process\.env\.NODE_ENV === 'production'/);
+assert.match(security,/sameSite: 'lax'/);
+assert.match(security,/Number\(payload\.session_version\) !== Number\(rows\[0\]\.session_version\)/);
+assert.match(vercel,/img-src 'self' data: blob: https:\/\/\*\.googleusercontent\.com/);
+
 assert.match(workplace,/router\.post\('\/calendar', requireAdmin/);
 assert.match(enterprise,/router\.get\('\/employee\/documents'/);
 assert.match(enterprise,/employee_documents WHERE id=:id AND employee_id=:employee/);
@@ -209,13 +252,44 @@ assert.match(leave,/input\.type === 'SICK' \? 'Sick leave'/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);
 assert.match(attendance,/OFF_PREMISES/);
-assert.match(attendance,/Browser coordinates are client-controlled/);
-assert.match(attendance,/verifyOfficeNetwork\(req\);\s*method = 'GPS'/);
+assert.match(attendance,/if \(distance <= Number\(settings\.geofence_meters \|\| POLICY\.geofenceMeters\)\) \{\s*method = 'GPS';\s*locationAccuracy = input\.accuracy;/);
 assert.match(attendance,/approvedStartByDate/);
 assert.match(admin,/approvedStartByEmployeeDate/);
 assert.match(workplace,/A pending or approved WFH request already exists for this date/);
 assert.match(workflowMigration,/uq_wfh_active_employee_day/);
 assert.match(workflowMigration,/OFF_PREMISES/);
+
+// Phase 3: Workflow Robustness & Database Concurrency contracts
+assert.match(db, /ER_LOCK_DEADLOCK/);
+assert.match(db, /PROTOCOL_CONNECTION_LOST/);
+assert.match(db, /Math\.random\(\) \* 30/); // Jittered backoff
+assert.match(workplace, /The file contents do not match the selected document type/);
+assert.match(workplace, /Readable\.from\(object\.buffer\)\.pipe\(res\)/);
+assert.match(workplace, /router\.delete\('\/calendar\/:date'/);
+assert.match(workplace, /National statutory holidays cannot be deleted/);
+
+const clientApp = fs.readFileSync(path.join(root, '../client/src/App.tsx'), 'utf8');
+assert.match(clientApp, /function DeactivateConfirmModal/);
+assert.match(clientApp, /function DeleteHolidayModal/);
+assert.doesNotMatch(clientApp, /window\.confirm\('Deactivate/);
+
+// Phase 4: Persistent Session Authentication ("Remember Me" & 30-Day Cookie)
+const employeeSessionsMigration = fs.readFileSync(path.join(root, 'migrations/012_employee_sessions.sql'), 'utf8');
+assert.match(employeeSessionsMigration, /CREATE TABLE IF NOT EXISTS employee_sessions/);
+assert.match(employeeSessionsMigration, /session_token_hash CHAR\(64\) NOT NULL UNIQUE/);
+assert.match(employeeSessionsMigration, /is_remember_me BOOLEAN NOT NULL DEFAULT FALSE/);
+
+const authRoutes = fs.readFileSync(path.join(root, 'src/routes/auth.mts'), 'utf8');
+assert.match(authRoutes, /router\.get\('\/sessions'/);
+assert.match(authRoutes, /router\.delete\('\/sessions\/:id'/);
+assert.match(authRoutes, /router\.delete\('\/sessions'/);
+assert.match(authRoutes, /createAndPersistSession/);
+
+assert.match(security, /parseDeviceName/);
+assert.match(security, /30 \* 24 \* 60 \* 60 \* 1000/);
+
+assert.match(clientApp, /Keep me signed in on this device for 30 days/);
+assert.match(clientApp, /function ActiveDevicesCard/);
 
 console.log('Production API contracts: PASS');
 

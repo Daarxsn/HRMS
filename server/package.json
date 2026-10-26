@@ -7,17 +7,23 @@
     "dev": "node --watch --experimental-strip-types src/index.mts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.mjs",
+    "worker:email": "node dist/src/email-outbox-worker.mjs",
     "migrate": "node --experimental-strip-types src/migrate.ts",
     "seed": "node --experimental-strip-types src/seed.ts",
     "db:verify": "node --experimental-strip-types test/database-smoke.ts",
     "db:audit": "node --experimental-strip-types test/production-integrity-audit.ts",
     "test:integration": "node --experimental-strip-types test/integration.ts",
-    "test": "node --experimental-strip-types --test test/policy.test.ts test/production-contract.test.ts",
+    "test": "node --experimental-strip-types --test test/policy.test.ts test/production-contract.test.ts test/object-storage.test.ts test/security.test.ts test/email-outbox.test.ts test/ui-contract.test.ts test/multi-page-routing.test.ts test/benefits-and-policies.test.ts test/email-routing.test.ts test/performance-and-indexing.test.ts test/rbac-and-role-management.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:migration-rehearsal": "node --experimental-strip-types test/migration-rehearsal.ts"
+    "test:migration-rehearsal": "node --experimental-strip-types test/migration-rehearsal.ts",
+    "test:backup-restore": "node --experimental-strip-types test/backup-restore-rehearsal.ts",
+    "bench:db-pool": "node --experimental-strip-types test/connection-pool-benchmark.ts",
+    "bench:admin-overview": "node --experimental-strip-types test/admin-overview-benchmark.ts",
+    "test:ui-contract": "node --experimental-strip-types --test test/ui-contract.test.ts"
   },
   "overrides": {
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "zod": "4.6.7"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.0",

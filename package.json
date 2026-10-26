@@ -10,16 +10,26 @@
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
     "build": "npm run build --workspace client && npm run build --workspace server",
     "start": "npm run start --workspace server",
-    "test": "npm run test --workspace server",
+    "test": "npm run test:policy && npm run test --workspace server",
+    "test:policy": "vitest run",
+    "test:e2e": "playwright test",
+    "test:a11y": "playwright test e2e/a11y.spec.ts",
     "db:migrate": "npm run migrate --workspace server",
     "db:seed": "npm run seed --workspace server",
     "db:audit": "npm run db:audit --workspace server",
     "typecheck": "npm run typecheck --workspace client && npm run typecheck --workspace server"
   },
   "overrides": {
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "zod": "4.6.7",
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
+    "concurrently": "^9.2.1",
+    "vitest": "^5.0.5"
   }
 }

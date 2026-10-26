@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { query } from '../db.mts';
 import { audit, requireAuth, publicUser } from '../security.mts';
@@ -46,13 +47,13 @@ router.get('/profile/photo', asyncRoute(async (req,res)=>{
   res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(photo.profile_photo_filename||'profile-photo')}`);
   res.setHeader('Cache-Control','private, no-store');
   if (file.kind === 'buffer') {
-    res.send(file.buffer);
+    Readable.from(file.buffer).pipe(res);
   } else {
-    file.stream
-      .on('error', () => {
-        if (!res.headersSent) res.status(404).end();
-      })
-      .pipe(res);
+    file.stream.on('error', () => {
+      console.error(JSON.stringify({type:'profile_photo_stream_failed',request_id:req.requestId}));
+      if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
+      else res.destroy();
+    }).pipe(res);
   }
 }));
 

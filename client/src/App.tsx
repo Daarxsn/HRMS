@@ -1,34 +1,35 @@
 // @ts-nocheck
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import {
   Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, Camera, Calendar,
   CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck,
   CircleHelp, CircleUserRound, ClipboardCheck, Clock3, Command, Download, FileClock, FileText, Filter,
-  Fingerprint, Gauge, House, LogIn, LogOut, MapPin, Menu, Megaphone, MoreHorizontal, Moon, Plus,
+  Fingerprint, Gauge, House, Laptop, LogIn, LogOut, MapPin, Menu, Megaphone, MoreHorizontal, Moon, Pencil, Plus,
   RefreshCw, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Timer, Trash2, Users, X,
-  PanelLeftClose, UserRound, XCircle
+  PanelLeftClose, UserRound, XCircle, ShieldAlert, GraduationCap
 } from 'lucide-react';
 import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
-import EnterpriseHRPage, { EmployeeDocumentsPage, EmployeePoliciesPage } from './EnterpriseHRPage';
+import EnterpriseHRPage, { EmployeeDocumentsPage, EmployeePoliciesPage, GrievancePage } from './EnterpriseHRPage';
 
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
-const today = todayLocal();
+let today = todayLocal();
+export const getToday = () => todayLocal();
 
 function locationFailureMessage(error, action='office check-in') {
   const code = Number(error?.code || 0);
   if (code === 1) {
-    return `Location permission was denied for ${action}. In Chrome, open Site settings for hr.fxcoworks.com and set Location to Allow. Also check macOS System Settings → Privacy & Security → Location Services, then reload and retry.`;
+    return `Location permission was denied for ${action}. In browser settings, set Location to Allow, or connect to the approved office Wi-Fi network.`;
   }
   if (code === 2) {
-    return `Chrome could not determine your Mac’s location for ${action}. Check that macOS Location Services is enabled for Chrome and Wi-Fi is on, then retry. If location access is already allowed, move near a window or outdoors briefly and try again.`;
+    return `Chrome could not determine your Mac’s location for ${action}. Ensure Wi-Fi is enabled or connect to the approved office Wi-Fi network.`;
   }
   if (code === 3) {
-    return `The location request timed out for ${action}. Check Chrome’s Location permission for hr.fxcoworks.com and macOS Location Services. Keep Wi-Fi enabled, then retry near a window or outdoors briefly.`;
+    return `The location request timed out for ${action}. Verifying via approved office Wi-Fi network…`;
   }
-  return `No location fix was received for ${action}. Check Chrome’s Location permission for hr.fxcoworks.com and macOS Location Services, keep Wi-Fi enabled, then reload and retry.`;
+  return `No location fix was received for ${action}. Verifying via approved office Wi-Fi network…`;
 }
 
 class AppErrorBoundary extends React.Component {
@@ -80,6 +81,20 @@ function StatusPill({ value, children }) {
   const labels={on_time:'On time',late_entry:'Late entry',pending:'Pending',approved:'Approved',rejected:'Declined',cancelled:'Withdrawn',active:'Active',inactive:'Inactive',wfh:'Working remotely',on_leave:'On leave',gps:'GPS verified',absent:'Absent'};
   return <span className={`status status-${key}`}><i className="status-dot" aria-hidden="true"/>{labels[String(raw).toLowerCase()]||raw}</span>;
 }
+function roleInfo(personOrRole) {
+  const role = typeof personOrRole === 'string' ? personOrRole : (personOrRole?.role || personOrRole?.user_type || 'EMPLOYEE');
+  const userType = typeof personOrRole === 'object' ? personOrRole?.user_type : null;
+  if (role === 'SUPER_ADMIN' || userType === 'SUPER_ADMIN') {
+    return { role: 'SUPER_ADMIN', label: 'Super Admin', fullLabel: 'Super Administrator', className: 'role-super-admin', avatarClass: 'avatar-super-admin' };
+  }
+  if (role === 'ADMIN' || userType === 'ADMIN') {
+    return { role: 'ADMIN', label: 'Administrator', fullLabel: 'Administrator', className: 'role-admin', avatarClass: 'avatar-admin' };
+  }
+  if (role === 'INTERN' || userType === 'INTERN') {
+    return { role: 'INTERN', label: 'Intern', fullLabel: 'Intern', className: 'role-intern', avatarClass: 'avatar-intern' };
+  }
+  return { role: 'EMPLOYEE', label: 'Employee', fullLabel: 'Employee', className: '', avatarClass: '' };
+}
 function EmptyState({ icon:Icon=FileText, title, body, action }) { return <div className="empty-state"><span className="empty-icon"><Icon size={21}/></span><h3>{title}</h3><p>{body}</p>{action}</div>; }
 function Card({ children, className='', ...props }) { return <section {...props} className={`card ${className}`}>{children}</section>; }
 function CardHeading({ title, subtitle, action }) { return <div className="card-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>{action}</div>; }
@@ -91,6 +106,20 @@ function App() {
   const [bootError,setBootError]=useState('');
   const [notifications,setNotifications]=useState({unread:0,notifications:[]});
   const [refresh,setRefresh]=useState(0);
+  const [currentDate,setCurrentDate]=useState(()=>todayLocal());
+  useEffect(()=>{
+    const syncCurrentDate=()=>{
+      const fresh=todayLocal();
+      if(fresh!==today){
+        today=fresh;
+        setCurrentDate(fresh);
+      }
+    };
+    const timer=window.setInterval(syncCurrentDate,15000);
+    window.addEventListener('focus',syncCurrentDate);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncCurrentDate();});
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',syncCurrentDate);};
+  },[]);
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('hrms-theme')||'light';}catch{return 'light';}});
   useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('hrms-theme',theme);}catch{/* Theme remains active for this session when storage is unavailable. */}},[theme]);
   const notify=(message,type='success')=>setToast({message,type});
@@ -117,14 +146,42 @@ function App() {
     const onSessionExpired=()=>{
       setUser(null);
       setNotifications({unread:0,notifications:[]});
+      try {
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+          sessionStorage.setItem('fx_hrms_return_url', window.location.pathname + window.location.search);
+        }
+      } catch {}
       setToast({message:'Your session has expired. Please sign in again.',type:'error'});
     };
     window.addEventListener('hrms:session-expired',onSessionExpired);
     return ()=>window.removeEventListener('hrms:session-expired',onSessionExpired);
   },[]);
-  const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme}),[user,notifications,theme]);
+  useEffect(()=>{
+    if (!loading && !user && window.location.pathname !== '/' && window.location.pathname !== '/login') {
+      try {
+        sessionStorage.setItem('fx_hrms_return_url', window.location.pathname + window.location.search);
+      } catch {}
+    }
+  },[loading,user]);
+  const value=useMemo(()=>({user,setUser,notify,refresh:()=>setRefresh((v)=>v+1),notifications,refreshNotifications,theme,setTheme,today:currentDate,currentDate}),[user,notifications,theme,currentDate]);
   const retryBoot=()=>{setBootError('');setLoading(true);window.location.reload();};
   return <AppContext.Provider value={value}><AppErrorBoundary><BrowserRouter>{loading?<div className="loading-screen"><div className="boot-brand"><IconLogo/><div><b>FALCHION XENIAA</b><span>PEOPLE PORTAL</span></div></div><div className="boot-loader"><div className="boot-line"><i/></div><span>Preparing your workspace</span></div></div>:bootError?<div className="loading-screen" role="alert"><IconLogo/><div className="card" style={{maxWidth:520,margin:'24px',textAlign:'center'}}><div className="eyebrow">CONNECTION ISSUE</div><h1>We could not reach the portal.</h1><p>{bootError}</p><button className="button button-primary" onClick={retryBoot}>Try again</button></div></div>:user?<Shell/>:<LoginScreen/>}<Toast toast={toast} onClose={()=>setToast(null)}/></BrowserRouter></AppErrorBoundary></AppContext.Provider>;
+}
+
+function getSafeReturnUrl(platform?: string): string {
+  try {
+    const raw = sessionStorage.getItem('fx_hrms_return_url');
+    sessionStorage.removeItem('fx_hrms_return_url');
+    if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
+      return platform === 'ADMIN' ? '/admin' : '/';
+    }
+    if (raw.startsWith('/admin') && platform !== 'ADMIN') {
+      return '/';
+    }
+    return raw;
+  } catch {
+    return platform === 'ADMIN' ? '/admin' : '/';
+  }
 }
 
 function LoginScreen() {
@@ -132,43 +189,59 @@ function LoginScreen() {
   const navigate=useNavigate();
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [rememberMe,setRememberMe]=useState(true);
   const signIn=async(credential)=>{
     setBusy(true);setError('');
-    try { const result=await post('/auth/google',{credential});setUser(result.user);navigate(result.user.landingPath || (result.user.platform==='ADMIN'?'/admin':'/'),{replace:true}); }
+    try {
+      const result=await post('/auth/google',{credential,rememberMe});
+      setUser(result.user);
+      const destination = getSafeReturnUrl(result.user.platform);
+      navigate(destination,{replace:true});
+    }
     catch(e){setError(e.message);setBusy(false);}
   };
   return <div className="login-page">
     <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
-      <div className="login-art-top"><img className="login-reference-brand" src="/falchion-xeniaa-horizontal.svg" alt="Falchion Xeniaa"/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
+      <div className="login-art-top"><IconLogo/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
       <div className="login-art-copy">
         <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
-        <h1>THE<br/>WORKPLACE<br/>BUILDS<br/><em>PEOPLE.</em></h1>
-        <p>A modern HR platform for teams that aim higher.</p>
+        <h1>Good work<br/><em>starts here.</em></h1>
+        <p>Everything that makes your workday work — thoughtfully brought together in one place.</p>
         <div className="login-feature-row" aria-label="People portal features">
           <div className="login-feature"><span className="login-feature-icon"><CalendarDays size={17}/></span><span><b>Your time</b><small>Attendance & leave</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
-          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Secure by design</small></span></div>
+          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Private by design</small></span></div>
         </div>
-
-        
+        <div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/>
+        <div className="art-note"><Sparkles size={15}/> Built around people, not presence</div>
       </div>
-      <div className="login-art-footer"><span>CULTURE TODAY. STRONGER TOMORROW.</span><span>EST. PUNE · INDIA</span></div>
+      <div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div>
     </section>
     <section className="login-panel" aria-label="Sign in">
       <div className="login-panel-inner">
         <div className="mobile-login-brand"><IconLogo/><span>FALCHION XENIAA</span></div>
         <div className="login-access-mark"><span className="login-access-icon"><ShieldCheck size={17}/></span><span>YOUR WORKSPACE, SECURED</span></div>
         <div className="eyebrow">THE PEOPLE PORTAL</div>
-        <h2>Welcome back<span className="login-title-period">.</span></h2>
-        <p className="login-lede">Sign in with your Google account to access Falchion Xeniaa HRMS.</p>
+        <h2>Welcome in<span className="login-title-period">.</span></h2>
+        <p className="login-lede">A better workday starts with the right people. Sign in with the Google account your administrator has added.</p>
         <div className="login-auth-card">
           <div className="login-auth-card-heading"><span className="login-google-g">G</span><span><b>Continue with Google</b><small>Use your authorised work account</small></span><ShieldCheck size={17} className="login-auth-shield"/></div>
           {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
           {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
+          <label className="login-remember-toggle" style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',margin:'14px 0 8px',fontSize:'13px',color:'var(--ui-text,#253831)',userSelect:'none'}}>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e)=>setRememberMe(e.target.checked)}
+              aria-label="Keep me signed in on this device for 30 days"
+              style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'var(--green-primary,#1e5a40)'}}
+            />
+            <span>Keep me signed in on this device for 30 days</span>
+          </label>
           <div className="login-auth-assurance"><LockKeyholeIcon/> Your account is verified securely by Google.</div>
         </div>
+        <div className="login-trust"><span><ShieldCheck size={14}/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
       </div>
-      <div className="login-trust"><span aria-label="Secure Google sign-in"><ShieldCheck size={14}/> Secure sign-in</span><span><LockKeyholeIcon/> Encrypted data</span><span><MapPin size={14}/> Location only when you check in</span></div>
       <div className="login-footer"><span>Need access?</span> Contact your Falchion Xeniaa administrator.</div>
     </section>
   </div>;
@@ -184,7 +257,8 @@ const employeeNav=[
   {to:'/notifications',label:'Notifications',icon:Bell},
   {to:'/documents',label:'My documents',icon:FileText},
   {to:'/calendar',label:'Holiday calendar',icon:Calendar},
-  {to:'/policies',label:'Policy center',icon:FileText}
+  {to:'/policies',label:'Policy center',icon:FileText},
+  {to:'/grievance',label:'Speak-Up & Grievance',icon:ShieldAlert}
 ];
 const adminNav=[
   {to:'/admin',label:'Overview',icon:Gauge},
@@ -198,39 +272,82 @@ const adminNav=[
   {to:'/admin/calendar',label:'Holiday calendar',icon:Calendar}
 ];
 
+function NotFoundPage({ isAdmin }: { isAdmin?: boolean }) {
+  return (
+    <div className="not-found-page" style={{ maxWidth: 540, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
+      <Card style={{ padding: '48px 32px', borderRadius: '16px', border: '1px solid var(--color-border, #E4E4E7)' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 14px', borderRadius: '999px', background: 'rgba(218, 175, 81, 0.14)', color: 'var(--fx-gold, #DAAF51)', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', marginBottom: '18px' }}>
+          <Sparkles size={14} /> 404 NOT FOUND
+        </div>
+        <h1 style={{ fontFamily: "var(--font-display, 'Sansation', sans-serif)", fontSize: '28px', color: 'var(--color-text, #18181B)', margin: '0 0 12px', letterSpacing: '-0.03em' }}>
+          We couldn’t find that page
+        </h1>
+        <p style={{ color: 'var(--color-text-muted, #52525B)', fontSize: '14px', lineHeight: 1.6, margin: '0 0 28px' }}>
+          The link you followed may be broken or the page may have been moved. Return to your overview to continue your workday.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <Link to={isAdmin ? '/admin' : '/'} className="button button-primary">
+            Return to overview <ArrowRight size={16} />
+          </Link>
+          <Link to="/attendance" className="button button-soft">
+            <Clock3 size={16} /> View attendance
+          </Link>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function PageSkeletonLoader() {
+  return (
+    <div className="page-skeleton-loader" style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '20px' }} role="status" aria-label="Loading page content">
+      <div className="skeleton-pulse" style={{ width: '240px', height: '32px', borderRadius: '8px' }} />
+      <div className="skeleton-pulse" style={{ width: '100%', height: '180px', borderRadius: '14px' }} />
+      <div className="skeleton-pulse" style={{ width: '100%', height: '320px', borderRadius: '14px' }} />
+    </div>
+  );
+}
+
 function Shell(){
   const {user,setUser,notifications,refreshNotifications,theme,setTheme}=useApp();
   const [mobileOpen,setMobileOpen]=useState(false);
   const [bellOpen,setBellOpen]=useState(false);
   const [commandOpen,setCommandOpen]=useState(false);
-  const isAdmin=user.role==='ADMIN';
+  const isSuperAdmin=Boolean(user.isSuperAdmin || user.role==='SUPER_ADMIN' || user.user_type==='SUPER_ADMIN');
+  const isAdmin=user.platform==='ADMIN' || user.role==='ADMIN' || isSuperAdmin;
   const location=useLocation();
-  const nav=isAdmin?adminNav:employeeNav.filter((item)=>item.to!=='/wfh'||user.wfh_enabled);
+  const nav=isAdmin
+    ? adminNav.filter((item)=>{
+        if(item.to==='/admin/settings') return isSuperAdmin || user.capabilities?.includes('office_settings');
+        if(item.to==='/admin/audit') return isSuperAdmin || user.capabilities?.includes('audit_trail');
+        return true;
+      })
+    : employeeNav.filter((item)=>item.to!=='/wfh'||user.wfh_enabled);
   const logout=async()=>{try{await post('/auth/logout');}catch{}setUser(null);};
   useEffect(()=>{setMobileOpen(false);setBellOpen(false);setCommandOpen(false);},[location.pathname]);
   useEffect(()=>{const handler=(event)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommandOpen(true);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
   return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a>
     {mobileOpen&&<button className="mobile-scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
-    <aside className={`sidebar${mobileOpen?' sidebar-open':''}`}>
+    <aside id="primary-navigation" className={`sidebar${mobileOpen?' sidebar-open':''}`} aria-label="Primary navigation">
       <div className="sidebar-brand">
         <Link to={isAdmin?'/admin':'/'} className="sidebar-brand-link" aria-label="Falchion Xeniaa People Portal">
           <span className="brand-logo-wrap"><IconLogo/></span>
         </Link>
-        <button className="sidebar-collapse" aria-label="Close menu" onClick={()=>setMobileOpen(false)}><PanelLeftClose size={17}/></button>
+        <button className="sidebar-collapse" aria-label="Close menu" aria-expanded={mobileOpen} aria-controls="primary-navigation" onClick={()=>setMobileOpen(false)}><PanelLeftClose size={17}/></button>
       </div>
-      <div className="workspace-chip"><span className="workspace-avatar">FX</span><span><b>Falchion Xeniaa</b><small>Pune · {isAdmin?'Administrator':'People'}</small></span><ChevronDown size={14}/></div>
+      <div className="workspace-chip"><span className="workspace-avatar">FX</span><span><b>Falchion Xeniaa</b><small>Pune · {isSuperAdmin?'Super Admin':isAdmin?'Administrator':'People'}</small></span><ChevronDown size={14}/></div>
       <div className="nav-caption">WORKSPACE</div>
-      <nav className="main-nav">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
+      <nav className="main-nav" aria-label="Workspace">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
       <div className="nav-bottom"><div className="nav-caption">ACCOUNT</div><NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><CircleUserRound size={18} strokeWidth={1.8}/><span>My profile</span></NavLink><button className="nav-link nav-logout" onClick={logout}><LogOut size={18} strokeWidth={1.8}/><span>Sign out</span></button></div>
       <div className="sidebar-note"><div className="note-spark"><Sparkles size={15}/></div><p><b>Work with trust.</b><br/>Presence is shared when you choose to check in. No background tracking.</p></div>
-      <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt="" loading="lazy" decoding="async"/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{user.role==='ADMIN'?'Administrator':user.user_type==='INTERN'?'Intern':'Employee'}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
+      <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt="" loading="lazy" decoding="async"/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
-    <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Open command menu"><Command size={15}/><span>Search</span><kbd>⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</Link></div></header>
-      <div className="page-wrap"><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
-        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/>
-        <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin?<AuditPage/>:<NoAccess/>}/>
-        <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div>
+    <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Open command menu"><Command size={15}/><span>Search</span><kbd>⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:initials(user.full_name)}</Link></div></header>
+      <div className="page-wrap"><Suspense fallback={<PageSkeletonLoader/>}><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
+        <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/><Route path="/grievance" element={<GrievancePage/>}/>
+        <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('office_settings'))?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('audit_trail'))?<AuditPage/>:<NoAccess/>}/>
+        <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<NotFoundPage isAdmin={isAdmin}/>}/></Routes></Suspense></div>
       <footer className="app-footer"><span>Falchion Xeniaa · People portal</span><span>Built on trust <span className="footer-dot">·</span> {new Date().getFullYear()}</span></footer>
       <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{(isAdmin?[['/admin','Overview',Gauge],['/admin/attendance','Attendance',Clock3],['/admin/approvals','Requests',ClipboardCheck],['/admin/team','People',Users],['/profile','Profile',CircleUserRound]]:[['/','Home',House],['/attendance','Attendance',Fingerprint],['/leave','Leave',CalendarDays],['/notifications','Alerts',Bell],['/profile','Profile',CircleUserRound]]).map(([to,label,Icon])=><NavLink key={to} to={to} end={to==='/'||to==='/admin'} className={({isActive})=>`mobile-bottom-item${isActive?' active':''}`}><Icon size={18}/><span>{label}</span>{((to==='/notifications'||to==='/admin/approvals')&&notifications.unread>0)&&<i>{notifications.unread>9?'9+':notifications.unread}</i>}</NavLink>)}</nav>
       {commandOpen&&<CommandPalette close={()=>setCommandOpen(false)} theme={theme} setTheme={setTheme} isAdmin={isAdmin}/>} 
@@ -254,34 +371,59 @@ function CommandPalette({close,theme,setTheme,isAdmin}){
 }
 
 function NotificationPopover({close,refresh}){
+  const popoverRef=useRef(null);
   const {notifications,notify}=useApp();const [items,setItems]=useState(notifications.notifications);const [busy,setBusy]=useState(false);const [busyId,setBusyId]=useState(null);
   useEffect(()=>setItems(notifications.notifications),[notifications]);
-  const mark=async(id)=>{setBusyId(id);try{await post(`/account/notifications/${id}/read`);setItems((all)=>all.map((x)=>x.id===id?{...x,read_at:new Date().toISOString()}:x));refresh();}catch(e){notify(e.message,'error');}finally{setBusyId(null);}}
-  const markAll=async()=>{setBusy(true);try{await post('/account/notifications/read-all');setItems((all)=>all.map((x)=>({...x,read_at:new Date().toISOString()})));refresh();}catch(e){notify(e.message,'error');}finally{setBusy(false);}}
-  return <div className="notification-popover"><div className="popover-heading"><div><b>Notifications</b><small>{notifications.unread?`${notifications.unread} unread`:'You’re all caught up'}</small></div><button className="text-button" disabled={!notifications.unread||busy} onClick={markAll}>Mark all read</button></div><div className="notification-list">{items.length?items.slice(0,8).map((item)=><button className={`notification-item${item.read_at?'':' notification-unread'}`} key={item.id} onClick={()=>mark(item.id)}><span className="notification-icon"><CheckCheck size={15}/></span><span><b>{item.title}</b><small>{item.body}</small><em>{formatTime(item.created_at)} · {formatDate(String(item.created_at).slice(0,10),{month:'short',day:'numeric'})}</em></span></button>):<div className="notification-empty"><Bell size={20}/><span>No notifications yet</span></div>}</div></div>;
+  useEffect(()=>{
+    const onPointerDown=(e)=>{
+      if(popoverRef.current&&!popoverRef.current.contains(e.target)&&!e.target.closest?.('.notification-button')){
+        close();
+      }
+    };
+    const onKeyDown=(e)=>{
+      if(e.key==='Escape')close();
+    };
+    document.addEventListener('mousedown',onPointerDown);
+    document.addEventListener('keydown',onKeyDown);
+    return()=>{
+      document.removeEventListener('mousedown',onPointerDown);
+      document.removeEventListener('keydown',onKeyDown);
+    };
+  },[close]);
+  const mark=async(id)=>{setBusyId(id);try{await post(`/account/notifications/${id}/read`);setItems((all)=>all.map((x)=>x.id===id?{...x,read_at:new Date().toISOString()}:x));refresh();}catch(e){notify(e.message,'error');}finally{setBusyId(null);}};
+  const markAll=async()=>{setBusy(true);try{await post('/account/notifications/read-all');setItems((all)=>all.map((x)=>({...x,read_at:new Date().toISOString()})));refresh();}catch(e){notify(e.message,'error');}finally{setBusy(false);}};
+  return <div ref={popoverRef} className="notification-popover" role="dialog" aria-label="Notifications popover"><div className="popover-heading"><div><b>Notifications</b><small>{notifications.unread?`${notifications.unread} unread`:'You’re all caught up'}</small></div><button className="text-button" disabled={!notifications.unread||busy} onClick={markAll}>Mark all read</button></div><div className="notification-list">{items.length?items.slice(0,8).map((item)=><button className={`notification-item${item.read_at?'':' notification-unread'}`} key={item.id} onClick={()=>mark(item.id)}><span className="notification-icon"><CheckCheck size={15}/></span><span><b>{item.title}</b><small>{item.body}</small><em>{formatTime(item.created_at)} · {formatDate(String(item.created_at).slice(0,10),{month:'short',day:'numeric'})}</em></span></button>):<div className="notification-empty"><Bell size={20}/><span>No notifications yet</span></div>}</div></div>;
 }
 function NoAccess(){return <div className="no-access"><ShieldCheck size={30}/><h2>You don’t have access to this view.</h2><p>Ask an administrator if you think this is a mistake.</p><Link className="text-link" to="/">Back to overview <ArrowRight size={15}/></Link></div>;}
 function weekDaysFor(date){const base=new Date(`${date}T12:00:00Z`);const weekday=base.getUTCDay();const mondayOffset=weekday===0?6:weekday-1;base.setUTCDate(base.getUTCDate()-mondayOffset);return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setUTCDate(base.getUTCDate()+i);return {date:d.toISOString().slice(0,10),label:['M','T','W','T','F','S','S'][i],working:true};});}
 
 function EmployeeHome(){
-  const {user,notifications,notify}=useApp();const [todayRow,setTodayRow]=useState(null);const [balance,setBalance]=useState([]);const [history,setHistory]=useState([]);const [weekRecords,setWeekRecords]=useState([]);const [holiday,setHoliday]=useState(null);const [calendarHolidays,setCalendarHolidays]=useState([]);const [leaveRequests,setLeaveRequests]=useState([]);const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',monthlyCap:4,requests:[]});const [time,setTime]=useState(new Date());const [todayOpen,setTodayOpen]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [dashboardRetry,setDashboardRetry]=useState(0);const homeRequest=useRef(0);
+  const {user,notifications,notify}=useApp();const [todayRow,setTodayRow]=useState(null);const [balance,setBalance]=useState([]);const [history,setHistory]=useState([]);const [weekRecords,setWeekRecords]=useState([]);const [holiday,setHoliday]=useState(null);const [calendarHolidays,setCalendarHolidays]=useState([]);const [leaveRequests,setLeaveRequests]=useState([]);const [wfhData,setWfhData]=useState({enabled:false,approvedToday:false,today:'',monthlyCap:4,requests:[]});const [birthdayPass,setBirthdayPass]=useState(null);const [time,setTime]=useState(new Date());const [todayOpen,setTodayOpen]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [dashboardRetry,setDashboardRetry]=useState(0);const homeRequest=useRef(0);
   useEffect(()=>{const timer=setInterval(()=>setTime(new Date()),30000);return()=>clearInterval(timer);},[]);
   const loadDashboard=async()=>{
     const requestId=++homeRequest.current;setLoading(true);
     const results=await Promise.allSettled([
       get(`/attendance?from=${today}&to=${today}`),get('/leave/balances'),
       get(`/attendance?from=${today.slice(0,4)}-01-01&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`),
-      get('/leave'),get('/wfh')
+      get('/leave'),get('/wfh'),get('/enterprise/birthday-pass')
     ]);
     if(requestId!==homeRequest.current)return;
-    const [attendance,balanceRows,historyRows,calendar,leave,wfh]=results;const unavailable=[];
+    const [attendance,balanceRows,historyRows,calendar,leave,wfh,bpass]=results;const unavailable=[];
     if(attendance.status==='fulfilled')setTodayRow(attendance.value.records?.[0]||null);else unavailable.push('today attendance');
     if(balanceRows.status==='fulfilled')setBalance(balanceRows.value.balances||[]);else unavailable.push('leave balances');
     if(historyRows.status==='fulfilled'){setWeekRecords(historyRows.value.records||[]);setHistory((historyRows.value.records||[]).filter((row)=>row.attendance_date!==today).slice(0,5));}else unavailable.push('attendance history');
     if(calendar.status==='fulfilled'){setHoliday((calendar.value.holidays||[]).find((item)=>item.date===today&&item.kind==='FIXED')||null);setCalendarHolidays(calendar.value.holidays||[]);}else unavailable.push('holiday calendar');
     if(leave.status==='fulfilled')setLeaveRequests(leave.value.requests||[]);else unavailable.push('leave requests');
     if(wfh.status==='fulfilled')setWfhData({enabled:Boolean(wfh.value.enabled),approvedToday:wfh.value.approvedToday===true,today:String(wfh.value.today||today).slice(0,10),monthlyCap:Number(wfh.value.monthlyCap||4),requests:wfh.value.requests||[]});else unavailable.push('WFH summary');
+    if(bpass.status==='fulfilled'&&bpass.value)setBirthdayPass(bpass.value);
     setError(unavailable.length?`Some overview details could not be refreshed: ${unavailable.join(', ')}. Retry to try again.`:'');setLoading(false);
+  };
+  const claimBirthdayPass=async()=>{
+    try{
+      await post('/enterprise/birthday-pass/claim');
+      setBirthdayPass((prev)=>prev?{...prev,pass:{...(prev.pass||{}),status:'CLAIMED'}}:null);
+      notify('Happy Birthday! Your 2-Hour Early Sign-Off Pass is now active.');
+    }catch(err){notify(err?.message||'Could not claim birthday pass.');}
   };
   useEffect(()=>{void loadDashboard();return()=>{homeRequest.current+=1;};},[dashboardRetry]);
   const welcome=Number(new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Kolkata'}).format(time));
@@ -305,14 +447,14 @@ function EmployeeHome(){
       if(best&&best.accuracy<=100){finish(null,best);return;}
       if(geoError.code===2||geoError.code===3){
         finish(new Error(best
-          ?'Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'
+          ?'Your browser could not get a precise enough location for office check-in. Falling back to office Wi-Fi verification.'
           :locationFailureMessage(geoError,'office check-in')));
       }
     };
     watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
     timeoutId=globalThis.setTimeout(()=>{
       if(best&&best.accuracy<=100)finish(null,best);
-      else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Keep Wi-Fi/location enabled, move near a window or outdoors briefly, then try again.'));
+      else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Falling back to office Wi-Fi verification.'));
       else finish(new Error(locationFailureMessage({code:3},'office check-in')));
     },5000);
   });
@@ -357,7 +499,7 @@ function EmployeeHome(){
         <p>{holiday?holiday.name+" is on the company holiday calendar. Attendance isn’t expected today.":todayRow?.check_in_at?"You checked in at "+formatTime(todayRow.check_in_at)+". Your day is yours to focus on.":remoteCheckInAvailable?"WFH access is enabled. Check in remotely without GPS, office Wi-Fi, or office geofencing.":"Check in when you arrive. Office attendance uses the office geofence or approved office network."}</p>
         <div className="hero-actions">{holiday?<Link className="button button-light" to="/calendar"><CalendarDays size={16}/> View holiday calendar <ArrowRight size={16}/></Link>:todayRow?.check_in_at?<Link className="button button-light" to="/attendance">{todayRow.check_out_at?"Review today":"Check out when you leave"}<ArrowRight size={16}/></Link>:<Link className="button button-light" to="/attendance"><LogIn size={16}/> {remoteCheckInAvailable?"Check in remotely":"Check in"} <ArrowRight size={16}/></Link>}<span className="hero-time">{new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}).format(time)} IST</span></div>
       </div>
-      <div className="hero-art"><div className="hero-date"><span>{new Intl.DateTimeFormat("en-IN",{weekday:"short",timeZone:"Asia/Kolkata"}).format(time)}</span><b>{new Intl.DateTimeFormat("en-IN",{day:"2-digit",timeZone:"Asia/Kolkata"}).format(time)}</b><small>{new Intl.DateTimeFormat("en-IN",{month:"short",timeZone:"Asia/Kolkata"}).format(time)}</small></div><div className="hero-ring ring-a"/><div className="hero-ring ring-b"/><div className="hero-plant"><span/><span/><span/><span/><i/></div></div>
+      <div className="hero-art"><div className="hero-date"><span>{new Intl.DateTimeFormat("en-IN",{weekday:"short",timeZone:"Asia/Kolkata"}).format(time)}</span><b>{new Intl.DateTimeFormat("en-IN",{day:"2-digit",timeZone:"Asia/Kolkata"}).format(time)}</b><small>{new Intl.DateTimeFormat("en-IN",{month:"short",timeZone:"Asia/Kolkata"}).format(time)}</small></div></div>
       <button type="button" className="hero-pulse-strip hero-pulse-interactive" onClick={()=>setTodayOpen(true)} aria-label="Open today attendance details">
         <div className="hero-pulse-status">
           <span className="hero-pulse-live"><i className="pulse-dot"/> TODAY&apos;S PULSE</span>
@@ -371,6 +513,37 @@ function EmployeeHome(){
       <div className="hero-bottom"><span>{remoteCheckInAvailable?<House size={14}/>:<MapPin size={14}/>} {remoteCheckInAvailable?'WFH access enabled · remote check-in available':'Falchion Xeniaa · Pune HQ'}</span><span>Mon–Sat <b>·</b> Report by 9:30 AM</span></div>
     </section>
     {todayOpen&&<TodayDrawer row={todayRow} holiday={holiday} close={()=>setTodayOpen(false)}/>}
+    {birthdayPass?.isBirthday&&(
+      <Card style={{
+        background: 'linear-gradient(135deg, rgba(218, 175, 81, 0.16) 0%, rgba(147, 19, 20, 0.08) 100%)',
+        border: '1.5px solid var(--fx-gold, #DAAF51)',
+        marginBottom: '20px',
+        padding: '20px 24px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <span style={{ fontSize: '32px' }}>🎂</span>
+            <div>
+              <b style={{ fontSize: '18px', color: 'var(--fx-red, #931314)', display: 'block' }}>Happy Birthday, {name}! 🎉</b>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--color-text, #333)' }}>
+                Because it’s your day, enjoy your <b>2-Hour Early Sign-Off Pass</b> today. No early exit penalty will be recorded upon checking out.
+              </p>
+            </div>
+          </div>
+          <div>
+            {birthdayPass.pass?.status === 'CLAIMED' ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 700, fontSize: '13px' }}>
+                <Check size={16} /> Pass Active (2h early exit enabled)
+              </span>
+            ) : (
+              <button className="button button-primary" type="button" onClick={claimBirthdayPass}>
+                Claim 2-Hour Pass
+              </button>
+            )}
+          </div>
+        </div>
+      </Card>
+    )}
     <Card className="overview-attendance-card"><div className="overview-attendance-copy"><div className="eyebrow">ATTENDANCE</div><h2>{holiday?'Holiday today':todayRow?.check_in_at?(todayRow.check_out_at?'Today is complete':'You are checked in'):'Ready to check in'}</h2><p>{holiday?'No attendance action is expected today.':todayRow?.check_in_at?(todayRow.check_out_at?'Your attendance entry is complete for today.':`Checked in at ${formatTime(todayRow.check_in_at)}. Check out when you finish.`):remoteCheckInAvailable?'WFH access is enabled. Start remotely without office location verification.':'Report between 9:00 and 9:30 AM. Office check-in verifies your location once.'}</p>{punchStage&&<small className="attendance-progress" role="status" aria-live="polite">{punchStage}</small>}{punchError&&<div className="inline-alert alert-error"><CircleAlert size={16}/>{punchError}<button type="button" onClick={()=>setPunchError('')} aria-label="Dismiss"><X size={14}/></button></div>}</div><div className="overview-attendance-action">{holiday?<Link className="button button-soft" to="/calendar">View calendar</Link>:todayRow?.check_in_at&&!todayRow?.check_out_at?<Button loading={punchBusy} icon={LogOut} onClick={()=>quickPunch('check-out')}>Check out</Button>:todayRow?.check_out_at?<span className="overview-attendance-done"><Check size={16}/> Checked out</span>:<Button loading={punchBusy} icon={LogIn} onClick={()=>quickPunch('check-in')}>{remoteCheckInAvailable?'Check in remotely':'Check in'}</Button>}{!holiday&&!todayRow?.check_in_at&&remoteCheckInAvailable&&<button type="button" className="text-link" onClick={()=>quickPunch('check-in','OFFICE')} disabled={punchBusy}>At the office? Check in with office verification</button>}<span className="report-window">Report time · 9:00–9:30 AM</span></div></Card>
     {latestAnnouncement&&<Card className="announcement-banner"><div className="announcement-banner-icon"><Megaphone size={18}/></div><div className="announcement-banner-copy"><span className="eyebrow">FROM FALCHION XENIAA</span><h2>{latestAnnouncement.title}</h2><p>{latestAnnouncement.body}</p><small>{formatDate(String(latestAnnouncement.created_at).slice(0,10),{day:'numeric',month:'short'})} · {formatTime(latestAnnouncement.created_at)}</small></div><Link className="tiny-arrow" to="/notifications"><ArrowUpRight size={16}/></Link></Card>}
     <section className="employee-action-center">
@@ -379,17 +552,18 @@ function EmployeeHome(){
         <div className="employee-action-grid">
           <Link className={`employee-action-item${!holiday&&!todayRow?.check_in_at?" action-item-primary":""}`} to="/attendance"><span className="employee-action-icon"><Clock3 size={17}/></span><span><b>{holiday?"Holiday today":todayRow?.check_in_at?(todayRow.check_out_at?"Review today":"Check out when you leave"):remoteCheckInAvailable?"Check in remotely":"Check in when you arrive"}</b><small>{holiday?"Attendance is not expected.":todayRow?.check_in_at?(todayRow.check_out_at?"Your attendance record is complete.":"Check out when you finish.") :remoteCheckInAvailable?"WFH access is enabled. No GPS or office Wi-Fi verification is required for remote check-in.":"Either the office geofence or approved office network can verify office attendance."}</small></span><ArrowRight size={15}/></Link>
           <Link className="employee-action-item" to="/leave"><span className="employee-action-icon"><CalendarDays size={17}/></span><span><b>{pendingLeave?pendingLeave+" pending leave request"+(pendingLeave===1?"":"s"):"Leave balances ready"}</b><small>{shared?.remaining??0} shared casual/sick · {earned?.remaining??0} earned · {floating?.remaining??0} floating</small></span><ArrowRight size={15}/></Link>
+          <Link className="employee-action-item" to="/profile"><span className="employee-action-icon"><GraduationCap size={17}/></span><span><b>Learning Budget</b><small>₹24,000/yr allowance · Submit claim</small></span><ArrowRight size={15}/></Link>
           {wfhData.enabled&&<Link className="employee-action-item" to="/wfh"><span className="employee-action-icon"><House size={17}/></span><span><b>{pendingWfh?pendingWfh+" pending WFH request"+(pendingWfh===1?"":"s"):"WFH access enabled"}</b><small>{approvedWfhThisMonth+"/"+wfhData.monthlyCap+" approved this month"}</small></span><ArrowRight size={15}/></Link>}
           <Link className="employee-action-item employee-action-button" to="/notifications"><span className="employee-action-icon"><Bell size={17}/></span><span><b>{unread?unread+" unread notification"+(unread===1?"":"s"):"No unread notifications"}</b><small>{unread?"Review approvals and updates from your team.":"You’re all caught up on updates."}</small></span><ArrowRight size={15}/></Link>
         </div>
       </Card>
       <Card className="next-holiday-card"><span className="next-holiday-icon"><Sun size={18}/></span><div><small>NEXT COMPANY HOLIDAY</small><b>{nextHoliday?formatDate(nextHoliday.date,{weekday:"short",day:"numeric",month:"long"}):"No upcoming holiday"}</b><span>{nextHoliday?.name||"Your calendar is clear."}</span></div><Link className="tiny-arrow" to="/calendar"><ArrowRight size={15}/></Link></Card>
     </section>
-    <div className="overview-grid"><Card className="balance-card"><CardHeading title="Time off, your way" subtitle="A little room to recharge." action={<Link className="tiny-arrow" to="/leave"><ArrowUpRight size={17}/></Link>}/><div className="balance-display"><div className="balance-number">{earned?.remaining??'—'}<small>days available</small></div><div className="balance-mini"><span className="mini-circle mini-sage"><Sun size={17}/></span><div><b>Earned leave</b><small>Accrues each month</small></div></div></div><div className="balance-rows">{balance.filter((b)=>b.type!=='EARNED').map((b)=><div key={b.type}><span>{b.label}</span><b>{b.remaining} <small>days</small></b></div>)}</div><Link className="card-foot-link" to="/leave">See balances & request leave <ArrowRight size={14}/></Link></Card>
+    <div className="overview-grid"><Card className="balance-card"><CardHeading title="Time off, your way" subtitle="A little room to recharge." action={<Link className="tiny-arrow" to="/leave"><ArrowUpRight size={17}/></Link>}/><div className="balance-display"><div className="balance-number">{earned?.remaining??'—'}<small>days available</small></div><div className="balance-mini"><span className="mini-circle mini-gold"><Sun size={17}/></span><div><b>Earned leave</b><small>Accrues each month</small></div></div></div><div className="balance-rows">{balance.filter((b)=>b.type!=='EARNED').map((b)=><div key={b.type}><span>{b.label}</span><b>{b.remaining} <small>days</small></b></div>)}</div><Link className="card-foot-link" to="/leave">See balances & request leave <ArrowRight size={14}/></Link></Card>
       <Card className="week-card"><CardHeading title="This week" subtitle="Small steps add up." action={<span className="week-number">WEEK AT A GLANCE</span>}/><div className="week-track">{weekProgress.map((day)=><div key={day.date} title={day.holidayName||(!day.working?'Sunday':undefined)} className={`week-day${day.completed?' day-done':''}${day.isCurrent&&!day.fixedHoliday?' day-current':''}${!day.working?' day-off':''}${day.row?.status==='ON_LEAVE'?' day-leave':''}`}><span>{day.label}</span><b>{day.completed?<Check size={14}/>:day.isCurrent&&!day.fixedHoliday?<span className="day-dot"/>:day.row?.status==='ON_LEAVE'?<span className="day-leave-mark">·</span>:!day.working?<span className="day-offmark">·</span>:<span className="day-empty"/>}</b></div>)}</div><div className="week-footer"><span><i className="legend-dot legend-done"/> {completedDays} days complete</span><span><i className="legend-dot legend-planned"/> {remainingDays} working days left</span></div><div className="week-quote"><span className="quote-mark">“</span><span>Presence is a contribution, not a surveillance metric.</span><b>— FALCHION CULTURE</b></div></Card>
     </div>
     <div className="section-head"><div><h2>Your recent days</h2><p>A simple view of your attendance history.</p></div><Link className="text-link" to="/attendance">Full attendance history <ArrowRight size={15}/></Link></div>
-    <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>DAY TYPE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:history.length?history.map((row)=><tr key={row.id}><td><b>{formatDate(row.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td><span className="table-type"><span className="type-dot"/>{row.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={row.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">No attendance records yet. Your recent workdays will appear here.</div></td></tr>}</tbody></table></div></Card>
+    <Card className="table-card"><div className="table-scroll"><table aria-label="Recent attendance history"><thead><tr><th scope="col">DATE</th><th scope="col">DAY TYPE</th><th scope="col">STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="3" className="table-message"><Spinner/></td></tr>:history.length?history.map((row)=><tr key={row.id}><td><b>{formatDate(row.attendance_date,{weekday:'short',day:'numeric',month:'short'})}</b></td><td><span className="table-type"><span className="type-dot"/>{row.check_in_method==='WFH'?'Remote':'Office'}</span></td><td><StatusPill value={row.status}/></td></tr>):<tr><td colSpan="3"><div className="table-message">No attendance records yet. Your recent workdays will appear here.</div></td></tr>}</tbody></table></div></Card>
     {!holiday&&<div className="mobile-attendance-dock" aria-label="Quick attendance action">
       <div className="mobile-attendance-dock-status"><span className="pulse-dot"/><span><b>{todayRow?.check_in_at?(todayRow.check_out_at?'Attendance complete':'Currently checked in'):'Not checked in'}</b><small>{todayRow?.check_in_at?formatTime(todayRow.check_in_at):'Ready when you arrive'}</small></span></div>
       {todayRow?.check_in_at&&!todayRow?.check_out_at
@@ -504,23 +678,23 @@ function AdminHome(){
   const stats=data?.stats||{};
   const adminHour=Number(new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Kolkata'}).format(new Date()));
   const adminGreeting=adminHour<12?'Good morning':adminHour<17?'Good afternoon':'Good evening';
-  return <div className="admin-overview-page">
+  return <>
     {error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/>{loading?'Refreshing…':'Retry dashboard'}</button></div>}
     <PageTitle eyebrow={formatDate(today,{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase()} title={`${adminGreeting}, ${user.full_name.split(' ')[0]}.`} description="Your people, today’s pulse, and the decisions that need you." action={<Link to="/admin/team" className="button button-primary"><Plus size={17}/> Add a person</Link>}/>
-    <div className="admin-mobile-command-strip admin-command-strip" role="group" aria-label="Administrator quick actions">
+    <div className="admin-mobile-command-strip" aria-label="Admin quick actions">
       <Link to="/admin/attendance"><Fingerprint size={17}/><span>Attendance</span></Link>
       <Link to="/admin/approvals"><ClipboardCheck size={17}/><span>Requests{stats.pending>0?<i>{stats.pending>9?'9+':stats.pending}</i>:null}</span></Link>
       <Link to="/admin/team"><Users size={17}/><span>People</span></Link>
       <Link to="/admin/reports"><Activity size={17}/><span>Reports</span></Link>
     </div>
-    <AdminSelfAttendanceCard/><section className="admin-hero"><div className="admin-hero-copy"><span className="admin-hero-kicker"><i className="pulse-dot"/> LIVE WORKFORCE BRIEF <small>{lastUpdated?'Updated '+new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}).format(lastUpdated)+' IST':'Updating…'}</small><button type="button" className={"admin-live-refresh"+(loading?" is-loading":"")} onClick={()=>void load()} disabled={loading} aria-label="Refresh administrator dashboard" title="Refresh dashboard"><RefreshCw size={13}/></button></span><h2>{!adminSections.dashboard?'Workplace metrics are temporarily unavailable.':data?.officeHoliday?String(data.holidayName||"Office holiday")+" today.":"Your workplace, in one calm view."}</h2><p>{!adminSections.dashboard?'Retry to refresh the workplace snapshot.':data?.officeHoliday?"Attendance is not expected today. Use the day to keep your team aligned and requests moving.":String(stats.present||0)+" of "+String(stats.employees||0)+" active people are checked in. "+String(stats.pending||0)+" request"+(stats.pending===1?"":"s")+" are waiting for review."}</p><div className="admin-hero-actions"><Link className="button button-light" to="/admin/attendance">Open live attendance <ArrowRight size={16}/></Link><Link className="admin-hero-secondary" to="/admin/approvals">Review queue <span>{stats.pending||0}</span></Link></div></div><div className="admin-hero-score"><span>ATTENDANCE TODAY</span><b>{adminSections.dashboard&&stats.employees?Math.round((stats.present/stats.employees)*100)+'%':'—'}</b><small>{adminSections.dashboard?String(stats.present||0)+' checked in · '+String(stats.absent||0)+' not checked in':'Waiting for workplace metrics'}</small><div><i style={{width:(adminSections.dashboard&&stats.employees?Math.round((stats.present/stats.employees)*100):0)+"%"}}/></div></div></section>
+    <AdminSelfAttendanceCard/><section className="admin-hero"><div className="admin-hero-copy"><span className="admin-hero-kicker"><i className="pulse-dot"/> LIVE WORKFORCE BRIEF <small>{lastUpdated?'Updated '+new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}).format(lastUpdated)+' IST':'Updating…'}</small></span><h2>{!adminSections.dashboard?'Workplace metrics are temporarily unavailable.':data?.officeHoliday?String(data.holidayName||"Office holiday")+" today.":"Your workplace, in one calm view."}</h2><p>{!adminSections.dashboard?'Retry to refresh the workplace snapshot.':data?.officeHoliday?"Attendance is not expected today. Use the day to keep your team aligned and requests moving.":String(stats.present||0)+" of "+String(stats.employees||0)+" active people are checked in. "+String(stats.pending||0)+" request"+(stats.pending===1?"":"s")+" are waiting for review."}</p><div className="admin-hero-actions"><Link className="button button-light" to="/admin/attendance">Open live attendance <ArrowRight size={16}/></Link><Link className="admin-hero-secondary" to="/admin/approvals">Review queue <span>{stats.pending||0}</span></Link></div></div><div className="admin-hero-score"><span>ATTENDANCE TODAY</span><b>{adminSections.dashboard&&stats.employees?Math.round((stats.present/stats.employees)*100)+'%':'—'}</b><small>{adminSections.dashboard?String(stats.present||0)+' checked in · '+String(stats.absent||0)+' not checked in':'Waiting for workplace metrics'}</small><div><i style={{width:(adminSections.dashboard&&stats.employees?Math.round((stats.present/stats.employees)*100):0)+"%"}}/></div></div></section>
     <div className="admin-intro"><div className="intro-icon"><Activity size={18}/></div><div><b>{data?.officeHoliday?`${data.holidayName||'Office holiday'} · attendance not expected`:'People, not just presence.'}</b><span>{data?.officeHoliday?'Today is a scheduled non-working day for Falchion Xeniaa.':'Attendance is a record of the workday—not a measure of someone’s value.'}</span></div><span className="intro-date"><span className="pulse-dot"/> {data?.officeHoliday?'SCHEDULED HOLIDAY':'LIVE TODAY'}</span></div>
     <div className="stat-grid">{[
-      {label:'Team members',value:stats.employees,meta:'Across employees & interns',icon:Users,tone:'blue',to:'/admin/team'},
-      {label:'Checked in today',value:stats.present,meta:(stats.employees?Math.round((stats.present/stats.employees)*100):0)+'% of active team',icon:Fingerprint,tone:'green',to:'/admin/attendance'},
-      {label:'Needs your attention',value:stats.pending,meta:'Requests waiting for review',icon:ClipboardCheck,tone:'gold',to:'/admin/approvals'},
-      {label:'Late entries today',value:stats.late,meta:'After 9:30 AM',icon:Clock3,tone:'rose',to:'/admin/attendance'}
-    ].map((item)=><Link to={item.to} className="admin-stat-link" key={item.label} aria-label={"Open "+item.label.toLowerCase()+" details"}><Card className={"stat-card stat-card-interactive stat-card-"+item.tone}><div className={"stat-icon stat-"+item.tone}><item.icon size={18}/></div><div className="stat-label">{item.label}</div><div className="stat-value">{loading||!adminSections.dashboard?'—':item.value??0}</div><div className="stat-meta">{item.meta}</div><span className="admin-stat-open" aria-hidden="true"><ArrowUpRight size={14}/></span></Card></Link>)}</div>
+      {label:'Team members',value:stats.employees,meta:'Across employees & interns',icon:Users,tone:'blue'},
+      {label:'Checked in today',value:stats.present,meta:`${stats.employees?Math.round((stats.present/stats.employees)*100):0}% of active team`,icon:Fingerprint,tone:'green'},
+      {label:'Needs your attention',value:stats.pending,meta:'Requests waiting for review',icon:ClipboardCheck,tone:'gold'},
+      {label:'Late entries today',value:stats.late,meta:'After 9:30 AM',icon:Clock3,tone:'rose'}
+    ].map((item)=><Card className="stat-card" key={item.label}><div className={`stat-icon stat-${item.tone}`}><item.icon size={18}/></div><div className="stat-label">{item.label}</div><div className="stat-value">{loading||!adminSections.dashboard?'—':item.value??0}</div><div className="stat-meta">{item.meta}</div></Card>)}</div>
     <div className="admin-pulse-grid">
       <Card className="admin-pulse-card"><CardHeading title="Workplace pulse" subtitle="A simple read on today’s working pattern."/><div className="admin-pulse-metrics">
         <div><span className="pulse-metric-icon pulse-green"><Fingerprint size={16}/></span><small>IN OFFICE</small><b>{loading?'—':stats.present||0}</b><em>checked in</em></div>
@@ -534,9 +708,9 @@ function AdminHome(){
       <Card className="approval-card"><CardHeading title="Your review queue" subtitle="A timely response goes a long way." action={<Link className="tiny-arrow" to="/admin/approvals"><ArrowUpRight size={17}/></Link>}/>{Number(stats.pending)>0?<><div className="approval-highlight"><div className="approval-stack"><span><CalendarDays size={17}/></span><span><House size={17}/></span><span><Clock3 size={17}/></span></div><div><b>{stats.pending} request{stats.pending===1?'':'s'} to review</b><small>Leave, WFH, attendance and flex starts</small></div></div><Link to="/admin/approvals" className="button button-primary full-button">Review requests <ArrowRight size={16}/></Link></>:<div className="queue-clear"><span><Check size={17}/></span><b>All caught up</b><small>No pending requests right now.</small></div>}<div className="review-reminder"><ShieldCheck size={15}/><span>Keep flexibility and individual context in mind when reviewing.</span></div></Card></div>
     <Card className="announcement-card"><CardHeading title="Workplace announcement" subtitle="Send a useful note to every active employee."/><div className="announcement-launch"><div className="announcement-launch-icon"><Megaphone size={18}/></div><div><b>Share something that matters</b><small>Holiday reminders, office updates or team notes.</small></div><button className="button button-soft button-small" onClick={()=>setAnnouncementOpen(true)}>New announcement</button></div></Card>
     <div className="admin-lower-grid"><Card className="activity-card"><CardHeading title="Recent activity" subtitle="Latest meaningful changes across the workspace." action={<Link className="tiny-arrow" to="/admin/audit"><ArrowUpRight size={17}/></Link>}/>{!adminSections.activity?<div className="admin-data-unavailable"><CircleAlert size={15}/><span>Recent activity is unavailable.</span><button type="button" className="text-button" onClick={()=>void load()}>Retry</button></div>:activity.length?<div className="activity-feed">{activity.map((item)=><div className="activity-item" key={item.id}><span className="activity-dot"/><div><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><small>{item.actor_name||"System"} · {formatTime(item.created_at)}</small></div><span>{formatDate(String(item.created_at).slice(0,10),{day:"numeric",month:"short"})}</span></div>)}</div>:<div className="queue-clear"><span><Check size={17}/></span><b>No recent activity</b><small>Workspace events will appear here.</small></div>}</Card><Card className="system-health-card"><CardHeading title="System health" subtitle="A quick signal that the workspace is ready."/><div className="health-grid"><div><span><i className="health-good"/> Database</span><b>{!adminSections.health?'Unavailable':health?.status==="ok"?"Healthy":"Unavailable"}</b><small>{health?.databaseLatencyMs?Math.round(health.databaseLatencyMs)+" ms latency":"—"}</small></div><div><span><i className="health-good"/> Storage</span><b>Configured</b><small>Private object storage</small></div><div><span><i className="health-good"/> Authentication</span><b>Ready</b><small>Google sign-in</small></div><div><span><i className="health-good"/> Office network</span><b>{!adminSections.health?'Unavailable':health?.officeNetwork?.configured?"Configured":"Needs setup"}</b><small>{!adminSections.health?'Could not verify':health?.officeNetwork?.configured?health.officeNetwork.configuredIpCount+" allowed source"+(health.officeNetwork.configuredIpCount===1?"":"s"):"Admin action needed"}</small></div></div></Card></div>
-    <div className="section-head"><div><h2>Temporary exits</h2><p>Only employees who marked themselves as currently out appear here.</p></div></div><Card className="table-card"><div className="table-scroll"><table><thead><tr><th>PERSON</th><th>LEFT AT</th><th>NOTE</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="4" className="table-message"><Spinner/></td></tr>:!adminSections.dashboard?<div className="table-message">Workplace data is unavailable. Retry to refresh.</div>:data?.temporaryExits?.length?data.temporaryExits.map((row)=><tr key={row.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code}</small></span></div></td><td>{formatTime(row.left_at)}</td><td>{row.reason||'—'}</td><td><span className="status status-on-time">Currently out</span></td></tr>):<tr><td colSpan="4"><div className="table-message">No one is currently marked as out.</div></td></tr>}</tbody></table></div></Card>
-    <div className="section-head"><div><h2>Today’s attendance</h2><p>Check-in, check-out and worked time for every active employee.</p></div><Link className="text-link" to="/admin/attendance">Open attendance management <ArrowRight size={15}/></Link></div><Card className="table-card admin-dashboard-attendance"><div className="table-scroll"><table><thead><tr><th>PERSON</th><th>CHECK IN</th><th>CHECK OUT</th><th>WORKED</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:!adminSections.dashboard?<div className="table-message">Attendance data is unavailable. Retry to refresh.</div>:data?.recent?.length?data.recent.map((row)=><tr key={row.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code} · {row.user_type==='INTERN'?'Intern':'Employee'}</small></span></div></td><td>{formatTime(row.check_in_at)}</td><td>{formatTime(row.check_out_at)}</td><td>{row.worked_minutes==null?(row.check_in_at?'In progress':'—'):formatMinutes(row.worked_minutes)}</td><td>{row.status?<StatusPill value={row.status}/>:<span className="status status-pending">Not checked in</span>}</td></tr>):<tr><td colSpan="5"><div className="table-message">No active employees are configured.</div></td></tr>}</tbody></table></div></Card>    {announcementOpen&&<Modal title="Publish an announcement" subtitle="It will appear in every active employee’s notifications." close={()=>setAnnouncementOpen(false)}><form className="form-stack" onSubmit={async(e)=>{e.preventDefault();setAnnouncementBusy(true);try{const result=await post('/admin/announcements',{title:announcementTitle,body:announcementBody});notify('Announcement sent to '+result.recipientCount+' active people.');setAnnouncementTitle('');setAnnouncementBody('');setAnnouncementOpen(false);await load();}catch(e){setError(e.message);}finally{setAnnouncementBusy(false);}}}><label className="form-field"><span>Headline</span><input value={announcementTitle} onChange={e=>setAnnouncementTitle(e.target.value)} maxLength="120" required placeholder="Example: Diwali office closure"/></label><label className="form-field"><span>Message</span><textarea value={announcementBody} onChange={e=>setAnnouncementBody(e.target.value)} minLength="8" maxLength="1000" required placeholder="Share the important details…"/></label><div className="form-modal-actions"><Button type="button" variant="soft" onClick={()=>setAnnouncementOpen(false)}>Cancel</Button><Button type="submit" loading={announcementBusy} icon={Megaphone}>Publish announcement</Button></div></form></Modal>}
-  </div>;
+    <div className="section-head"><div><h2>Temporary exits</h2><p>Only employees who marked themselves as currently out appear here.</p></div></div><Card className="table-card"><div className="table-scroll"><table aria-label="Currently out employees"><thead><tr><th scope="col">PERSON</th><th scope="col">LEFT AT</th><th scope="col">NOTE</th><th scope="col">STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="4" className="table-message"><Spinner/></td></tr>:!adminSections.dashboard?<div className="table-message">Workplace data is unavailable. Retry to refresh.</div>:data?.temporaryExits?.length?data.temporaryExits.map((row)=><tr key={row.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code}</small></span></div></td><td>{formatTime(row.left_at)}</td><td>{row.reason||'—'}</td><td><span className="status status-on-time">Currently out</span></td></tr>):<tr><td colSpan="4"><div className="table-message">No one is currently marked as out.</div></td></tr>}</tbody></table></div></Card>
+    <div className="section-head"><div><h2>Today’s attendance</h2><p>Check-in, check-out and worked time for every active employee.</p></div><Link className="text-link" to="/admin/attendance">Open attendance management <ArrowRight size={15}/></Link></div><Card className="table-card admin-dashboard-attendance"><div className="table-scroll"><table aria-label="Today team attendance overview"><thead><tr><th scope="col">PERSON</th><th scope="col">CHECK IN</th><th scope="col">CHECK OUT</th><th scope="col">WORKED</th><th scope="col">STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:!adminSections.dashboard?<div className="table-message">Attendance data is unavailable. Retry to refresh.</div>:data?.recent?.length?data.recent.map((row)=><tr key={row.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code} · {row.user_type==='INTERN'?'Intern':'Employee'}</small></span></div></td><td>{formatTime(row.check_in_at)}</td><td>{formatTime(row.check_out_at)}</td><td>{row.worked_minutes==null?(row.check_in_at?'In progress':'—'):formatMinutes(row.worked_minutes)}</td><td>{row.status?<StatusPill value={row.status}/>:<span className="status status-pending">Not checked in</span>}</td></tr>):<tr><td colSpan="5"><div className="table-message">No active employees are configured.</div></td></tr>}</tbody></table></div></Card>    {announcementOpen&&<Modal title="Publish an announcement" subtitle="It will appear in every active employee’s notifications." close={()=>setAnnouncementOpen(false)}><form className="form-stack" onSubmit={async(e)=>{e.preventDefault();setAnnouncementBusy(true);try{const result=await post('/admin/announcements',{title:announcementTitle,body:announcementBody});notify('Announcement sent to '+result.recipientCount+' active people.');setAnnouncementTitle('');setAnnouncementBody('');setAnnouncementOpen(false);await load();}catch(e){setError(e.message);}finally{setAnnouncementBusy(false);}}}><label className="form-field"><span>Headline</span><input aria-label="Headline" value={announcementTitle} onChange={e=>setAnnouncementTitle(e.target.value)} maxLength="120" required placeholder="Example: Diwali office closure"/></label><label className="form-field"><span>Message</span><textarea aria-label="Message" value={announcementBody} onChange={e=>setAnnouncementBody(e.target.value)} minLength="8" maxLength="1000" required placeholder="Share the important details…"/></label><div className="form-modal-actions"><Button type="button" variant="soft" onClick={()=>setAnnouncementOpen(false)}>Cancel</Button><Button type="submit" loading={announcementBusy} icon={Megaphone}>Publish announcement</Button></div></form></Modal>}
+  </>;
 }
 
 function TodayDrawer({row,holiday,close}){
@@ -581,12 +755,12 @@ function AttendancePage(){
       if(best&&best.accuracy<=100){finish(null,best);return;}
       if(geoError.code===2||geoError.code===3){
         finish(new Error(best
-          ?'Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'
+          ?'Your browser could not get a precise enough location. Falling back to office Wi-Fi verification.'
           :locationFailureMessage(geoError,'office attendance')));
       }
     };
     watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
-    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Move near a window or outdoors briefly, then try again.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),5000);
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Falling back to office Wi-Fi verification.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),5000);
   });
   const punch=async(type,workLocation)=>{
     setActionBusy(true);setActionError('');
@@ -636,8 +810,15 @@ function AttendancePage(){
 }
 
 function AttendanceHistoryExplorer({rows,loading}){
-  const [month,setMonth]=useState(()=>new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1));
-  const [selected,setSelected]=useState(today);
+  const [searchParams,setSearchParams]=useSearchParams();
+  const dateParam=searchParams.get('date');
+  const initialDate=dateParam&&/^\d{4}-\d{2}-\d{2}$/.test(dateParam)?dateParam:today;
+  const [month,setMonth]=useState(()=>new Date(Number(initialDate.slice(0,4)),Number(initialDate.slice(5,7))-1,1));
+  const [selected,setSelectedState]=useState(initialDate);
+  const setSelected=(d)=>{
+    setSelectedState(d);
+    setSearchParams(prev=>{const n=new URLSearchParams(prev);if(d===today)n.delete('date');else n.set('date',d);return n;},{replace:true});
+  };
   const year=month.getFullYear();const monthNo=month.getMonth();const prefix=`${year}-${String(monthNo+1).padStart(2,'0')}`;
   const monthRows=rows.filter((r)=>String(r.attendance_date).startsWith(prefix));
   const byDate=new Map(monthRows.map((r)=>[r.attendance_date,r]));
@@ -675,27 +856,199 @@ function StatusPillLabel(value){const labels={ON_TIME:'On time',LATE_ENTRY:'Late
 function CorrectionModal({close,onDone}){
   const [date,setDate]=useState(today);const [checkIn,setCheckIn]=useState('');const [checkOut,setCheckOut]=useState('');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/corrections',{date,requestedCheckIn:checkIn?new Date(checkIn).toISOString():undefined,requestedCheckOut:checkOut?new Date(checkOut).toISOString():undefined,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
-  return <Modal title="Request an attendance correction" subtitle="A short note helps the administrator review the day." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Work date</span><input type="date" value={date} max={today} onChange={(e)=>setDate(e.target.value)} required/></label><div className="form-two"><label className="form-field"><span>Correct check-in <small>(optional)</small></span><input type="datetime-local" value={checkIn} onChange={(e)=>setCheckIn(e.target.value)}/></label><label className="form-field"><span>Correct check-out <small>(optional)</small></span><input type="datetime-local" value={checkOut} onChange={(e)=>setCheckOut(e.target.value)}/></label></div><label className="form-field"><span>What happened?</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="For example: I missed the checkout because my phone battery ran out." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Send for review</Button></div></form></Modal>;
+  return <Modal title="Request an attendance correction" subtitle="A short note helps the administrator review the day." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Work date</span><input aria-label="Work date" type="date" value={date} max={today} onChange={(e)=>setDate(e.target.value)} required/></label><div className="form-two"><label className="form-field"><span>Correct check-in <small>(optional)</small></span><input type="datetime-local" value={checkIn} onChange={(e)=>setCheckIn(e.target.value)}/></label><label className="form-field"><span>Correct check-out <small>(optional)</small></span><input type="datetime-local" value={checkOut} onChange={(e)=>setCheckOut(e.target.value)}/></label></div><label className="form-field"><span>What happened?</span><textarea aria-label="What happened?" value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="For example: I missed the checkout because my phone battery ran out." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Send for review</Button></div></form></Modal>;
 }
 function FlexModal({close,onDone}){
   const [date,setDate]=useState(today);const [startTime,setStart]=useState('10:00');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/attendance/flex-requests',{date,startTime,reason});onDone();}catch(x){setError(x.message);}finally{setBusy(false);}};
-  return <Modal title="Request a flexible start" subtitle="The policy allows 9:00–10:30 AM with manager approval." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Requested start</span><input type="time" min="09:00" max="10:30" value={startTime} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Context for your manager</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Share any details that would be helpful." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Request approval</Button></div></form></Modal>;
+  return <Modal title="Request a flexible start" subtitle="The policy allows 9:00–10:30 AM with manager approval." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input aria-label="Date" type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Requested start</span><input aria-label="Requested start" type="time" min="09:00" max="10:30" value={startTime} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Context for your manager</span><textarea aria-label="Context for your manager" value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Share any details that would be helpful." minLength="8" maxLength="1000" required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Send}>Request approval</Button></div></form></Modal>;
 }
 function Modal({title,subtitle,close,children}){
   const closeRef=useRef(null);
+  const modalRef=useRef(null);
   useEffect(()=>{
     const previous=document.activeElement;
     const scrollY=window.scrollY;
     document.body.style.overflow='hidden';
-    requestAnimationFrame(()=>closeRef.current?.focus());
-    const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();close();}};
+    requestAnimationFrame(()=>{
+      const focusable=modalRef.current?.querySelectorAll('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if(focusable?.length>1){
+        focusable[1].focus();
+      }else{
+        closeRef.current?.focus();
+      }
+    });
+    const onKey=(event)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();
+        close();
+        return;
+      }
+      if(event.key==='Tab'&&modalRef.current){
+        const focusable=Array.from(modalRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'));
+        if(!focusable.length)return;
+        const first=focusable[0];
+        const last=focusable[focusable.length-1];
+        if(event.shiftKey&&document.activeElement===first){
+          event.preventDefault();
+          last.focus();
+        }else if(!event.shiftKey&&document.activeElement===last){
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener('keydown',onKey);
-    return()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow='';if(previous instanceof HTMLElement)previous.focus();window.scrollTo(0,scrollY);};
+    return()=>{
+      document.removeEventListener('keydown',onKey);
+      document.body.style.overflow='';
+      if(previous instanceof HTMLElement)previous.focus();
+      window.scrollTo(0,scrollY);
+    };
   },[close]);
-  return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button ref={closeRef} className="icon-button" onClick={close} aria-label="Close"><X size={19}/></button></div>{children}</div></div>;
+  return <div className="modal-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div ref={modalRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-heading"><div><h2 id="modal-title">{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button ref={closeRef} className="icon-button" onClick={close} aria-label="Close dialog"><X size={19}/></button></div>{children}</div></div>;
 }
 function InlineError({children}){return <div className="inline-alert alert-error" role="alert"><CircleAlert size={16}/>{children}</div>;}
+
+function EarnedLeaveEncashmentSection({ notify, refresh }) {
+  const [eligibility, setEligibility] = useState(null);
+  const [encashments, setEncashments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [days, setDays] = useState(1);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [elRes, encRes] = await Promise.all([
+        get('/leave/encashment/eligibility'),
+        get('/leave/encashments')
+      ]);
+      setEligibility(elRes);
+      setEncashments(encRes?.encashments || []);
+      if (elRes?.maxEncashableDays >= 1) {
+        setDays((prev) => Math.min(Math.max(1, prev), elRes.maxEncashableDays));
+      }
+    } catch (e) {
+      setError(e.message || 'Could not load encashment details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadData(); }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting || !eligibility?.isEligible) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await post('/leave/encashment', { days: Number(days), reason: reason.trim() || undefined });
+      notify(`Encashment request for ${days} Earned Leave day(s) submitted for admin review.`);
+      setReason('');
+      await loadData();
+      if (refresh) refresh();
+    } catch (err) {
+      setError(err.message || 'Could not submit encashment request.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card className="leave-encashment-card" style={{ marginTop: '24px' }}>
+      <CardHeading
+        title="Earned Leave Encashment"
+        subtitle="Eligible employees with 12+ months continuous service can encash accrued Earned Leaves. Casual and Sick leaves are strictly excluded."
+        action={<span className="policy-chip"><BriefcaseBusiness size={14} /> 12-Month Rule</span>}
+      />
+      {error && <InlineError>{error}</InlineError>}
+      {loading ? (
+        <div style={{ padding: '24px', textAlign: 'center' }}><Spinner /></div>
+      ) : (
+        <div className="form-stack">
+          {eligibility?.isEligible ? (
+            <div style={{ padding: '16px', background: 'rgba(218, 175, 81, 0.08)', borderRadius: '10px', border: '1px solid var(--brand-gold, #DAAF51)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontWeight: 700, color: 'var(--brand-dark, #111)' }}>
+                  Tenure: {eligibility.tenureMonths} months (Eligible)
+                </span>
+                <span style={{ fontSize: '13px', color: '#666' }}>
+                  Available EL: <b>{eligibility.earnedBalance} days</b> · Max encashable now: <b>{eligibility.maxEncashableDays} days</b>
+                </span>
+              </div>
+              <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '130px 1fr auto', gap: '12px', alignItems: 'end' }}>
+                <label className="form-field">
+                  <span>Days to encash</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={eligibility.maxEncashableDays}
+                    value={days}
+                    onChange={(e) => setDays(Number(e.target.value))}
+                    required
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Note (optional)</span>
+                  <input
+                    type="text"
+                    placeholder="Context for payroll review"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+                <Button type="submit" loading={submitting} disabled={eligibility.maxEncashableDays < 1} icon={Send}>
+                  Submit encashment
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <div style={{ padding: '16px', background: 'var(--canvas-subtle, #f8f9fa)', borderRadius: '10px', border: '1px solid var(--border-subtle, #e5e7eb)' }}>
+              <p style={{ margin: 0, color: 'var(--text-muted, #666)', fontSize: '13px' }}>
+                <b>Not currently eligible for encashment:</b> {eligibility?.tenureMonths < 12
+                  ? `Continuous tenure is currently ${eligibility?.tenureMonths || 0} of 12 required months.`
+                  : `No available Earned Leave balance to encash (EL balance: ${eligibility?.earnedBalance || 0}, pending: ${eligibility?.pendingDays || 0}).`}
+              </p>
+            </div>
+          )}
+
+          {encashments.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>Your encashment requests</h3>
+              <div className="table-scroll">
+                <table aria-label="Earned leave encashments">
+                  <thead>
+                    <tr>
+                      <th scope="col">DATES</th>
+                      <th scope="col">DAYS</th>
+                      <th scope="col">STATUS</th>
+                      <th scope="col">REASON / REVIEW NOTE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {encashments.map((item) => (
+                      <tr key={item.id}>
+                        <td>{formatDate(String(item.created_at).slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                        <td><b>{item.days} day{Number(item.days) === 1 ? '' : 's'}</b></td>
+                        <td><StatusPill value={item.status} /></td>
+                        <td>{item.rejection_reason || item.reason || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function LeavePage(){
   const {notify,refresh}=useApp();const [balances,setBalances]=useState([]);const [requests,setRequests]=useState([]);const [loading,setLoading]=useState(true);const [refreshing,setRefreshing]=useState(false);const [busy,setBusy]=useState(false);const [withdrawBusy,setWithdrawBusy]=useState(null);const [error,setError]=useState('');const [loadError,setLoadError]=useState('');const leaveRequest=useRef(0);const leaveLoaded=useRef(false);const [file,setFile]=useState(null);const [type,setType]=useState('CASUAL');const [startDate,setStart]=useState('');const [endDate,setEnd]=useState('');const [reason,setReason]=useState('');
@@ -722,11 +1075,12 @@ function LeavePage(){
     {error&&<InlineError>{error}</InlineError>}
     {loadError&&<div className="employee-page-error" role="alert"><CircleAlert size={16}/><span>{loadError}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading||refreshing}><RefreshCw size={14} className={refreshing?'spin':''}/>{loading||refreshing?'Refreshing…':'Retry leave data'}</button></div>}
     <div className="leave-balance-grid">{loading?<Card className="balance-loading"><Spinner/></Card>:balanceCards.map((b,i)=><Card className={`leave-balance-tile leave-balance-${i}`} key={b.type}><div className="leave-tile-top"><span>{b.type==='CASUAL'?'Casual + sick':b.label}</span><span className="leave-tile-icon">{b.type==='CASUAL'?<Sun size={17}/>:b.type==='EARNED'?<BriefcaseBusiness size={17}/>:<Sparkles size={17}/>}</span></div><div className="leave-tile-value">{b.reviewRequired?'HR review':b.remaining}<small>{b.reviewRequired?'balance provisional':'days available'}</small></div><div className="leave-progress"><span style={{width:`${b.entitlement?Math.max(4,Math.min(100,(b.remaining/b.entitlement)*100)):0}%`}}/></div><div className="leave-tile-foot"><span>{b.used} used</span><span>{b.pending?`${b.pending} pending`:`${b.accrued} allocated`}</span></div><p className="leave-tile-note">{b.type==='CASUAL'?'Shared 8-day annual balance for casual and sick leave.':b.type==='EARNED'?(b.reviewRequired?'HR review required before using this provisional balance.':'Accrues 1 day/month after probation, up to 15 days/year.'):'For cultural, religious or personal days.'}</p></Card>)}</div>
-    {upcomingLeave.length>0&&<section className="leave-upcoming-strip"><div className="leave-upcoming-heading"><span className="eyebrow">UP NEXT</span><b>Your approved time away</b><small>Planned days already cleared by your approver.</small></div><div className="leave-upcoming-list">{upcomingLeave.map((r)=><Link to="/leave" key={r.id} className="leave-upcoming-item"><span className="leave-upcoming-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating'}[r.leave_type]||'Leave'}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})} · {r.days} day{Number(r.days)===1?'':'s'}</small></span><ArrowRight size={14}/></Link>)}</div></section>}
+    {upcomingLeave.length>0&&<section className="leave-upcoming-strip"><div className="leave-upcoming-heading"><span className="eyebrow">UP NEXT</span><b>Your approved time away</b><small>Planned days already cleared by your approver.</small></div><div className="leave-upcoming-list">{upcomingLeave.map((r)=><Link to="/leave" key={r.id} className="leave-upcoming-item"><span className="leave-upcoming-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating',LEARNING:'Learning'}[r.leave_type]||'Leave'}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})} · {r.days} day{Number(r.days)===1?'':'s'}</small></span><ArrowRight size={14}/></Link>)}</div></section>}
     <div className="leave-layout"><Card className="leave-form-card"><CardHeading title="Request time off" subtitle="Share the dates and a little context."/><form className="form-stack leave-request-form" onSubmit={submit}>
-      <div className="leave-type-group"><div className="form-field"><span>Casual + sick</span><div className="leave-type-switch" role="group" aria-label="Casual and sick leave selection"><button type="button" className={type==='CASUAL'?'active':''} onClick={()=>setType('CASUAL')}>Casual</button><button type="button" className={type==='SICK'?'active':''} onClick={()=>setType('SICK')}>Sick</button></div><small className="field-help">Both use the same shared 8-day annual balance. Sick leave of 3+ consecutive calendar days requires a doctor’s note.</small></div><div className="form-field"><span>Other leave</span><div className="select-wrap"><select value={type==='CASUAL'||type==='SICK'?'EARNED':type} onChange={(e)=>setType(e.target.value)}><option value="EARNED">Earned leave</option><option value="FLOATING">Floating leave</option></select><ChevronDown size={15}/></div></div></div>
-      <div className="form-two"><label className="form-field"><span>First day</span><input type="date" value={startDate} min={today} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Last day</span><input type="date" value={endDate} min={startDate||today} onChange={(e)=>setEnd(e.target.value)} required/></label></div>
-      <label className="form-field"><span>A short note</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="What would you like your approver to know?" minLength="8" maxLength="1000" required/></label>
+      <div className="leave-type-group"><div className="form-field"><span>Casual + sick</span><div className="leave-type-switch" role="group" aria-label="Casual and sick leave selection"><button type="button" className={type==='CASUAL'?'active':''} onClick={()=>setType('CASUAL')}>Casual</button><button type="button" className={type==='SICK'?'active':''} onClick={()=>setType('SICK')}>Sick</button></div><small className="field-help">Both use the same shared 8-day annual balance. Sick leave of 3+ consecutive calendar days requires a doctor’s note.</small></div><div className="form-field"><span>Other leave</span><div className="select-wrap"><select value={type==='CASUAL'||type==='SICK'?'EARNED':type} onChange={(e)=>setType(e.target.value)}><option value="EARNED">Earned leave</option><option value="FLOATING">Floating leave</option><option value="LEARNING">Learning time off (up to 2d/quarter)</option></select><ChevronDown size={15}/></div></div></div>
+      <div className="form-two"><label className="form-field"><span>First day</span><input aria-label="First day" type="date" value={startDate} min={today} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Last day</span><input aria-label="Last day" type="date" value={endDate} min={startDate||today} onChange={(e)=>setEnd(e.target.value)} required/></label></div>
+      <label className="form-field"><span>A short note</span><textarea aria-label="A short note" value={reason} onChange={(e)=>setReason(e.target.value)} placeholder={type==='LEARNING'?'Course title, provider, and learning summary…':'What would you like your approver to know?'} minLength="8" maxLength="1000" required/></label>
+      {type==='LEARNING'&&<div className="doc-required" style={{borderColor:'var(--brand-gold,#DAAF51)'}}><GraduationCap size={16}/><span><b>Learning Time Off</b><small>Up to 2 days per calendar quarter for professional development, certifications, and conferences. Does not deduct from your personal leave balances.</small></span></div>}
       {requiresDoctorNote&&<div className="doc-required"><FileText size={16}/><span><b>Doctor’s note required</b><small>The policy asks for basic documentation for 3+ consecutive days.</small></span></div>}
       <label className="file-drop"><input type="file" accept="application/pdf,image/jpeg,image/png" onChange={(e)=>{const next=e.target.files?.[0]||null;setError('');if(next&&next.size>4*1024*1024){setError('Attachments must be 4 MB or smaller.');setFile(null);return;}setFile(next);}}/><span className="file-drop-icon"><Plus size={17}/></span><span><b>{file?file.name:'Add an attachment'}</b><small>{type==='SICK'&&sickDays>=3?'PDF, JPG or PNG · Required':'PDF, JPG or PNG · up to 4 MB'}</small></span>{file?<button type="button" className="icon-button" onClick={(e)=>{e.preventDefault();e.stopPropagation();setFile(null);}} aria-label="Remove attachment"><X size={16}/></button>:<span className="file-optional">OPTIONAL</span>}</label>
       <div className="leave-form-note"><CircleHelp size={15}/><span>Working days are Monday–Saturday. Sundays and listed holidays aren’t deducted from your balance.</span></div>
@@ -734,22 +1088,23 @@ function LeavePage(){
         <div className="leave-request-preview-head"><span className="eyebrow">REQUEST PREVIEW</span><Check size={15}/></div>
         <div className="leave-request-preview-main">
           <span><CalendarDays size={16}/><b>{startDate?formatDate(startDate,{day:'numeric',month:'short',year:'numeric'}):'Choose your first day'}{endDate?' – '+formatDate(endDate,{day:'numeric',month:'short',year:'numeric'}):''}</b></span>
-          <span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating'}[type]||'Leave'}</b><small>{reason?reason.length+' characters added':'Add a short note'}</small></span>
+          <span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating',LEARNING:'Learning'}[type]||'Leave'}</b><small>{reason?reason.length+' characters added':'Add a short note'}</small></span>
         </div>
       </div>}
       <Button type="submit" loading={busy} icon={Send}>Send leave request</Button>
     </form></Card>
-      <div className="leave-side"><Card className="policy-card"><div className="policy-card-icon"><ShieldCheck size={18}/></div><h3>Time away is time gained.</h3><p>We encourage advance notice where you can, and understand that emergencies happen.</p><div className="policy-rule"><b>01</b><span><strong>Casual + sick</strong><small>Shared 8 days/year. No note for up to 2 consecutive sick days.</small></span></div><div className="policy-rule"><b>02</b><span><strong>Earned leave</strong><small>15 days/year entitlement; accrues 1 day/month after probation.</small></span></div><div className="policy-rule"><b>03</b><span><strong>Floating days</strong><small>4 days each calendar year for meaningful observances.</small></span></div></Card><Card className="leave-help-card"><span className="help-leaf"><Sun size={18}/></span><div><b>Plans change. That’s okay.</b><p>Pending requests can be withdrawn and sent again with new dates.</p></div></Card></div>
+      <div className="leave-side"><Card className="policy-card"><div className="policy-card-icon"><ShieldCheck size={18}/></div><h3>Time away is time gained.</h3><p>We encourage advance notice where you can, and understand that emergencies happen.</p><div className="policy-rule"><b>01</b><span><strong>Casual + sick</strong><small>Shared 8 days/year. No note for up to 2 consecutive sick days.</small></span></div><div className="policy-rule"><b>02</b><span><strong>Earned leave</strong><small>15 days/year entitlement; accrues 1 day/month after probation.</small></span></div><div className="policy-rule"><b>03</b><span><strong>Floating days</strong><small>4 days each calendar year for meaningful observances.</small></span></div><div className="policy-rule"><b>04</b><span><strong>Learning time off</strong><small>Up to 2 days/quarter for training and certifications.</small></span></div></Card><Card className="leave-help-card"><span className="help-leaf"><Sun size={18}/></span><div><b>Plans change. That’s okay.</b><p>Pending requests can be withdrawn and sent again with new dates.</p></div></Card></div>
     </div>
-    <div className="section-head"><div><h2>Your requests</h2><p>See what’s coming up and what’s been approved.</p></div><span className="history-count">{requests.length} {requests.length===1?'request':'requests'}</span></div><Card className="table-card"><div className="table-scroll"><table><thead><tr><th>LEAVE</th><th>DATES</th><th>DAYS</th><th>REQUESTED</th><th>STATUS</th><th></th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:requests.length?requests.map((r)=><tr key={r.id}><td><b>{({CASUAL:'Casual leave',SICK:'Sick leave',EARNED:'Earned leave',FLOATING:'Floating leave'})[r.leave_type]}</b>{r.attachment_name&&<small className="table-subline"><FileText size={12}/> {r.attachment_name}</small>}</td><td>{formatDate(r.start_date,{day:'numeric',month:'short'})}{r.start_date!==r.end_date?` – ${formatDate(r.end_date,{day:'numeric',month:'short'})}`:''}</td><td>{r.days}</td><td>{formatDate(String(r.created_at).slice(0,10),{day:'numeric',month:'short'})}</td><td><StatusPill value={r.status}/></td><td>{r.status==='PENDING'&&<button className="table-action" disabled={withdrawBusy===r.id||busy} onClick={()=>withdraw(r.id)}>{withdrawBusy===r.id?'Withdrawing…':'Withdraw'}</button>}{r.reviewer_note&&<span className="table-note" title={r.reviewer_note}><CircleHelp size={14}/></span>}</td></tr>):<tr><td colSpan="6"><div className="table-message">No leave requests yet. When you’re ready, your first request starts above.</div></td></tr>}</tbody></table></div></Card>
+    <div className="section-head"><div><h2>Your requests</h2><p>See what’s coming up and what’s been approved.</p></div><span className="history-count">{requests.length} {requests.length===1?'request':'requests'}</span></div><Card className="table-card"><div className="table-scroll"><table aria-label="Your leave request history"><thead><tr><th scope="col">LEAVE</th><th scope="col">DATES</th><th scope="col">DAYS</th><th scope="col">REQUESTED</th><th scope="col">STATUS</th><th scope="col">ACTIONS</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:requests.length?requests.map((r)=><tr key={r.id}><td><b>{({CASUAL:'Casual leave',SICK:'Sick leave',EARNED:'Earned leave',FLOATING:'Floating leave',LEARNING:'Learning time off'})[r.leave_type]||r.leave_type}</b>{r.attachment_name&&<small className="table-subline"><FileText size={12}/> {r.attachment_name}</small>}</td><td>{formatDate(r.start_date,{day:'numeric',month:'short'})}{r.start_date!==r.end_date?` – ${formatDate(r.end_date,{day:'numeric',month:'short'})}`:''}</td><td>{r.days}</td><td>{formatDate(String(r.created_at).slice(0,10),{day:'numeric',month:'short'})}</td><td><StatusPill value={r.status}/></td><td>{r.status==='PENDING'&&<button className="table-action" disabled={withdrawBusy===r.id||busy} onClick={()=>withdraw(r.id)}>{withdrawBusy===r.id?'Withdrawing…':'Withdraw'}</button>}{r.reviewer_note&&<span className="table-note" title={r.reviewer_note}><CircleHelp size={14}/></span>}</td></tr>):<tr><td colSpan="6"><div className="table-message">No leave requests yet. When you’re ready, your first request starts above.</div></td></tr>}</tbody></table></div></Card>
     <div className="mobile-request-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:requests.length?requests.map((r)=><Card className="mobile-request-card" key={'mobile-'+r.id}>
-        <div className="mobile-request-card-top"><span className="mobile-request-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><div><b>{{CASUAL:'Casual leave',SICK:'Sick leave',EARNED:'Earned leave',FLOATING:'Floating leave'}[r.leave_type]}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})}</small></div><StatusPill value={r.status}/></div>
+        <div className="mobile-request-card-top"><span className="mobile-request-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><div><b>{{CASUAL:'Casual leave',SICK:'Sick leave',EARNED:'Earned leave',FLOATING:'Floating leave',LEARNING:'Learning time off'}[r.leave_type]||r.leave_type}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})}</small></div><StatusPill value={r.status}/></div>
         <div className="mobile-request-card-meta"><span><b>{r.days}</b> day{Number(r.days)===1?'':'s'}</span><span>Requested {formatDate(String(r.created_at).slice(0,10),{day:'numeric',month:'short'})}</span></div>
         {r.reviewer_note&&<div className="mobile-request-note"><CircleHelp size={14}/><span>{r.reviewer_note}</span></div>}
         {r.status==='PENDING'&&<button className="mobile-request-action" disabled={withdrawBusy===r.id||busy} onClick={()=>withdraw(r.id)}>{withdrawBusy===r.id?'Withdrawing…':'Withdraw request'}</button>}
       </Card>):<EmptyState icon={CalendarDays} title="No leave requests yet." body="Your submitted requests will appear here."/>}
     </div>
+    <EarnedLeaveEncashmentSection notify={notify} refresh={load}/>
   </>;
 }
 
@@ -773,9 +1128,9 @@ function WfhPage(){
     {!loading&&!loadError&&data.enabled&&!data.approvedToday&&<div className="inline-alert alert-neutral wfh-not-approved-today" role="status"><House size={17}/><span>WFH access is enabled. You can check in remotely without GPS or office Wi-Fi; same-day attendance does not require a WFH request approval.</span></div>}
     {data.enabled&&!loadError&&!loading&&<div className="wfh-usage-grid"><div className="wfh-usage-main"><span className="eyebrow">THIS MONTH</span><b>{approvedThisMonth} <em>/ {data.monthlyCap}</em></b><small>approved remote days</small><div className="wfh-usage-bar"><i style={{width:(data.monthlyCap?Math.min(100,(approvedThisMonth/data.monthlyCap)*100):0)+'%'}}/></div></div><div><span className="eyebrow">AVAILABLE</span><b>{remainingWfhDays}</b><small>days remaining</small></div><div><span className="eyebrow">PENDING</span><b>{pendingWfhCount}</b><small>awaiting approval</small></div></div>}
     <section className="wfh-banner"><div className="wfh-banner-icon"><House size={21}/></div><div><span className="hero-kicker">FLEXIBILITY IS BUILT ON TRUST</span><h2>{loading?'Checking your remote-work access…':loadError?'Remote-work status is temporarily unavailable.':data.enabled?'A remote day, with a little planning.':'WFH isn’t enabled for your account yet.'}</h2><p>{loading?'We’re checking your current eligibility and request history.':loadError?'Retry the access check. We won’t treat a connection failure as a disabled account.':data.enabled?`WFH is available for you by approval, typically up to ${data.monthlyCap} days per month.`:'Ask an administrator if your role should be included in the current WFH arrangement.'}</p></div><div className="wfh-banner-art"><div/><House size={42}/><span/></div></section>
-    <div className="wfh-layout"><Card className="wfh-request-card"><CardHeading title="Plan a remote day" subtitle="Submit planned dates for manager review. Enabled employees can check in remotely without same-day approval."/>{loading?<div className="employee-page-loading" role="status"><Spinner/><span>Checking eligibility…</span></div>:loadError?<div className="employee-page-error-inline"><CircleAlert size={16}/><span>Remote-work access could not be verified.</span><button type="button" className="text-button" onClick={()=>void load()}>Retry</button></div>:data.enabled?<form className="form-stack" onSubmit={submit}><label className="form-field"><span>Remote work date</span><input type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><div className="request-kind-toggle"><button type="button" className={kind==='PLANNED'?'kind-selected':''} onClick={()=>setKind('PLANNED')}><CalendarDays size={16}/><span><b>Planned</b><small>Ask at least 24 hours ahead</small></span></button><button type="button" className={kind==='EMERGENCY'?'kind-selected':''} onClick={()=>setKind('EMERGENCY')}><CircleAlert size={16}/><span><b>Unexpected</b><small>Same-day emergency request</small></span></button></div><label className="form-field"><span>Anything your manager should know?</span><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="A little context helps with team coordination." minLength="8" maxLength="1000" required/></label><div className="wfh-policy-note"><ShieldCheck size={15}/><span>Remote work follows the same 9 AM–6 PM schedule. Performance is measured through delivery, not online presence.</span></div>{(date||reason)&&<div className="wfh-request-preview"><div className="wfh-request-preview-head"><span className="eyebrow">REQUEST PREVIEW</span><Check size={15}/></div><div className="wfh-request-preview-grid"><span><CalendarDays size={16}/><b>{date?formatDate(date,{weekday:"short",day:"numeric",month:"short",year:"numeric"}):"Choose a date"}</b></span><span><House size={16}/><b>{kind==="EMERGENCY"?"Unexpected":"Planned"}</b><small>{reason?reason.length+" characters added":"Add a little context"}</small></span></div></div>}<Button type="submit" loading={busy} disabled={loading||Boolean(loadError)} icon={Send}>Request WFH approval</Button></form>:<div className="wfh-disabled"><LockIcon/><h3>Not enabled for this account</h3><p>WFH currently applies to one employee and can be configured by an administrator.</p></div>}</Card>
+    <div className="wfh-layout"><Card className="wfh-request-card"><CardHeading title="Plan a remote day" subtitle="Submit planned dates for manager review. Enabled employees can check in remotely without same-day approval."/>{loading?<div className="employee-page-loading" role="status"><Spinner/><span>Checking eligibility…</span></div>:loadError?<div className="employee-page-error-inline"><CircleAlert size={16}/><span>Remote-work access could not be verified.</span><button type="button" className="text-button" onClick={()=>void load()}>Retry</button></div>:data.enabled?<form className="form-stack" onSubmit={submit}><label className="form-field"><span>Remote work date</span><input aria-label="Remote work date" type="date" value={date} min={today} onChange={(e)=>setDate(e.target.value)} required/></label><div className="request-kind-toggle"><button type="button" className={kind==='PLANNED'?'kind-selected':''} onClick={()=>setKind('PLANNED')}><CalendarDays size={16}/><span><b>Planned</b><small>Ask at least 24 hours ahead</small></span></button><button type="button" className={kind==='EMERGENCY'?'kind-selected':''} onClick={()=>setKind('EMERGENCY')}><CircleAlert size={16}/><span><b>Unexpected</b><small>Same-day emergency request</small></span></button></div><label className="form-field"><span>Anything your manager should know?</span><textarea aria-label="Anything your manager should know?" value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="A little context helps with team coordination." minLength="8" maxLength="1000" required/></label><div className="wfh-policy-note"><ShieldCheck size={15}/><span>Remote work follows the same 9 AM–6 PM schedule. Performance is measured through delivery, not online presence.</span></div>{(date||reason)&&<div className="wfh-request-preview"><div className="wfh-request-preview-head"><span className="eyebrow">REQUEST PREVIEW</span><Check size={15}/></div><div className="wfh-request-preview-grid"><span><CalendarDays size={16}/><b>{date?formatDate(date,{weekday:"short",day:"numeric",month:"short",year:"numeric"}):"Choose a date"}</b></span><span><House size={16}/><b>{kind==="EMERGENCY"?"Unexpected":"Planned"}</b><small>{reason?reason.length+" characters added":"Add a little context"}</small></span></div></div>}<Button type="submit" loading={busy} disabled={loading||Boolean(loadError)} icon={Send}>Request WFH approval</Button></form>:<div className="wfh-disabled"><LockIcon/><h3>Not enabled for this account</h3><p>WFH currently applies to one employee and can be configured by an administrator.</p></div>}</Card>
       <div className="wfh-side"><Card className="wfh-guidelines"><CardHeading title="Working remotely" subtitle="Simple expectations for a good day."/><div className="guideline-row"><span className="guideline-number">01</span><div><b>Keep your team aligned</b><p>Availability on Slack, email and calls during regular working hours.</p></div></div><div className="guideline-row"><span className="guideline-number">02</span><div><b>Protect company information</b><p>Use a private workspace and avoid unsecured public Wi-Fi.</p></div></div><div className="guideline-row"><span className="guideline-number">03</span><div><b>Trust over tracking</b><p>No spyware, screen recording, webcam watching or keyboard tracking.</p></div></div></Card><div className="wfh-quote">“We measure contribution through delivery, not online presence.”<small>REMOTE WORK POLICY</small></div></div></div>
-    <div className="section-head"><div><h2>Your WFH requests</h2><p>Planned and emergency requests for this year.</p></div></div><Card className="table-card"><div className="table-scroll"><table><thead><tr><th>DATE</th><th>REQUEST TYPE</th><th>CONTEXT</th><th>STATUS</th><th>NOTE</th><th>ACTION</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:data.requests?.length?data.requests.map((r)=><tr key={r.id}><td><b>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td>{r.request_kind==='EMERGENCY'?'Emergency':'Planned'}</td><td className="reason-cell">{r.reason}</td><td><StatusPill value={r.status}/></td><td>{r.reviewer_note||'—'}</td><td>{['PENDING','APPROVED'].includes(String(r.status).toUpperCase())&&String(r.request_date).slice(0,10)>=today?<Button size="small" variant="soft" loading={cancelBusy===r.id} disabled={Boolean(cancelBusy)} onClick={()=>void cancelRequest(r)}>Cancel</Button>:'—'}</td></tr>):<tr><td colSpan="6"><div className="table-message">No WFH requests yet.</div></td></tr>}</tbody></table></div></Card>
+    <div className="section-head"><div><h2>Your WFH requests</h2><p>Planned and emergency requests for this year.</p></div></div><Card className="table-card"><div className="table-scroll"><table aria-label="Your work from home requests"><thead><tr><th scope="col">DATE</th><th scope="col">REQUEST TYPE</th><th scope="col">CONTEXT</th><th scope="col">STATUS</th><th scope="col">NOTE</th><th scope="col">ACTION</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:data.requests?.length?data.requests.map((r)=><tr key={r.id}><td><b>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b></td><td>{r.request_kind==='EMERGENCY'?'Emergency':'Planned'}</td><td className="reason-cell">{r.reason}</td><td><StatusPill value={r.status}/></td><td>{r.reviewer_note||'—'}</td><td>{['PENDING','APPROVED'].includes(String(r.status).toUpperCase())&&String(r.request_date).slice(0,10)>=today?<Button size="small" variant="soft" loading={cancelBusy===r.id} disabled={Boolean(cancelBusy)} onClick={()=>void cancelRequest(r)}>Cancel</Button>:'—'}</td></tr>):<tr><td colSpan="6"><div className="table-message">No WFH requests yet.</div></td></tr>}</tbody></table></div></Card>
     <div className="mobile-request-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:data.requests?.length?data.requests.map((r)=><Card className="mobile-request-card" key={'mobile-'+r.id}>
         <div className="mobile-request-card-top"><span className="mobile-request-date"><House size={16}/></span><div><b>{r.request_kind==='EMERGENCY'?'Emergency WFH':'Planned WFH'}</b><small>{formatDate(r.request_date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</small></div><StatusPill value={r.status}/></div>
@@ -801,12 +1156,15 @@ function OutPage(){
 }
 
 function CalendarPage(){
-  const {user}=useApp();
+  const {user,notify}=useApp();
   const [month,setMonth]=useState(()=>{const p=today.split('-').map(Number);return new Date(p[0],p[1]-1,1);});
   const [holidays,setHolidays]=useState([]);
   const [loading,setLoading]=useState(true);
   const [reloadKey,setReloadKey]=useState(0);
   const [addOpen,setAddOpen]=useState(false);
+  const [editingHoliday,setEditingHoliday]=useState(null);
+  const [deletingHoliday,setDeletingHoliday]=useState(null);
+  const [deleteBusy,setDeleteBusy]=useState(false);
   const [error,setError]=useState('');
   const [created,setCreated]=useState(false);
   const year=month.getFullYear();
@@ -838,10 +1196,25 @@ function CalendarPage(){
     return {day,key,holiday:holidayMap.get(key),isToday:key===today,isSunday:new Date(year,monthNo,day).getDay()===0};
   });
 
+  const handleDeleteHoliday=async()=>{
+    if(!deletingHoliday)return;
+    setDeleteBusy(true);
+    try{
+      await del('/calendar/'+deletingHoliday.date);
+      notify(deletingHoliday.name+' was removed from the calendar.');
+      setDeletingHoliday(null);
+      retry();
+    }catch(e){
+      throw e;
+    }finally{
+      setDeleteBusy(false);
+    }
+  };
+
   return <>
     <PageTitle eyebrow="PLAN AHEAD, LEAVE SPACE" title="Holiday calendar" description="National holidays and company observances for your year." action={user.role==='ADMIN'?<Button variant="soft" icon={Plus} onClick={()=>setAddOpen(true)}>Add holiday</Button>:null}/>
     {error&&<div className="calendar-load-error" role="alert"><span className="calendar-load-error-icon"><CircleAlert size={17}/></span><div><b>We couldn’t refresh the holiday calendar.</b><p>{error}</p><Button variant="soft" size="small" icon={RefreshCw} onClick={retry} disabled={loading}>Retry calendar</Button></div></div>}
-    {created&&<div className="inline-alert alert-success calendar-created-message" role="status" aria-live="polite"><CircleCheck size={16}/> Holiday added to the company calendar.<button type="button" onClick={()=>setCreated(false)} aria-label="Dismiss confirmation"><X size={15}/></button></div>}
+    {created&&<div className="inline-alert alert-success calendar-created-message" role="status" aria-live="polite"><CircleCheck size={16}/> Holiday updated in the company calendar.<button type="button" onClick={()=>setCreated(false)} aria-label="Dismiss confirmation"><X size={15}/></button></div>}
 
     <div className="calendar-main-stage">
       <Card className="calendar-card" aria-busy={loading}>
@@ -857,14 +1230,51 @@ function CalendarPage(){
     <section className="holiday-section">
       <div className="section-head holiday-section-head"><div><h2>Holidays in {year}</h2><p>One clean view of national and company observances.</p></div><div className="holiday-section-meta"><span className="holiday-count">{yearHolidays.length}</span><span>{loading?"Updating calendar…":error?"Last available data":"Updated for this year"}</span></div></div>
       <Card className="holidays-card holidays-card-wide" aria-busy={loading}>
-        {loading?<div className="table-message calendar-list-loading" role="status"><Spinner/> Loading annual holidays…</div>:yearHolidays.length?<div className="holiday-grid">{yearHolidays.map((h)=><div className={"holiday-row holiday-row-"+(h.kind==="FLOATING"?"floating":"fixed")} key={h.date}><div className="holiday-date"><b>{formatDate(h.date,{day:"2-digit"})}</b><small>{formatDate(h.date,{month:"short"}).toUpperCase()}</small></div><div className="holiday-row-copy"><b>{h.name}</b><small>{formatDate(h.date,{weekday:"long"})} · {h.kind==="FLOATING"?"Floating":"Fixed"}</small></div><span className="holiday-pin"><Sun size={16}/></span></div>)}</div>:error?<div className="calendar-empty-error"><CircleAlert size={18}/><b>Holiday data is unavailable.</b><p>Try loading the calendar again. No changes have been made to your leave balance.</p><Button variant="soft" size="small" icon={RefreshCw} onClick={retry}>Retry calendar</Button></div>:<EmptyState icon={CalendarDays} title="No holidays found" body="Company holidays will show here once they’re added."/>}
+        {loading?<div className="table-message calendar-list-loading" role="status"><Spinner/> Loading annual holidays…</div>:yearHolidays.length?<div className="holiday-grid">{yearHolidays.map((h)=><div className={"holiday-row holiday-row-"+(h.kind==="FLOATING"?"floating":"fixed")} key={h.date}><div className="holiday-date"><b>{formatDate(h.date,{day:"2-digit"})}</b><small>{formatDate(h.date,{month:"short"}).toUpperCase()}</small></div><div className="holiday-row-copy"><b>{h.name}</b><small>{formatDate(h.date,{weekday:"long"})} · {h.kind==="FLOATING"?"Floating":"Fixed"}{h.isPolicy?' · Statutory national holiday':''}</small></div>{user.role==='ADMIN'&&!h.isPolicy?<div className="holiday-row-actions" style={{display:'flex',gap:'6px',alignItems:'center'}}><button className="icon-button" type="button" title={"Edit "+h.name} aria-label={"Edit "+h.name} onClick={()=>setEditingHoliday(h)}><Pencil size={14}/></button><button className="icon-button" type="button" style={{color:'var(--red,#e53e3e)'}} title={"Remove "+h.name} aria-label={"Remove "+h.name} onClick={()=>setDeletingHoliday(h)}><Trash2 size={14}/></button></div>:<span className="holiday-pin" title={h.isPolicy?'Statutory national holiday':'Company observance'}><Sun size={16}/></span>}</div>)}</div>:error?<div className="calendar-empty-error"><CircleAlert size={18}/><b>Holiday data is unavailable.</b><p>Try loading the calendar again. No changes have been made to your leave balance.</p><Button variant="soft" size="small" icon={RefreshCw} onClick={retry}>Retry calendar</Button></div>:<EmptyState icon={CalendarDays} title="No holidays found" body="Company holidays will show here once they’re added."/>}
       </Card>
       <div className="calendar-note calendar-note-wide"><span><ShieldCheck size={17}/></span><div><b>How leave days are counted</b><p>Sundays and holidays are excluded from leave balance calculations. Saturday is a working day.</p></div></div>
     </section>
-    {addOpen&&<AddHolidayModal close={()=>setAddOpen(false)} onDone={()=>{setAddOpen(false);setCreated(true);retry();}}/>}
+    {addOpen&&<HolidayModal close={()=>setAddOpen(false)} onDone={(msg)=>{setAddOpen(false);setCreated(true);notify(msg);retry();}}/>}
+    {editingHoliday&&<HolidayModal holiday={editingHoliday} close={()=>setEditingHoliday(null)} onDone={(msg)=>{setEditingHoliday(null);notify(msg);retry();}}/>}
+    {deletingHoliday&&<DeleteHolidayModal holiday={deletingHoliday} close={()=>setDeletingHoliday(null)} onConfirm={handleDeleteHoliday} busy={deleteBusy}/>}
   </>;
 }
-function AddHolidayModal({close,onDone}){const [date,setDate]=useState('');const [name,setName]=useState('');const [kind,setKind]=useState('FLOATING');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/calendar',{date,name,kind});onDone();}catch(e){setError(e.message);}finally{setBusy(false);}};return <Modal title="Add a company holiday" subtitle="This date will be excluded from working-day leave calculations." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input type="date" value={date} onChange={(e)=>setDate(e.target.value)} required/></label><label className="form-field"><span>Holiday name</span><input value={name} maxLength="160" onChange={(e)=>setName(e.target.value)} placeholder="For example: Diwali" required/></label><label className="form-field"><span>Holiday type</span><div className="select-wrap"><select value={kind} onChange={(e)=>setKind(e.target.value)}><option value="FLOATING">Floating festival / observance · yellow</option><option value="FIXED">Fixed company holiday · red</option></select><ChevronDown size={15}/></div></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button type="submit" loading={busy}>Add holiday</Button></div></form></Modal>;}
+function HolidayModal({holiday,close,onDone}){
+  const isEditing=Boolean(holiday);
+  const [date,setDate]=useState(holiday?.date||'');
+  const [name,setName]=useState(holiday?.name||'');
+  const [kind,setKind]=useState(holiday?.kind||'FLOATING');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const submit=async(e)=>{
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try{
+      await post('/calendar',{date,name,kind});
+      onDone(isEditing?name+' was updated.':name+' was added to the company calendar.');
+    }catch(e){
+      setError(e.message);
+    }finally{
+      setBusy(false);
+    }
+  };
+  return <Modal title={isEditing?"Edit company holiday":"Add a company holiday"} subtitle={isEditing?"Update observance name or classification.":"This date will be excluded from working-day leave calculations."} close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>Date</span><input aria-label="Date" type="date" value={date} onChange={(e)=>setDate(e.target.value)} disabled={isEditing} required/></label><label className="form-field"><span>Holiday name</span><input aria-label="Holiday name" value={name} maxLength="160" onChange={(e)=>setName(e.target.value)} placeholder="For example: Diwali" required/></label><label className="form-field"><span>Holiday type</span><div className="select-wrap"><select value={kind} onChange={(e)=>setKind(e.target.value)}><option value="FLOATING">Floating festival / observance · yellow</option><option value="FIXED">Fixed company holiday · red</option></select><ChevronDown size={15}/></div></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close} disabled={busy}>Cancel</Button><Button type="submit" loading={busy}>{isEditing?"Save changes":"Add holiday"}</Button></div></form></Modal>;
+}
+function DeleteHolidayModal({holiday,close,onConfirm,busy}){
+  const [error,setError]=useState('');
+  const submit=async(e)=>{
+    e.preventDefault();
+    setError('');
+    try{
+      await onConfirm();
+    }catch(e){
+      setError(e.message);
+    }
+  };
+  return <Modal title="Remove company holiday" subtitle="Remove this observance from the company calendar." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}<div className="inline-alert alert-warning" role="alert" style={{display:'flex',gap:'8px',alignItems:'flex-start'}}><CircleAlert size={18} style={{flexShrink:0,marginTop:'2px'}}/><div><strong>Confirm removal:</strong><p style={{margin:'4px 0 0 0',fontSize:'13px'}}>Are you sure you want to remove <b>{holiday.name}</b> ({holiday.date})? This date will become a regular working day for leave calculations.</p></div></div><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close} disabled={busy}>Cancel</Button><Button type="submit" className="button-danger" loading={busy}>Remove holiday</Button></div></form></Modal>;
+}
+const AddHolidayModal=HolidayModal;
 
 function NotificationsPage(){
   const {notifications,refreshNotifications,notify}=useApp();
@@ -887,7 +1297,31 @@ function NotificationsPage(){
 }
 function ApprovalsPage(){
   const {notify,refresh}=useApp();
-  const [items,setItems]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [loadFailed,setLoadFailed]=useState(false);const [filter,setFilter]=useState('ALL');const [search,setSearch]=useState('');const [reviewing,setReviewing]=useState(null);const [busy,setBusy]=useState(false);const approvalsRequest=useRef(0);const approvalsLoaded=useRef(false);
+  const [searchParams,setSearchParams]=useSearchParams();
+  const [items,setItems]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [loadFailed,setLoadFailed]=useState(false);
+  const [filter,setFilterState]=useState(()=>searchParams.get('filter')?.toUpperCase()||'ALL');
+  const [search,setSearchState]=useState(()=>searchParams.get('search')||'');
+  const [reviewing,setReviewing]=useState(null);const [busy,setBusy]=useState(false);const approvalsRequest=useRef(0);const approvalsLoaded=useRef(false);
+  const deepLinkedProcessed = useRef(false);
+  const targetId = searchParams.get('id');
+  const targetType = searchParams.get('type')?.toLowerCase();
+
+  useEffect(() => {
+    if (!targetId || items.length === 0 || deepLinkedProcessed.current) return;
+    const found = items.find((x: any) => x.id === targetId && (!targetType || String(x.type).toLowerCase() === targetType));
+    if (found) {
+      deepLinkedProcessed.current = true;
+      setReviewing({ item: found, decision: 'APPROVED' });
+    }
+  }, [items, targetId, targetType]);
+  const setFilter=(f)=>{
+    setFilterState(f);
+    setSearchParams(prev=>{const n=new URLSearchParams(prev);if(f==='ALL')n.delete('filter');else n.set('filter',f);return n;},{replace:true});
+  };
+  const setSearch=(s)=>{
+    setSearchState(s);
+    setSearchParams(prev=>{const n=new URLSearchParams(prev);if(!s)n.delete('search');else n.set('search',s);return n;},{replace:true});
+  };
   const load=async()=>{const requestId=++approvalsRequest.current;if(!approvalsLoaded.current)setLoading(true);setError('');setLoadFailed(false);try{const r=await get('/admin/approvals');if(requestId!==approvalsRequest.current)return;setItems(Array.isArray(r.approvals)?r.approvals:[]);approvalsLoaded.current=true;}catch(e){if(requestId===approvalsRequest.current){setError(e.message||'The review queue could not be loaded.');setLoadFailed(true);}}finally{if(requestId===approvalsRequest.current)setLoading(false);}};
   useEffect(()=>{void load();return()=>{approvalsRequest.current+=1;};},[]);
   const visible=items.filter((x)=>{const matchFilter=filter==='ALL'||String(x.type||'').toUpperCase()===filter;const text=((x.full_name||'')+' '+(x.employee_code||'')+' '+(x.category||'')+' '+(x.reason||'')).toLowerCase();return matchFilter&&text.includes(search.toLowerCase());});
@@ -912,6 +1346,211 @@ function ApprovalCard({item,onReview}){
 function ReviewModal({item,initialDecision,busy,close,onReview}){
   const [note,setNote]=useState('');const [decision,setDecision]=useState(initialDecision||'APPROVED');
   return <Modal title={decision==='APPROVED'?'Approve this request?':'Decline this request?'} subtitle={item.full_name+' · '+item.category} close={close}><div className="review-summary"><span className="review-summary-icon">{item.type==='wfh'?<House size={17}/>:item.type==='flex'?<Timer size={17}/>:item.type==='correction'?<Clock3 size={17}/>:<CalendarDays size={17}/>}</span><div><b>{item.date?formatDate(item.date,{weekday:'short',day:'numeric',month:'long',year:'numeric'}):'Attendance correction'}</b><p>{item.reason||'No additional context provided.'}</p></div></div><label className="form-field"><span>Note for the employee <small>(optional)</small></span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder={decision==='APPROVED'?'Add helpful context if useful.':'A short explanation will help them understand.'} maxLength="1000"/></label><div className="decision-toggle"><button type="button" className={decision==='APPROVED'?'decision-current':''} onClick={()=>setDecision('APPROVED')}><Check size={14}/> Approve</button><button type="button" className={decision==='REJECTED'?'decision-current decision-no':''} onClick={()=>setDecision('REJECTED')}><X size={14}/> Decline</button></div><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button variant={decision==='APPROVED'?'primary':'danger'} loading={busy} onClick={()=>onReview(decision,note)}>{decision==='APPROVED'?'Confirm approval':'Confirm decline'}</Button></div></Modal>;
+}
+
+function LearningAllowanceSection({ notify }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ title: '', provider: '', amount: '', notes: '' });
+  const [file, setFile] = useState(null);
+
+  const loadBudget = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await get('/enterprise/learning/budget');
+      setData(res);
+    } catch (e) {
+      setError(e.message || 'Could not load Learning & Development allowance.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadBudget(); }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting || !form.title.trim() || !form.provider.trim() || !form.amount) return;
+    const amountVal = Number(form.amount);
+    if (amountVal <= 0 || (data && amountVal > data.remaining_balance)) {
+      setError(`Claim amount cannot exceed remaining balance (₹${data?.remaining_balance || 0}).`);
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      let attachmentId = null;
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const up = await post('/files', formData);
+        attachmentId = up.id;
+      }
+      await post('/enterprise/learning/claims', {
+        title: form.title.trim(),
+        provider: form.provider.trim(),
+        amount_inr: amountVal,
+        invoice_attachment_id: attachmentId,
+        notes: form.notes.trim() || undefined
+      });
+      notify(`L&D claim for ₹${amountVal} submitted for admin review.`);
+      setForm({ title: '', provider: '', amount: '', notes: '' });
+      setFile(null);
+      setShowForm(false);
+      await loadBudget();
+    } catch (err) {
+      setError(err.message || 'Could not submit learning claim.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const spentOrCommitted = (data?.approved_amount || 0) + (data?.pending_amount || 0);
+  const percentUsed = data?.annual_allowance ? Math.min(100, Math.round((spentOrCommitted / data.annual_allowance) * 100)) : 0;
+
+  return (
+    <Card className="profile-info-card learning-allowance-card" style={{ marginTop: '20px' }}>
+      <div className="profile-info-heading">
+        <div>
+          <span className="profile-info-icon"><GraduationCap size={18} /></span>
+          <div>
+            <h2>Learning & Development Allowance</h2>
+            <p>Annual budget of ₹24,000 (₹2,000/month) for books, courses, certifications, and conferences.</p>
+          </div>
+        </div>
+        {!showForm && data && data.remaining_balance > 0 && (
+          <button type="button" className="button button-soft button-small" onClick={() => setShowForm(true)}>
+            <Plus size={14} /> New claim
+          </button>
+        )}
+      </div>
+
+      {error && <InlineError>{error}</InlineError>}
+
+      {loading ? (
+        <div style={{ padding: '24px', textAlign: 'center' }}><Spinner /></div>
+      ) : data ? (
+        <div>
+          <div className="leave-progress" style={{ marginBottom: '16px' }}>
+            <span style={{ width: `${percentUsed}%`, background: 'var(--brand-gold, #DAAF51)' }} />
+          </div>
+          <div className="profile-info-grid" style={{ marginBottom: '16px' }}>
+            <div><span>Annual allowance</span><b>₹{data.annual_allowance.toLocaleString('en-IN')}</b></div>
+            <div><span>Approved claims</span><b>₹{data.approved_amount.toLocaleString('en-IN')}</b></div>
+            <div><span>Pending review</span><b>₹{data.pending_amount.toLocaleString('en-IN')}</b></div>
+            <div><span>Remaining balance</span><b style={{ color: 'var(--brand-gold, #DAAF51)' }}>₹{data.remaining_balance.toLocaleString('en-IN')}</b></div>
+          </div>
+
+          {showForm && (
+            <form onSubmit={handleSubmit} className="form-stack" style={{ padding: '16px', background: 'var(--canvas-subtle, #f9fafb)', borderRadius: '8px', border: '1px solid var(--border-subtle, #eee)', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>Submit L&D Reimbursement Claim</h3>
+              <div className="form-two">
+                <label className="form-field">
+                  <span>Course / Certification Title</span>
+                  <input
+                    type="text"
+                    required
+                    maxLength={180}
+                    placeholder="e.g. AWS Certified Solutions Architect"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Platform / Provider</span>
+                  <input
+                    type="text"
+                    required
+                    maxLength={120}
+                    placeholder="e.g. Udemy, Coursera, Pearson"
+                    value={form.provider}
+                    onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="form-two">
+                <label className="form-field">
+                  <span>Reimbursement Amount (₹)</span>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max={data.remaining_balance}
+                    placeholder={`Max ₹${data.remaining_balance}`}
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Receipt / Invoice (PDF, JPG, PNG)</span>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+              </div>
+              <label className="form-field">
+                <span>Learning context / Relevance</span>
+                <textarea
+                  rows={2}
+                  maxLength={1000}
+                  placeholder="How does this course enhance your role at Falchion Xeniaa?"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </label>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button type="button" className="button button-soft button-small" onClick={() => setShowForm(false)}>Cancel</button>
+                <Button type="submit" loading={submitting} size="small" icon={Send}>Submit claim</Button>
+              </div>
+            </form>
+          )}
+
+          {data.claims && data.claims.length > 0 ? (
+            <div className="table-scroll">
+              <table aria-label="Learning allowance claims">
+                <thead>
+                  <tr>
+                    <th scope="col">COURSE / CERTIFICATION</th>
+                    <th scope="col">PROVIDER</th>
+                    <th scope="col">AMOUNT</th>
+                    <th scope="col">DATE</th>
+                    <th scope="col">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.claims.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <b>{c.title}</b>
+                        {c.attachment_name && (
+                          <small className="table-subline"><FileText size={12} /> {c.attachment_name}</small>
+                        )}
+                        {c.rejection_reason && (
+                          <small style={{ color: 'var(--brand-red, #931314)', display: 'block', marginTop: '2px' }}>Note: {c.rejection_reason}</small>
+                        )}
+                      </td>
+                      <td>{c.provider}</td>
+                      <td><b>₹{Number(c.amount_inr).toLocaleString('en-IN')}</b></td>
+                      <td>{formatDate(String(c.created_at).slice(0, 10), { day: 'numeric', month: 'short' })}</td>
+                      <td><StatusPill value={c.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ fontSize: '13px', color: 'var(--text-muted, #777)', margin: '8px 0 0' }}>No claims submitted for this fiscal year yet.</p>
+          )}
+        </div>
+      ) : null}
+    </Card>
+  );
 }
 
 function ProfilePage(){
@@ -1053,15 +1692,19 @@ function ProfilePage(){
           <div><span className="profile-info-icon"><CircleUserRound size={18}/></span><div><h2>Contact details</h2><p>Your name and work email are controlled by administrators. You can update your mobile number.</p></div></div>
         </div>
         <form className="profile-contact-form" onSubmit={save}>
-          <label className="form-field"><span>Full name</span><input value={profile.full_name||''} disabled autoComplete="name"/></label>
-          <label className="form-field"><span>Work email</span><input type="email" value={profile.email||''} disabled autoComplete="email"/></label>
-          <label className="form-field"><span>Mobile number</span><input type="tel" value={phone} maxLength="32" autoComplete="tel" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …" aria-describedby="profile-phone-help"/></label>
+          <label className="form-field"><span>Full name</span><input aria-label="Full name" value={profile.full_name||''} disabled autoComplete="name"/></label>
+          <label className="form-field"><span>Work email</span><input aria-label="Work email" type="email" value={profile.email||''} disabled autoComplete="email"/></label>
+          <label className="form-field"><span>Mobile number</span><input aria-label="Mobile number" type="tel" value={phone} maxLength="32" autoComplete="tel" onChange={(e)=>setPhone(e.target.value)} placeholder="+91 …" aria-describedby="profile-phone-help"/></label>
           <div id="profile-phone-help" className="profile-security"><ShieldCheck size={16}/><span>Google Sign-In secures access. Role, branch, department and position remain administrator-controlled.</span></div>
           <Button type="submit" loading={busy} disabled={!phoneChanged||profileLoading}>Save mobile number</Button>
         </form>
       </Card>
 
       <Card className="profile-preferences-card"><div className="profile-preferences-heading"><span className="profile-info-icon"><Settings size={18}/></span><div><h2>Workspace preferences</h2><p>Personalize how the People Portal feels on your devices.</p></div></div><div className="preference-row"><div><b>Appearance</b><small>Choose the visual mode for this browser.</small></div><div className="preference-segment" role="group" aria-label="Appearance"><button className={theme==='light'?'active':''} aria-pressed={theme==='light'} onClick={()=>setTheme('light')} type="button"><Sun size={14}/> Light</button><button className={theme==='dark'?'active':''} aria-pressed={theme==='dark'} onClick={()=>setTheme('dark')} type="button"><Moon size={14}/> Dark</button></div></div><div className="preference-row"><div><b>Motion</b><small>Interface animations respect your system accessibility settings.</small></div><span className="preference-note"><ShieldCheck size={14}/> Accessible by default</span></div></Card>
+
+      <LearningAllowanceSection notify={notify}/>
+
+      <ActiveDevicesCard notify={notify}/>
 
       <Card className="privacy-card">
         <div className="privacy-icon"><ShieldCheck size={18}/></div>
@@ -1071,50 +1714,339 @@ function ProfilePage(){
   </>;
 }
 
+function ActiveDevicesCard({notify}){
+  const [sessions,setSessions]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const [revokingId,setRevokingId]=useState(null);
+  const [revokingAll,setRevokingAll]=useState(false);
+
+  const loadSessions=async()=>{
+    setLoading(true);
+    setError('');
+    try{
+      const data=await get('/auth/sessions');
+      setSessions(Array.isArray(data.sessions)?data.sessions:[]);
+    }catch(e){
+      setError(e.message||'Could not load active sessions.');
+    }finally{
+      setLoading(false);
+    }
+  };
+
+  useEffect(()=>{void loadSessions();},[]);
+
+  const revokeSession=async(id)=>{
+    setRevokingId(id);
+    try{
+      const res=await del('/auth/sessions/'+id);
+      if(res.signedOut){
+        window.location.reload();
+        return;
+      }
+      notify('Device session was disconnected.');
+      await loadSessions();
+    }catch(e){
+      notify(e.message||'Could not revoke device session.','error');
+    }finally{
+      setRevokingId(null);
+    }
+  };
+
+  const revokeAllOther=async()=>{
+    setRevokingAll(true);
+    try{
+      const res=await del('/auth/sessions');
+      notify(`Disconnected ${res.revokedCount||'all'} other device session(s).`);
+      await loadSessions();
+    }catch(e){
+      notify(e.message||'Could not disconnect other sessions.','error');
+    }finally{
+      setRevokingAll(false);
+    }
+  };
+
+  const otherSessions=sessions.filter(s=>!s.isCurrent);
+
+  return (
+    <Card className="profile-preferences-card profile-sessions-card">
+      <div className="profile-preferences-heading">
+        <span className="profile-info-icon"><Laptop size={18}/></span>
+        <div style={{flex:1}}>
+          <h2>Active devices & sessions</h2>
+          <p>Manage devices authorized to access your account with 30-day Remember Me.</p>
+        </div>
+        {otherSessions.length>0&&(
+          <Button
+            variant="soft"
+            size="small"
+            onClick={revokeAllOther}
+            loading={revokingAll}
+          >
+            Sign out other devices
+          </Button>
+        )}
+      </div>
+
+      {loading?(
+        <div className="table-message" style={{padding:'20px 0'}}><Spinner/> Loading authorized devices…</div>
+      ):error?(
+        <div className="inline-alert alert-error" style={{margin:'10px 0'}}><CircleAlert size={16}/>{error}</div>
+      ):(
+        <div className="device-sessions-list" style={{display:'flex',flexDirection:'column',gap:'10px',marginTop:'14px'}}>
+          {sessions.map((session)=>(
+            <div
+              key={session.id}
+              className="device-session-item"
+              style={{
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'space-between',
+                padding:'12px 14px',
+                borderRadius:'8px',
+                border:'1px solid var(--ui-border,#e5e7eb)',
+                background:session.isCurrent?'var(--ui-surface-subtle,#f8faf9)':'var(--ui-surface,#ffffff)'
+              }}
+            >
+              <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                <div
+                  style={{
+                    width:'36px',
+                    height:'36px',
+                    borderRadius:'8px',
+                    display:'grid',
+                    placeItems:'center',
+                    background:session.isCurrent?'rgba(30,90,64,0.1)':'rgba(0,0,0,0.05)',
+                    color:session.isCurrent?'var(--green-primary,#1e5a40)':'var(--ui-text-muted,#6b7280)'
+                  }}
+                >
+                  <Laptop size={18}/>
+                </div>
+                <div>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                    <b style={{fontSize:'13px',color:'var(--ui-text,#253831)'}}>{session.deviceName||'Web Device'}</b>
+                    {session.isCurrent?(
+                      <span className="status-pill status-pill-active" style={{fontSize:'11px',padding:'2px 8px'}}>This device</span>
+                    ):(
+                      <span style={{fontSize:'11px',color:'var(--ui-text-muted,#6b7280)'}}>
+                        {session.isRememberMe?'Remembered · 30d':'Standard session'}
+                      </span>
+                    )}
+                  </div>
+                  <small style={{fontSize:'11px',color:'var(--ui-text-muted,#6b7280)',display:'block',marginTop:'2px'}}>
+                    {session.ipAddress ? `IP: ${session.ipAddress} · ` : ''}
+                    {session.isCurrent ? 'Active now' : `Last active ${formatDate(session.lastActiveAt)}`}
+                  </small>
+                </div>
+              </div>
+              {!session.isCurrent&&(
+                <button
+                  type="button"
+                  className="button button-soft button-small"
+                  style={{color:'var(--red,#dc2626)',borderColor:'rgba(220,38,38,0.2)'}}
+                  onClick={()=>revokeSession(session.id)}
+                  disabled={revokingId===session.id}
+                >
+                  {revokingId===session.id?'Revoking…':'Revoke'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function TeamPage(){
-  const {notify}=useApp();
-  const [people,setPeople]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [busyId,setBusyId]=useState(null);const [search,setSearch]=useState('');const [addOpen,setAddOpen]=useState(false);const [filter,setFilter]=useState('ALL');const [view,setView]=useState(()=>{try{return localStorage.getItem('hrms-people-view')||'cards';}catch{return 'cards';}});const [selected,setSelected]=useState(null);const [photoVersion,setPhotoVersion]=useState(Date.now());const peopleRequest=useRef(0);const peopleLoaded=useRef(false);
+  const {user,notify}=useApp();
+  const isSuperAdmin=Boolean(user?.isSuperAdmin || user?.role==='SUPER_ADMIN' || user?.user_type==='SUPER_ADMIN');
+  const [people,setPeople]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [busyId,setBusyId]=useState(null);const [search,setSearch]=useState('');const [addOpen,setAddOpen]=useState(false);const [deactivatingPerson,setDeactivatingPerson]=useState(null);const [roleChangeTarget,setRoleChangeTarget]=useState(null);const [filter,setFilter]=useState('ALL');const [view,setView]=useState(()=>{try{return localStorage.getItem('hrms-people-view')||'cards';}catch{return 'cards';}});const [selected,setSelected]=useState(null);const [photoVersion,setPhotoVersion]=useState(Date.now());const peopleRequest=useRef(0);const peopleLoaded=useRef(false);
   const load=async()=>{const requestId=++peopleRequest.current;if(!peopleLoaded.current)setLoading(true);setError('');try{const r=await get('/admin/users');if(requestId!==peopleRequest.current)return;setPeople(Array.isArray(r.users)?r.users:[]);setPhotoVersion(Date.now());peopleLoaded.current=true;}catch(e){if(requestId===peopleRequest.current)setError(e.message||'The people directory could not be loaded.');}finally{if(requestId===peopleRequest.current)setLoading(false);}};
   useEffect(()=>{void load();return()=>{peopleRequest.current+=1;};},[]);
-  const update=async(person,changes)=>{if(changes.status==='INACTIVE'&&!window.confirm('Deactivate '+person.full_name+"'s account? They will no longer be able to sign in."))return;setBusyId(person.id);setError('');try{await patch('/admin/users/'+person.id,changes);notify(person.full_name+'’s profile was updated.');await load();if(selected?.id===person.id)setSelected({...person,...changes});}catch(e){setError(e.message);}finally{setBusyId(null);}};
+  const performUpdate=async(person,changes)=>{setBusyId(person.id);setError('');try{await patch('/admin/users/'+person.id,changes);notify(person.full_name+'’s profile was updated.');await load();if(selected?.id===person.id)setSelected({...person,...changes});}catch(e){setError(e.message);}finally{setBusyId(null);}};
+  const update=async(person,changes)=>{if(changes.status==='INACTIVE'){setDeactivatingPerson(person);return;}await performUpdate(person,changes);};
+  const confirmDeactivate=async()=>{if(!deactivatingPerson)return;setBusyId(deactivatingPerson.id);try{await patch('/admin/users/'+deactivatingPerson.id,{status:'INACTIVE'});notify(deactivatingPerson.full_name+'’s account was deactivated.');await load();if(selected?.id===deactivatingPerson.id)setSelected({...selected,status:'INACTIVE'});setDeactivatingPerson(null);}catch(e){setError(e.message);throw e;}finally{setBusyId(null);}};
+  const confirmRoleChange=async(targetRole)=>{
+    if(!roleChangeTarget)return;
+    setBusyId(roleChangeTarget.person.id);
+    try{
+      await put('/admin/employees/'+roleChangeTarget.person.id+'/role',{role:targetRole});
+      notify(roleChangeTarget.person.full_name+'’s role was updated to '+roleInfo(targetRole).label+'. Active sessions refreshed.');
+      await load();
+      if(selected?.id===roleChangeTarget.person.id){
+        setSelected({...selected,role:targetRole,user_type:targetRole});
+      }
+      setRoleChangeTarget(null);
+    }catch(e){
+      setError(e.message||'Could not update role.');
+      throw e;
+    }finally{
+      setBusyId(null);
+    }
+  };
   const uploadPhoto=async(person,file)=>{if(!file)return;if(file.size>4*1024*1024){setError('Profile photos must be 4 MB or smaller.');return;}setBusyId(person.id);setError('');try{const form=new FormData();form.append('photo',file);await post('/admin/users/'+person.id+'/photo',form);notify(person.full_name+'’s profile photo was updated.');await load();}catch(e){setError(e.message);}finally{setBusyId(null);}};
   const filtered=people.filter((p)=>((p.full_name||'')+' '+(p.employee_code||'')+' '+(p.email||'')+' '+(p.department||'')+' '+(p.position||'')).toLowerCase().includes(search.toLowerCase())&&(filter==='ALL'||(filter==='ACTIVE'?p.status==='ACTIVE':p.status==='INACTIVE')));
   const setViewMode=(mode)=>{setView(mode);try{localStorage.setItem('hrms-people-view',mode);}catch{/* Keep the selected view for this session if storage is unavailable. */}};
+  const getRoleOptionsFor=(targetPerson)=>{
+    if(isSuperAdmin){
+      return [{value:'SUPER_ADMIN',label:'Super Admin'},{value:'ADMIN',label:'Administrator'},{value:'EMPLOYEE',label:'Employee'},{value:'INTERN',label:'Intern'}];
+    }
+    if(targetPerson.role==='SUPER_ADMIN'||targetPerson.user_type==='SUPER_ADMIN'||targetPerson.id===user?.id){
+      return [];
+    }
+    return [{value:'ADMIN',label:'Administrator'},{value:'EMPLOYEE',label:'Employee'},{value:'INTERN',label:'Intern'}];
+  };
+
   return <><PageTitle eyebrow="A PEOPLE-FIRST WORKPLACE" title="People" description="A living directory of your workplace, access and organization." action={<Button icon={Plus} onClick={()=>setAddOpen(true)}>Add a person</Button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/>{loading?'Refreshing…':'Retry people'}</button></div>}
-    <div className="people-hero-strip" aria-busy={loading}><div><span className="eyebrow">WORKFORCE DIRECTORY</span><b>{people.filter((p)=>p.status==='ACTIVE').length} active people</b><small>{people.filter((p)=>p.wfh_enabled).length} enabled for WFH · {people.filter((p)=>p.role==='ADMIN').length} administrators</small></div><div className="people-strip-stats"><span><b>{people.length}</b><small>Total</small></span><span><b>{people.filter((p)=>p.user_type==='INTERN').length}</b><small>Interns</small></span><span><b>{new Set(people.map((p)=>p.department).filter(Boolean)).size||0}</b><small>Departments</small></span></div></div>
+    <div className="people-hero-strip" aria-busy={loading}><div><span className="eyebrow">WORKFORCE DIRECTORY</span><b>{people.filter((p)=>p.status==='ACTIVE').length} active people</b><small>{people.filter((p)=>p.wfh_enabled).length} enabled for WFH · {people.filter((p)=>p.role==='SUPER_ADMIN'||p.user_type==='SUPER_ADMIN').length} super admins · {people.filter((p)=>(p.role==='ADMIN'||p.user_type==='ADMIN')&&p.role!=='SUPER_ADMIN'&&p.user_type!=='SUPER_ADMIN').length} administrators</small></div><div className="people-strip-stats"><span><b>{people.length}</b><small>Total</small></span><span><b>{people.filter((p)=>p.role==='SUPER_ADMIN'||p.user_type==='SUPER_ADMIN'||p.role==='ADMIN'||p.user_type==='ADMIN').length}</b><small>Admins</small></span><span><b>{people.filter((p)=>p.user_type==='INTERN'||p.role==='INTERN').length}</b><small>Interns</small></span><span><b>{new Set(people.map((p)=>p.department).filter(Boolean)).size||0}</b><small>Departments</small></span></div></div>
     <Card className="people-table-card"><div className="table-toolbar people-toolbar"><div className="search-box"><Search size={16}/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search name, ID, department…" aria-label="Search people"/></div><div className="toolbar-right"><div className="view-toggle"><button className={view==='cards'?'active':''} onClick={()=>setViewMode('cards')} aria-label="Card view">Cards</button><button className={view==='table'?'active':''} onClick={()=>setViewMode('table')} aria-label="Table view">Table</button></div><div className="select-wrap select-small"><select value={filter} onChange={(e)=>setFilter(e.target.value)}><option value="ALL">All people</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select><ChevronDown size={14}/></div><button className="button button-soft button-small" onClick={load}><RefreshCw size={14}/> Refresh</button></div></div>
-      {view==='cards'?<div className="people-card-grid">{loading?<div className="people-loading-grid"><Spinner/></div>:filtered.length?filtered.map((p)=>{const photo=p.profile_photo_key?assetUrl('/admin/users/'+p.id+'/photo')+'?v='+photoVersion:null;return <button className="person-card" key={p.id} onClick={()=>setSelected(p)}><div className="person-card-top"><span className={'avatar person-card-avatar '+(p.role==='ADMIN'?'avatar-admin':'')}>{photo?<img src={photo} alt=""/>:initials(p.full_name)}</span><span className="person-card-arrow"><ArrowUpRight size={15}/></span></div><div className="person-card-name">{p.full_name}</div><div className="person-card-role">{p.position||p.title||'Employee'} · {p.user_type==='INTERN'?'Intern':p.role==='ADMIN'?'Administrator':'Employee'}</div><div className="person-card-meta"><span>{p.department||'General'}</span><span>{p.branch||'Pune'}</span></div><div className="person-card-footer"><span className={'person-live-dot '+(p.status==='ACTIVE'?'on':'off')}/><span>{p.status==='ACTIVE'?'Active':'Inactive'}</span><span className="person-card-code">{p.employee_code}</span></div></button>}):<div className="table-message">No people match your search.</div>}</div>
-      :<div className="table-scroll"><table><thead><tr><th>PERSON</th><th>ROLE</th><th>BRANCH</th><th>DEPARTMENT</th><th>POSITION</th><th>EMAIL</th><th>WFH</th><th>STATUS</th><th></th></tr></thead><tbody>{loading?<tr><td colSpan="9" className="table-message"><Spinner/></td></tr>:filtered.length?filtered.map((p)=>{const photo=p.profile_photo_key?assetUrl('/admin/users/'+p.id+'/photo')+'?v='+photoVersion:null;return <tr key={p.id} onClick={()=>setSelected(p)} className="table-row-click"><td><div className="person-cell"><label className="table-avatar-photo" onClick={(e)=>e.stopPropagation()}><span className={'avatar avatar-table '+(p.role==='ADMIN'?'avatar-admin':'')}>{photo?<img src={photo} alt=""/>:initials(p.full_name)}</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e)=>{const f=e.target.files?.[0];e.target.value='';uploadPhoto(p,f);}} disabled={busyId===p.id}/></label><span><b>{p.full_name}</b><small>{p.employee_code}</small></span></div></td><td><span className={'role-chip'+(p.role==='ADMIN'?' role-admin':'')}>{p.role==='ADMIN'?'Administrator':p.user_type==='INTERN'?'Intern':'Employee'}</span></td><td>{p.branch||'Pune'}</td><td>{p.department||'General'}</td><td>{p.position||p.title}</td><td className="email-cell">{p.email}</td><td><button className={'toggle'+(p.wfh_enabled?' toggle-on':'')} role="switch" aria-checked={p.wfh_enabled} aria-label={'Toggle WFH for '+p.full_name} onClick={(e)=>{e.stopPropagation();update(p,{wfhEnabled:!p.wfh_enabled})}} disabled={busyId===p.id}><i/></button></td><td><StatusPill value={p.status}/></td><td><button className="text-button" onClick={(e)=>{e.stopPropagation();update(p,{status:p.status==='ACTIVE'?'INACTIVE':'ACTIVE'})}} disabled={busyId===p.id}>{busyId===p.id?'Updating…':p.status==='ACTIVE'?'Deactivate':'Reactivate'}</button></td></tr>}):<tr><td colSpan="9"><div className="table-message">No people match your search.</div></td></tr>}</tbody></table></div>}
+      {view==='cards'?<div className="people-card-grid">{loading?<div className="people-loading-grid"><Spinner/></div>:filtered.length?filtered.map((p)=>{const photo=p.profile_photo_key?assetUrl('/admin/users/'+p.id+'/photo')+'?v='+photoVersion:null;const info=roleInfo(p);return <button className="person-card" key={p.id} onClick={()=>setSelected(p)}><div className="person-card-top"><span className={'avatar person-card-avatar '+(info.avatarClass||(p.role==='ADMIN'?'avatar-admin':''))}>{photo?<img src={photo} alt=""/>:initials(p.full_name)}</span><span className="person-card-arrow"><ArrowUpRight size={15}/></span></div><div className="person-card-name">{p.full_name}</div><div className="person-card-role">{p.position||p.title||'Employee'} · <span className={'role-chip '+(info.className||'')}>{info.label}</span></div><div className="person-card-meta"><span>{p.department||'General'}</span><span>{p.branch||'Pune'}</span></div><div className="person-card-footer"><span className={'person-live-dot '+(p.status==='ACTIVE'?'on':'off')}/><span>{p.status==='ACTIVE'?'Active':'Inactive'}</span><span className="person-card-code">{p.employee_code}</span></div></button>}):<div className="table-message">No people match your search.</div>}</div>
+      :<div className="table-scroll"><table aria-label="Company employee directory"><thead><tr><th scope="col">PERSON</th><th scope="col">ROLE</th><th scope="col">BRANCH</th><th scope="col">DEPARTMENT</th><th scope="col">POSITION</th><th scope="col">EMAIL</th><th scope="col">WFH</th><th scope="col">STATUS</th><th scope="col">ACTIONS</th></tr></thead><tbody>{loading?<tr><td colSpan="9" className="table-message"><Spinner/></td></tr>:filtered.length?filtered.map((p)=>{const photo=p.profile_photo_key?assetUrl('/admin/users/'+p.id+'/photo')+'?v='+photoVersion:null;const info=roleInfo(p);const options=getRoleOptionsFor(p);const isLocked=options.length===0;const currentVal=(p.role==='SUPER_ADMIN'||p.user_type==='SUPER_ADMIN')?'SUPER_ADMIN':p.role==='ADMIN'?'ADMIN':(p.user_type==='INTERN'||p.role==='INTERN')?'INTERN':'EMPLOYEE';return <tr key={p.id} onClick={()=>setSelected(p)} className="table-row-click"><td><div className="person-cell"><label className="table-avatar-photo" onClick={(e)=>e.stopPropagation()}><span className={'avatar avatar-table '+(info.avatarClass||(p.role==='ADMIN'?'avatar-admin':''))}>{photo?<img src={photo} alt=""/>:initials(p.full_name)}</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e)=>{const f=e.target.files?.[0];e.target.value='';uploadPhoto(p,f);}} disabled={busyId===p.id}/></label><span><b>{p.full_name}</b><small>{p.employee_code}</small></span></div></td><td onClick={(e)=>e.stopPropagation()}>{isLocked?<span className={'role-chip '+(info.className||'')+' role-locked-badge'} title={p.role==='SUPER_ADMIN'||p.user_type==='SUPER_ADMIN'?'Super Administrator accounts can only be modified by Super Administrators.':'You cannot change your own administrative account role.'}><ShieldCheck size={12}/> {info.label}</span>:<div className="role-select-inline"><select value={currentVal} onChange={(e)=>{const nextVal=e.target.value;if(nextVal!==currentVal){setRoleChangeTarget({person:p,targetRole:nextVal});}}} disabled={busyId===p.id} aria-label={'Change role for '+p.full_name}>{options.map((opt)=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><ChevronDown size={12}/></div>}</td><td>{p.branch||'Pune'}</td><td>{p.department||'General'}</td><td>{p.position||p.title}</td><td className="email-cell">{p.email}</td><td><button className={'toggle'+(p.wfh_enabled?' toggle-on':'')} role="switch" aria-checked={p.wfh_enabled} aria-label={'Toggle WFH for '+p.full_name} onClick={(e)=>{e.stopPropagation();update(p,{wfhEnabled:!p.wfh_enabled})}} disabled={busyId===p.id}><i/></button></td><td><StatusPill value={p.status}/></td><td><button className="text-button" onClick={(e)=>{e.stopPropagation();update(p,{status:p.status==='ACTIVE'?'INACTIVE':'ACTIVE'})}} disabled={busyId===p.id}>{busyId===p.id?'Updating…':p.status==='ACTIVE'?'Deactivate':'Reactivate'}</button></td></tr>}):<tr><td colSpan="9"><div className="table-message">No people match your search.</div></td></tr>}</tbody></table></div>}
       <div className="table-bottom"><span>Showing {filtered.length} of {people.length} people</span><span>Click a profile to open details.</span></div></Card>
     <div className="team-notice"><ShieldCheck size={16}/><span>Google access is granted only after an administrator provisions the employee’s email.</span></div>
-    {selected&&<PersonDrawer person={selected} close={()=>setSelected(null)} onUpdate={update}/>}
-    {addOpen&&<AddPersonModal close={()=>setAddOpen(false)} onDone={()=>{setAddOpen(false);notify('The new account is ready for Google sign-in.');load();}}/>}
+    {selected&&<PersonDrawer person={selected} close={()=>setSelected(null)} onUpdate={update} onRoleChange={(person,role)=>setRoleChangeTarget({person,targetRole:role})} isSuperAdmin={isSuperAdmin} currentUser={user} busyId={busyId}/>}
+    {addOpen&&<AddPersonModal close={()=>setAddOpen(false)} onDone={()=>{setAddOpen(false);notify('The new account is ready for Google sign-in.');load();}} isSuperAdmin={isSuperAdmin}/>}
+    {deactivatingPerson&&<DeactivateConfirmModal person={deactivatingPerson} close={()=>setDeactivatingPerson(null)} onConfirm={confirmDeactivate} busy={busyId===deactivatingPerson.id}/>}
+    {roleChangeTarget&&<RoleChangeConfirmModal person={roleChangeTarget.person} targetRole={roleChangeTarget.targetRole} close={()=>setRoleChangeTarget(null)} onConfirm={confirmRoleChange} busy={busyId===roleChangeTarget.person.id}/>}
   </>;
 }
-function PersonDrawer({person,close,onUpdate}){
+
+function RoleChangeConfirmModal({person,targetRole,close,onConfirm,busy}){
+  const [error,setError]=useState('');
+  const current=roleInfo(person);
+  const next=roleInfo(targetRole);
+
+  const getImpactDescription=(newRole)=>{
+    switch(newRole){
+      case 'SUPER_ADMIN':
+        return 'Grants full root authority: company settings, geofence configuration, audit trails, and authority to promote or demote any administrative account.';
+      case 'ADMIN':
+        return 'Grants standard administrative permissions: workforce management, attendance reviews, leave and WFH approvals, HR operations, and reporting.';
+      case 'EMPLOYEE':
+        return 'Grants standard workforce workspace access: attendance check-in, leave requests, WFH requests, profile, and policy center access.';
+      case 'INTERN':
+        return 'Grants intern workspace access: attendance check-in, policy center, and intern leave policy (max 1 day/month accrual; 0 Earned Leave).';
+      default:
+        return 'Updates organizational permissions.';
+    }
+  };
+
+  const handleConfirm=async()=>{
+    setError('');
+    try{
+      await onConfirm(targetRole);
+    }catch(err){
+      setError(err?.message||'Could not update employee role.');
+    }
+  };
+
+  return <Modal title="Confirm Role Change" subtitle={'Updating organizational tier for '+(person?.full_name||'employee')} close={close}>
+    <div className="form-stack">
+      <div className="inline-alert alert-warning" role="alert" style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+        <ShieldAlert size={20} style={{flexShrink:0,marginTop:'2px',color:'#b45309'}}/>
+        <div>
+          <strong>Privilege & Session Impact:</strong>
+          <p style={{margin:'4px 0 0 0',fontSize:'12px',lineHeight:1.5}}>
+            Changing <b>{person?.full_name}</b> from <span className={'role-chip '+(current.className||'')}>{current.label}</span> to <span className={'role-chip '+(next.className||'')}>{next.label}</span> will immediately invalidate all active login sessions for this account. The user will be required to sign in again to receive updated permissions.
+          </p>
+        </div>
+      </div>
+
+      <div style={{padding:'12px 14px',borderRadius:'8px',background:'var(--color-bg-subtle,#f8fafc)',border:'1px solid var(--color-border,#e2e8f0)',fontSize:'12px'}}>
+        <b style={{display:'block',marginBottom:'4px',color:'var(--color-text,#1e293b)'}}>Target Tier Privileges:</b>
+        <p style={{margin:0,color:'var(--color-text-muted,#64748b)',lineHeight:1.5}}>
+          {getImpactDescription(targetRole)}
+        </p>
+      </div>
+
+      {error&&<InlineError>{error}</InlineError>}
+
+      <div className="form-modal-actions">
+        <Button variant="soft" type="button" onClick={close} disabled={busy}>Cancel</Button>
+        <Button type="button" onClick={handleConfirm} loading={busy} icon={ShieldCheck}>
+          Confirm & update role
+        </Button>
+      </div>
+    </div>
+  </Modal>;
+}
+
+function DeactivateConfirmModal({person,close,onConfirm,busy}){
+  const [typedName,setTypedName]=useState('');
+  const [error,setError]=useState('');
+  const isMatch=typedName.trim()===(person?.full_name||'').trim();
+
+  const handleSubmit=async(e)=>{
+    e.preventDefault();
+    if(!isMatch){
+      setError('Typed name does not match the employee name.');
+      return;
+    }
+    setError('');
+    try{
+      await onConfirm();
+    }catch(err){
+      setError(err?.message||'Could not deactivate employee.');
+    }
+  };
+
+  return <Modal title="Deactivate employee account" subtitle={'Revoking access for '+(person?.full_name||'employee')} close={close}><form className="form-stack" onSubmit={handleSubmit}><div className="inline-alert alert-warning" role="alert" style={{display:'flex',gap:'8px',alignItems:'flex-start'}}><CircleAlert size={18} style={{flexShrink:0,marginTop:'2px'}}/><div><strong>Important safeguard:</strong><p style={{margin:'4px 0 0 0',fontSize:'12px'}}>Deactivating this account will immediately revoke all active sessions for <b>{person?.full_name}</b> ({person?.email}). They will no longer be able to log in or submit attendance and leave requests.</p></div></div>{error&&<InlineError>{error}</InlineError>}<label className="form-field"><span>To confirm, please type <strong>{person?.full_name}</strong> below:</span><input aria-label="Confirm employee full name" value={typedName} onChange={(e)=>{setTypedName(e.target.value);setError('');}} placeholder={person?.full_name} autoFocus required/></label><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close} disabled={busy}>Cancel</Button><Button type="submit" className="button-danger" disabled={!isMatch||busy} loading={busy}>Deactivate account</Button></div></form></Modal>;
+}
+
+function PersonDrawer({person,close,onUpdate,onRoleChange,isSuperAdmin,currentUser,busyId}){
   const photo=person.profile_photo_key?assetUrl('/admin/users/'+person.id+'/photo')+'?v='+Date.now():null;
+  const info=roleInfo(person);
+  const isTargetSuper=person.role==='SUPER_ADMIN'||person.user_type==='SUPER_ADMIN';
+  const isSelf=person.id===currentUser?.id;
+  const canModifyRole=isSuperAdmin?true:(!isTargetSuper&&!isSelf);
+  const options=isSuperAdmin
+    ?[{value:'SUPER_ADMIN',label:'Super Admin'},{value:'ADMIN',label:'Administrator'},{value:'EMPLOYEE',label:'Employee'},{value:'INTERN',label:'Intern'}]
+    :[{value:'ADMIN',label:'Administrator'},{value:'EMPLOYEE',label:'Employee'},{value:'INTERN',label:'Intern'}];
+  const currentVal=isTargetSuper?'SUPER_ADMIN':person.role==='ADMIN'?'ADMIN':(person.user_type==='INTERN'||person.role==='INTERN')?'INTERN':'EMPLOYEE';
+
   return <div className="drawer-backdrop" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><aside className="person-drawer" role="dialog" aria-modal="true" aria-label={person.full_name+' details'}>
     <div className="drawer-cover"><button className="icon-button drawer-close" onClick={close} aria-label="Close"><X size={18}/></button><div className="drawer-avatar">{photo?<img src={photo} alt=""/>:initials(person.full_name)}</div></div>
-    <div className="drawer-body"><div className="drawer-heading"><div><span className="eyebrow">EMPLOYEE PROFILE</span><h2>{person.full_name}</h2><p>{person.position||person.title||'Employee'} · {person.role==='ADMIN'?'Administrator':person.user_type==='INTERN'?'Intern':'Employee'}</p></div><StatusPill value={person.status}/></div>
+    <div className="drawer-body"><div className="drawer-heading"><div><span className="eyebrow">EMPLOYEE PROFILE</span><h2>{person.full_name}</h2><p>{person.position||person.title||'Employee'} · <span className={'role-chip '+(info.className||'')}>{info.fullLabel}</span></p></div><StatusPill value={person.status}/></div>
     <div className="drawer-tags"><span>{person.employee_code}</span><span>{person.department||'General'}</span><span>{person.branch||'Pune'}</span></div>
     <div className="drawer-section"><span className="eyebrow">WORKPLACE</span><div className="drawer-facts"><div><small>Email</small><b>{person.email}</b></div><div><small>Position</small><b>{person.position||person.title}</b></div><div><small>WFH access</small><b>{person.wfh_enabled?'Enabled':'Not enabled'}</b></div><div><small>Joined</small><b>{person.joined_on?formatDate(person.joined_on):'—'}</b></div><div><small>Probation</small><b>{person.probation_end_date?formatDate(person.probation_end_date):'—'}</b></div><div><small>Late entries · 30d</small><b>{person.late_count??0}</b></div></div></div>
+    <div className="drawer-section"><span className="eyebrow">ROLE & PERMISSIONS</span>
+      <div className="drawer-facts"><div><small>System Tier</small><span className={'role-chip '+(info.className||'')}>{info.fullLabel}</span></div><div><small>Authority</small><b>{isTargetSuper?'Full Root Authority':person.role==='ADMIN'?'Workforce Administration':info.role==='INTERN'?'Intern Quota Enforced':'Standard Employee'}</b></div></div>
+      {canModifyRole?(
+        <div style={{marginTop:'12px'}}>
+          <label className="form-field"><span>Change organizational role</span>
+            <div className="select-wrap">
+              <select value={currentVal} onChange={(e)=>{if(e.target.value!==currentVal&&onRoleChange)onRoleChange(person,e.target.value);}} disabled={busyId===person.id} aria-label="Change employee role">
+                {options.map((opt)=><option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
+              <ChevronDown size={14}/>
+            </div>
+          </label>
+        </div>
+      ):(
+        <div style={{marginTop:'10px',fontSize:'12px',color:'var(--color-text-muted,#71717a)',display:'flex',gap:'6px',alignItems:'center'}}>
+          <ShieldCheck size={14} style={{color:'var(--fx-gold,#DAAF51)'}}/>
+          <span>{isSelf?'Self-privilege alteration is restricted.':'Super Administrator accounts are protected.'}</span>
+        </div>
+      )}
+    </div>
     <div className="drawer-section"><span className="eyebrow">ACCOUNT</span><div className="drawer-actions"><button className="button button-soft" onClick={()=>onUpdate(person,{wfhEnabled:!person.wfh_enabled})}>{person.wfh_enabled?'Disable':'Enable'} WFH</button><button className={'button '+(person.status==='ACTIVE'?'button-danger':'button-primary')} onClick={()=>onUpdate(person,{status:person.status==='ACTIVE'?'INACTIVE':'ACTIVE'})}>{person.status==='ACTIVE'?'Deactivate':'Reactivate'}</button></div></div>
     </div>
   </aside></div>;
 }
 
-function AddPersonModal({close,onDone}){
+function AddPersonModal({close,onDone,isSuperAdmin}){
   const defaultJoined=today;
   const defaultProbation=(()=>{const d=new Date(`${defaultJoined}T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()+4);return d.toISOString().slice(0,10);})();
   const [values,setValues]=useState({employeeCode:'',fullName:'',email:'',userType:'EMPLOYEE',title:'Employee',position:'Employee',branch:'Pune',department:'General',phone:'',joinedOn:defaultJoined,wfhEnabled:false,probationEndDate:defaultProbation});
   const [error,setError]=useState('');const [busy,setBusy]=useState(false);const set=(key,value)=>setValues((v)=>({...v,[key]:value}));
   const submit=async(e)=>{e.preventDefault();setBusy(true);setError('');try{await post('/admin/users',{...values,probationEndDate:values.probationEndDate||null});onDone();}catch(e){setError(e.message);}finally{setBusy(false);}};
   return <Modal title="Add someone to the team" subtitle="Provision their organization record and Google Sign-In access." close={close}><form className="form-stack" onSubmit={submit}>{error&&<InlineError>{error}</InlineError>}
-    <div className="form-two"><label className="form-field"><span>Employee ID</span><input value={values.employeeCode} maxLength="24" onChange={(e)=>set('employeeCode',e.target.value)} placeholder="FX-0012" required/></label><label className="form-field"><span>Employee type</span><div className="select-wrap"><select value={values.userType} onChange={(e)=>set('userType',e.target.value)}><option value="EMPLOYEE">Employee</option><option value="INTERN">Intern</option><option value="ADMIN">Administrator</option></select><ChevronDown size={14}/></div></label></div>
-    <label className="form-field"><span>Full name</span><input value={values.fullName} maxLength="120" onChange={(e)=>set('fullName',e.target.value)} required/></label>
-    <label className="form-field"><span>Google account email</span><input type="email" value={values.email} maxLength="254" onChange={(e)=>set('email',e.target.value)} placeholder="name@falchionxeniaa.com" required/></label>
-    <div className="form-three"><label className="form-field"><span>Branch</span><input value={values.branch} onChange={(e)=>set('branch',e.target.value)} placeholder="Pune" required/></label><label className="form-field"><span>Department</span><input value={values.department} onChange={(e)=>set('department',e.target.value)} placeholder="General" required/></label><label className="form-field"><span>Position</span><input value={values.position} onChange={(e)=>{set('position',e.target.value);set('title',e.target.value)}} placeholder="Employee" required/></label></div>
-    <div className="form-two"><label className="form-field"><span>Mobile number</span><input type="tel" value={values.phone} maxLength="32" onChange={(e)=>set('phone',e.target.value)} placeholder="+91 …"/></label><label className="form-field"><span>Joined on</span><input type="date" value={values.joinedOn} onChange={(e)=>{const next=e.target.value;set('joinedOn',next);const d=new Date(`${next}T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()+4);set('probationEndDate',d.toISOString().slice(0,10));}} required/></label></div>
+    <div className="form-two"><label className="form-field"><span>Employee ID</span><input aria-label="Employee ID" value={values.employeeCode} maxLength="24" onChange={(e)=>set('employeeCode',e.target.value)} placeholder="FX-0012" required/></label><label className="form-field"><span>Employee tier</span><div className="select-wrap"><select value={values.userType} onChange={(e)=>set('userType',e.target.value)}><option value="EMPLOYEE">Employee</option><option value="INTERN">Intern</option><option value="ADMIN">Administrator</option>{isSuperAdmin&&<option value="SUPER_ADMIN">Super Administrator</option>}</select><ChevronDown size={14}/></div></label></div>
+    <label className="form-field"><span>Full name</span><input aria-label="Full name" value={values.fullName} maxLength="120" onChange={(e)=>set('fullName',e.target.value)} required/></label>
+    <label className="form-field"><span>Google account email</span><input aria-label="Google account email" type="email" value={values.email} maxLength="254" onChange={(e)=>set('email',e.target.value)} placeholder="name@falchionxeniaa.com" required/></label>
+    <div className="form-three"><label className="form-field"><span>Branch</span><input aria-label="Branch" value={values.branch} onChange={(e)=>set('branch',e.target.value)} placeholder="Pune" required/></label><label className="form-field"><span>Department</span><input aria-label="Department" value={values.department} onChange={(e)=>set('department',e.target.value)} placeholder="General" required/></label><label className="form-field"><span>Position</span><input aria-label="Position" value={values.position} onChange={(e)=>{set('position',e.target.value);set('title',e.target.value)}} placeholder="Employee" required/></label></div>
+    <div className="form-two"><label className="form-field"><span>Mobile number</span><input aria-label="Mobile number" type="tel" value={values.phone} maxLength="32" onChange={(e)=>set('phone',e.target.value)} placeholder="+91 …"/></label><label className="form-field"><span>Joined on</span><input aria-label="Joined on" type="date" value={values.joinedOn} onChange={(e)=>{const next=e.target.value;set('joinedOn',next);const d=new Date(`${next}T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()+4);set('probationEndDate',d.toISOString().slice(0,10));}} required/></label></div>
     <label className="form-field"><span>Provision / probation ends <small>(4 months)</small></span><input type="date" value={values.probationEndDate} onChange={(e)=>set('probationEndDate',e.target.value)} required/></label>
     <label className="checkbox-line"><input type="checkbox" checked={values.wfhEnabled} onChange={(e)=>set('wfhEnabled',e.target.checked)}/><span>Enable WFH request access</span></label>
     <div className="form-modal-actions"><Button type="button" variant="soft" onClick={close}>Cancel</Button><Button type="submit" loading={busy} icon={Plus}>Create account</Button></div>
@@ -1122,7 +2054,17 @@ function AddPersonModal({close,onDone}){
 }
 
 function AdminAttendancePage(){
-  const [from,setFrom]=useState(today);const [to,setTo]=useState(today);const [rows,setRows]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [search,setSearch]=useState('');const [statusFilter,setStatusFilter]=useState('ALL');const [selected,setSelected]=useState(null);const attendanceAdminRequest=useRef(0);const attendanceAdminLoaded=useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [from,setFromState]=useState(()=>searchParams.get('from')||today);
+  const [to,setToState]=useState(()=>searchParams.get('to')||today);
+  const [rows,setRows]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
+  const [search,setSearchState]=useState(()=>searchParams.get('search')||'');
+  const [statusFilter,setStatusFilterState]=useState(()=>searchParams.get('status')||'ALL');
+  const [selected,setSelected]=useState(null);const attendanceAdminRequest=useRef(0);const attendanceAdminLoaded=useRef(false);
+  const setFrom=(v)=>{setFromState(v);setSearchParams(prev=>{const n=new URLSearchParams(prev);n.set('from',v);return n;},{replace:true});};
+  const setTo=(v)=>{setToState(v);setSearchParams(prev=>{const n=new URLSearchParams(prev);n.set('to',v);return n;},{replace:true});};
+  const setSearch=(v)=>{setSearchState(v);setSearchParams(prev=>{const n=new URLSearchParams(prev);if(!v)n.delete('search');else n.set('search',v);return n;},{replace:true});};
+  const setStatusFilter=(v)=>{setStatusFilterState(v);setSearchParams(prev=>{const n=new URLSearchParams(prev);if(v==='ALL')n.delete('status');else n.set('status',v);return n;},{replace:true});};
   const load=async()=>{const requestId=++attendanceAdminRequest.current;if(from>to){setError('The start date must be on or before the end date.');setLoading(false);return;}if(!attendanceAdminLoaded.current)setLoading(true);setError('');try{const data=await get('/admin/attendance?from='+from+'&to='+to);if(requestId!==attendanceAdminRequest.current)return;setRows(Array.isArray(data.records)?data.records:[]);attendanceAdminLoaded.current=true;}catch(e){if(requestId===attendanceAdminRequest.current)setError(e.message||'Attendance records could not be refreshed.');}finally{if(requestId===attendanceAdminRequest.current)setLoading(false);}};
   useEffect(()=>{void load();return()=>{attendanceAdminRequest.current+=1;};},[]);
   const filteredRows=rows.filter((r)=>((r.full_name||'')+' '+(r.employee_code||'')).toLowerCase().includes(search.toLowerCase())&&(statusFilter==='ALL'||(statusFilter==='PRESENT'&&['ON_TIME','LATE_ENTRY'].includes(r.status))||(statusFilter==='LATE'&&r.status==='LATE_ENTRY')||(statusFilter==='ABSENT'&&r.status==='ABSENT')||(statusFilter==='WFH'&&r.status==='WFH')));
@@ -1130,7 +2072,7 @@ function AdminAttendancePage(){
   return <><PageTitle eyebrow="ATTENDANCE, WITH CONTEXT" title="Attendance" description="Review the working day without losing the human context behind the record." action={<Button variant="soft" icon={RefreshCw} onClick={()=>void load()} disabled={loading}>{loading?'Refreshing…':'Refresh records'}</Button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}>Retry records</button></div>}
     <div className="admin-attendance-summary"><div><span className="admin-attendance-summary-icon green"><Fingerprint size={17}/></span><b>{loading?'—':present}</b><small>Present</small></div><div><span className="admin-attendance-summary-icon rose"><Clock3 size={17}/></span><b>{loading?'—':late}</b><small>Late</small></div><div><span className="admin-attendance-summary-icon gold"><CalendarDays size={17}/></span><b>{loading?'—':absent}</b><small>Absent</small></div><div><span className="admin-attendance-summary-icon blue"><House size={17}/></span><b>{loading?'—':remote}</b><small>Remote</small></div></div>
     <Card className="admin-attendance-card"><div className="filter-toolbar admin-attendance-toolbar"><div className="filter-date"><CalendarDays size={16}/><label><span>FROM</span><input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label><ArrowRight size={14}/><label><span>TO</span><input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label></div><div className="admin-attendance-filters"><div className="search-box"><Search size={15}/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search people" aria-label="Search people"/></div><div className="select-wrap select-small"><select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}><option value="ALL">All status</option><option value="PRESENT">Present</option><option value="LATE">Late</option><option value="ABSENT">Absent</option><option value="WFH">Remote</option></select><ChevronDown size={14}/></div><Button size="small" onClick={load} icon={Filter}>Apply</Button></div></div>
-      <div className="table-scroll"><table><thead><tr><th>PERSON</th><th>DATE</th><th>CHECK IN</th><th>CHECK OUT</th><th>VERIFY</th><th>LOCATION CHECK</th><th>STATUS</th><th>EXITS</th></tr></thead><tbody>{loading?<tr><td colSpan="8" className="table-message"><Spinner/></td></tr>:filteredRows.length?filteredRows.map((r)=><tr key={r.id} className="table-row-click" onClick={()=>setSelected(r)}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code} · {r.user_type==='INTERN'?'Intern':'Employee'}</small></span></div></td><td>{formatDate(r.attendance_date,{day:'numeric',month:'short'})}</td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td><span className="verify-tag"><i/>{r.check_in_method||'—'}</span></td><td>{r.check_in_distance_m==null?'—':<span className="location-audit"><MapPin size={13}/>{Math.round(r.check_in_distance_m)} m<small>±{Math.round(r.check_in_accuracy_m||0)} m</small></span>}</td><td><StatusPill value={r.status}/>{r.correction_pending&&<span className="correction-mark">Correction</span>}</td><td>{r.exit_count||0}</td></tr>):<tr><td colSpan="8"><div className="table-message">No attendance records match these filters.</div></td></tr>}</tbody></table></div><div className="admin-attendance-foot"><span><ShieldCheck size={14}/> GPS coordinates are stored only when the employee checks in or out.</span><span>{filteredRows.length} visible records</span></div></Card>
+      <div className="table-scroll"><table aria-label="Workforce attendance management records"><thead><tr><th scope="col">PERSON</th><th scope="col">DATE</th><th scope="col">CHECK IN</th><th scope="col">CHECK OUT</th><th scope="col">VERIFY</th><th scope="col">LOCATION CHECK</th><th scope="col">STATUS</th><th scope="col">EXITS</th></tr></thead><tbody>{loading?<tr><td colSpan="8" className="table-message"><Spinner/></td></tr>:filteredRows.length?filteredRows.map((r)=><tr key={r.id} className="table-row-click" onClick={()=>setSelected(r)}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code} · {r.user_type==='INTERN'?'Intern':'Employee'}</small></span></div></td><td>{formatDate(r.attendance_date,{day:'numeric',month:'short'})}</td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td><span className="verify-tag"><i/>{r.check_in_method||'—'}</span></td><td>{r.check_in_distance_m==null?'—':<span className="location-audit"><MapPin size={13}/>{Math.round(r.check_in_distance_m)} m<small>±{Math.round(r.check_in_accuracy_m||0)} m</small></span>}</td><td><StatusPill value={r.status}/>{r.correction_pending&&<span className="correction-mark">Correction</span>}</td><td>{r.exit_count||0}</td></tr>):<tr><td colSpan="8"><div className="table-message">No attendance records match these filters.</div></td></tr>}</tbody></table></div><div className="admin-attendance-foot"><span><ShieldCheck size={14}/> GPS coordinates are stored only when the employee checks in or out.</span><span>{filteredRows.length} visible records</span></div></Card>
     <div className="mobile-admin-attendance-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:filteredRows.length?filteredRows.map((r)=><button type="button" key={'mobile-'+r.id} className="mobile-admin-attendance-card" onClick={()=>setSelected(r)}>
         <div className="mobile-admin-attendance-top"><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code} · {r.user_type==='INTERN'?'Intern':'Employee'}</small></span></div><StatusPill value={r.status}/></div>
@@ -1164,7 +2106,7 @@ function ReportsPage(){
     <div className="report-metrics"><Card><span className="report-metric-icon metric-blue"><FileText size={17}/></span><small>PRESENT DAYS</small><b>{loading||!attendanceReportLoaded?'—':attended.length}</b></Card><Card><span className="report-metric-icon metric-green"><Check size={17}/></span><small>ON TIME</small><b>{loading||!attendanceReportLoaded?'—':onTime}</b></Card><Card><span className="report-metric-icon metric-rose"><Clock3 size={17}/></span><small>LATE ENTRIES</small><b>{loading||!attendanceReportLoaded?'—':late}</b></Card><Card><span className="report-metric-icon metric-gold"><Timer size={17}/></span><small>OPEN SHIFTS</small><b>{loading||!attendanceReportLoaded?'—':open}</b></Card></div>
     <div className="report-status-summary"><span>ABSENT <b>{loading||!attendanceReportLoaded?'—':absent}</b></span><span>ON LEAVE <b>{loading||!attendanceReportLoaded?'—':onLeave}</b></span><span>WFH <b>{loading||!attendanceReportLoaded?'—':wfh}</b></span><span>TOTAL WORKDAYS <b>{loading||!attendanceReportLoaded?'—':rows.length}</b></span></div>
     <div className="section-head"><div><h2>Attendance report</h2><p>{from} — {to} · Fixed 30-minute lunch deducted from completed shifts.</p></div><Link className="text-link" to="/admin/attendance">Open attendance management <ArrowRight size={15}/></Link></div>
-    <Card className="table-card"><div className="table-scroll"><table><thead><tr><th>PERSON</th><th>DATE</th><th>CHECK IN</th><th>CHECK OUT</th><th>WORKED</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:rows.length?rows.slice(0,20).map((r)=><tr key={r.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code}</small></span></div></td><td>{formatDate(r.attendance_date,{day:'numeric',month:'short',year:'2-digit'})}</td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td>{r.check_out_at?formatMinutes(Math.max(0,Math.round((new Date(r.check_out_at)-new Date(r.check_in_at))/60000)-30)):'In progress'}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="6"><div className="table-message">No records in this report range.</div></td></tr>}</tbody></table></div>{rows.length>20&&<div className="table-bottom">Showing the latest 20 of {rows.length} records. The CSV includes every record in the selected range.</div>}</Card>
+    <Card className="table-card"><div className="table-scroll"><table aria-label="Attendance report data"><thead><tr><th scope="col">PERSON</th><th scope="col">DATE</th><th scope="col">CHECK IN</th><th scope="col">CHECK OUT</th><th scope="col">WORKED</th><th scope="col">STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="6" className="table-message"><Spinner/></td></tr>:rows.length?rows.slice(0,20).map((r)=><tr key={r.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code}</small></span></div></td><td>{formatDate(r.attendance_date,{day:'numeric',month:'short',year:'2-digit'})}</td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td>{r.check_out_at?formatMinutes(Math.max(0,Math.round((new Date(r.check_out_at)-new Date(r.check_in_at))/60000)-30)):'In progress'}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="6"><div className="table-message">No records in this report range.</div></td></tr>}</tbody></table></div>{rows.length>20&&<div className="table-bottom">Showing the latest 20 of {rows.length} records. The CSV includes every record in the selected range.</div>}</Card>
     <div className="mobile-report-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:rows.length?rows.slice(0,20).map((row)=><Card className="mobile-report-card" key={'mobile-att-report-'+row.id}>
         <div className="mobile-report-card-top"><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code}</small></span></div><StatusPill value={row.status}/></div>
@@ -1172,7 +2114,7 @@ function ReportsPage(){
       </Card>):<EmptyState icon={FileText} title="No records in this range." body="Adjust the reporting period and apply again."/>}
     </div>
     <div className="section-head"><div><h2>Leave & time off</h2><p>Approved, pending and rejected leave requests in the selected period.</p></div><span className="history-count">{loading||!leaveReportLoaded?'—':leaveSummary.requested||0} requests</span></div>
-    <Card className="report-leave-card"><div className="report-leave-summary"><div className="summary-box"><small>REQUESTED</small><b>{loading?'—':leaveSummary.requested||0}</b></div><div className="summary-box"><small>APPROVED</small><b>{loading?'—':leaveSummary.approved||0}</b></div><div className="summary-box"><small>PENDING</small><b>{loading?'—':leaveSummary.pending||0}</b></div><div className="summary-box"><small>APPROVED DAYS</small><b>{loading||!leaveReportLoaded?'—':leaveSummary.approvedDays||0}</b></div></div><div className="table-scroll"><table><thead><tr><th>PERSON</th><th>LEAVE</th><th>DATES</th><th>DAYS</th><th>STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:leaveReport.requests?.length?leaveReport.requests.slice(0,30).map((r)=><tr key={r.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code}</small></span></div></td><td>{r.leave_type==='CASUAL'||r.leave_type==='SICK'?'Casual + sick':r.leave_type==='EARNED'?'Earned':'Floating'}</td><td>{formatDate(r.start_date,{day:'numeric',month:'short'})}{r.start_date!==r.end_date?` – ${formatDate(r.end_date,{day:'numeric',month:'short'})}`:''}</td><td>{r.days}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="5"><div className="table-message">No leave requests in this report range.</div></td></tr>}</tbody></table></div></Card>
+    <Card className="report-leave-card"><div className="report-leave-summary"><div className="summary-box"><small>REQUESTED</small><b>{loading?'—':leaveSummary.requested||0}</b></div><div className="summary-box"><small>APPROVED</small><b>{loading?'—':leaveSummary.approved||0}</b></div><div className="summary-box"><small>PENDING</small><b>{loading?'—':leaveSummary.pending||0}</b></div><div className="summary-box"><small>APPROVED DAYS</small><b>{loading||!leaveReportLoaded?'—':leaveSummary.approvedDays||0}</b></div></div><div className="table-scroll"><table aria-label="Leave report data"><thead><tr><th scope="col">PERSON</th><th scope="col">LEAVE</th><th scope="col">DATES</th><th scope="col">DAYS</th><th scope="col">STATUS</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:leaveReport.requests?.length?leaveReport.requests.slice(0,30).map((r)=><tr key={r.id}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code}</small></span></div></td><td>{r.leave_type==='CASUAL'||r.leave_type==='SICK'?'Casual + sick':r.leave_type==='EARNED'?'Earned':'Floating'}</td><td>{formatDate(r.start_date,{day:'numeric',month:'short'})}{r.start_date!==r.end_date?` – ${formatDate(r.end_date,{day:'numeric',month:'short'})}`:''}</td><td>{r.days}</td><td><StatusPill value={r.status}/></td></tr>):<tr><td colSpan="5"><div className="table-message">No leave requests in this report range.</div></td></tr>}</tbody></table></div></Card>
     <div className="mobile-report-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:leaveReport.requests?.length?leaveReport.requests.slice(0,30).map((row)=><Card className="mobile-report-card" key={'mobile-leave-report-'+row.id}>
         <div className="mobile-report-card-top"><div className="person-cell"><span className="avatar avatar-table">{initials(row.full_name)}</span><span><b>{row.full_name}</b><small>{row.employee_code}</small></span></div><StatusPill value={row.status}/></div>
@@ -1247,8 +2189,8 @@ function SettingsPage(){
         <Card className="settings-card">
           <CardHeading title="Pune HQ attendance" subtitle="GPS check-in requires both the office geofence and approved office network; the network can also serve as the fallback when GPS is inaccurate."/>
           <form className="form-stack" onSubmit={save}>
-            <label className="form-field"><span>Office name</span><input value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label>
-            <div className="form-two"><label className="form-field"><span>Latitude</span><input type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div>
+            <label className="form-field"><span>Office name</span><input aria-label="Office name" value={form.office_name||''} maxLength="120" onChange={(e)=>set('office_name',e.target.value)} required/></label>
+            <div className="form-two"><label className="form-field"><span>Latitude</span><input aria-label="Latitude" type="number" step="0.000001" min="-90" max="90" value={form.office_latitude??''} onChange={(e)=>set('office_latitude',e.target.value)} required/></label><label className="form-field"><span>Longitude</span><input aria-label="Longitude" type="number" step="0.000001" min="-180" max="180" value={form.office_longitude??''} onChange={(e)=>set('office_longitude',e.target.value)} required/></label></div>
             <div className="form-two"><label className="form-field"><span>Geofence radius <small>(metres)</small></span><input type="number" min="20" max="1000" value={form.geofence_meters??''} onChange={(e)=>set('geofence_meters',e.target.value)} required/></label><label className="form-field"><span>Maximum GPS accuracy <small>(metres)</small></span><input type="number" min="20" max="250" value={form.gps_max_accuracy_meters??''} onChange={(e)=>set('gps_max_accuracy_meters',e.target.value)} required/></label></div>
             <div className="locked-policy"><span><Clock3 size={16}/></span><div><b>Attendance rules</b><small>9:00 AM–6:00 PM · Monday–Saturday · late at 9:30 AM · fixed 30-minute lunch</small></div><span className="locked-badge"><ShieldCheck size={12}/> CURRENT POLICY</span></div>
             <Button type="submit" loading={busy}>Save office settings</Button>
@@ -1308,7 +2250,7 @@ function AuditPage(){
   const visible=logs.filter((row)=>{const q=(search||'').toLowerCase();const hay=((row.action||'')+' '+(row.actor_name||'')+' '+(row.employee_code||'')+' '+(row.entity_type||'')+' '+JSON.stringify(row.details||{})).toLowerCase();return (eventFilter==='ALL'||row.action===eventFilter)&&hay.includes(q);});
   return <><PageTitle eyebrow="A CLEAR ACCOUNT OF CHANGES" title="Audit trail" description="A searchable, append-only account of important workspace changes." action={<button type="button" className="button button-soft" onClick={()=>void load()} disabled={loading}><RefreshCw size={15}/>{loading?' Refreshing…':' Refresh'}</button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}>Retry audit trail</button></div>}
     <div className="audit-banner"><div className="audit-banner-icon"><ShieldCheck size={19}/></div><div><b>Trust, with a record.</b><p>Sign-ins, approvals, attendance and settings changes are recorded. Private attachment contents and exact locations are not copied into this log.</p></div><span>{visible.length} of {logs.length} events</span></div>
-    <Card className="audit-table-card"><div className="table-toolbar audit-toolbar"><div className="search-box"><Search size={15}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search person, event or detail…" aria-label="Search audit trail"/></div><div className="toolbar-right"><div className="select-wrap select-small"><select value={eventFilter} onChange={e=>setEventFilter(e.target.value)}><option value="ALL">All events</option>{events.map((event)=><option value={event} key={event}>{String(event).replaceAll('_',' ')}</option>)}</select><ChevronDown size={14}/></div><span className="audit-retention"><FileClock size={14}/> Append-only</span></div></div><div className="table-scroll"><table><thead><tr><th>EVENT</th><th>WHO</th><th>WHAT CHANGED</th><th>NETWORK</th><th>WHEN</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:loadFailed?<tr><td colSpan="5"><div className="admin-empty-recovery"><CircleAlert size={18}/><b>Audit trail unavailable</b><span>We could not verify the latest recorded events. Refresh to try again.</span></div></td></tr>:visible.length?visible.map((row)=><tr key={row.id}><td><span className="audit-event"><i/>{String(row.action||'event').replaceAll('_',' ').toLowerCase()}</span><small className="table-subline">{row.entity_type}</small></td><td><div className="person-cell"><span className="avatar avatar-table avatar-audit">{initials(row.actor_name||'System')}</span><span><b>{row.actor_name||'System'}</b><small>{row.employee_code||'Automated'}</small></span></div></td><td className="audit-details">{row.details&&Object.keys(row.details).length?Object.entries(row.details).map(([key,value])=>String(key).replaceAll('_',' ')+': '+(typeof value==='object'?JSON.stringify(value):String(value))).join(' · '):row.entity_id||'—'}</td><td className="audit-ip">{row.ip_address||'—'}</td><td><b>{formatDate(String(row.created_at).slice(0,10),{day:'numeric',month:'short'})}</b><small className="table-subline">{formatTime(row.created_at)}</small></td></tr>):<tr><td colSpan="5"><div className="table-message">No audit events match this view.</div></td></tr>}</tbody></table></div></Card>
+    <Card className="audit-table-card"><div className="table-toolbar audit-toolbar"><div className="search-box"><Search size={15}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search person, event or detail…" aria-label="Search audit trail"/></div><div className="toolbar-right"><div className="select-wrap select-small"><select value={eventFilter} onChange={e=>setEventFilter(e.target.value)}><option value="ALL">All events</option>{events.map((event)=><option value={event} key={event}>{String(event).replaceAll('_',' ')}</option>)}</select><ChevronDown size={14}/></div><span className="audit-retention"><FileClock size={14}/> Append-only</span></div></div><div className="table-scroll"><table aria-label="System audit logs"><thead><tr><th scope="col">EVENT</th><th scope="col">WHO</th><th scope="col">WHAT CHANGED</th><th scope="col">NETWORK</th><th scope="col">WHEN</th></tr></thead><tbody>{loading?<tr><td colSpan="5" className="table-message"><Spinner/></td></tr>:loadFailed?<tr><td colSpan="5"><div className="admin-empty-recovery"><CircleAlert size={18}/><b>Audit trail unavailable</b><span>We could not verify the latest recorded events. Refresh to try again.</span></div></td></tr>:visible.length?visible.map((row)=><tr key={row.id}><td><span className="audit-event"><i/>{String(row.action||'event').replaceAll('_',' ').toLowerCase()}</span><small className="table-subline">{row.entity_type}</small></td><td><div className="person-cell"><span className="avatar avatar-table avatar-audit">{initials(row.actor_name||'System')}</span><span><b>{row.actor_name||'System'}</b><small>{row.employee_code||'Automated'}</small></span></div></td><td className="audit-details">{row.details&&Object.keys(row.details).length?Object.entries(row.details).map(([key,value])=>String(key).replaceAll('_',' ')+': '+(typeof value==='object'?JSON.stringify(value):String(value))).join(' · '):row.entity_id||'—'}</td><td className="audit-ip">{row.ip_address||'—'}</td><td><b>{formatDate(String(row.created_at).slice(0,10),{day:'numeric',month:'short'})}</b><small className="table-subline">{formatTime(row.created_at)}</small></td></tr>):<tr><td colSpan="5"><div className="table-message">No audit events match this view.</div></td></tr>}</tbody></table></div></Card>
   </>;
 }
 
