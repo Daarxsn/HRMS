@@ -44,9 +44,39 @@ function connect(database) {
 function checksum(sql) {
   return crypto.createHash('sha256').update(sql).digest('hex');
 }
+function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inBacktick = false;
+
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i];
+    const prevChar = i > 0 ? sql[i - 1] : '';
+
+    if (char === "'" && !inDoubleQuote && !inBacktick && prevChar !== '\\') {
+      inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && !inSingleQuote && !inBacktick && prevChar !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+    } else if (char === '`' && !inSingleQuote && !inDoubleQuote && prevChar !== '\\') {
+      inBacktick = !inBacktick;
+    }
+
+    if (char === ';' && !inSingleQuote && !inDoubleQuote && !inBacktick) {
+      if (current.trim()) statements.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
 function executeSqlFile(connection, sql) {
   return (async () => {
-    for (const statement of sql.split(';').map((part) => part.trim()).filter(Boolean)) {
+    for (const statement of splitSqlStatements(sql)) {
       await connection.query(statement);
     }
   })();

@@ -51,6 +51,37 @@ function hasExpectedIndex(schema, table, name, columns, unique) {
   return Boolean(item && String(item.columnsUsed) === columns && ((Number(item.nonUnique) === 0) === unique));
 }
 
+function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inBacktick = false;
+
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i];
+    const prevChar = i > 0 ? sql[i - 1] : '';
+
+    if (char === "'" && !inDoubleQuote && !inBacktick && prevChar !== '\\') {
+      inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && !inSingleQuote && !inBacktick && prevChar !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+    } else if (char === '`' && !inSingleQuote && !inDoubleQuote && prevChar !== '\\') {
+      inBacktick = !inBacktick;
+    }
+
+    if (char === ';' && !inSingleQuote && !inDoubleQuote && !inBacktick) {
+      if (current.trim()) statements.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
 async function preflightPendingMigration(file, connection) {
   const schema = await inspectSchema(connection);
 
@@ -180,7 +211,7 @@ try {
       console.warn(`Reconciled ${file} ledger because all expected schema changes are present and the active-WFH integrity check passed.`);
       continue;
     }
-    for (const statement of sql.split(';').map((s) => s.trim()).filter(Boolean)) {
+    for (const statement of splitSqlStatements(sql)) {
       await connection.query(statement);
     }
     await connection.execute('INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)', [file, checksum]);
