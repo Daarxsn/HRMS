@@ -20,6 +20,7 @@ test('login reference composition is measured and captured on desktop', async ({
   testInfo.skip(testInfo.project.name !== 'chromium', 'Reference-sized screenshot is captured in desktop Chromium.');
   await page.setViewportSize({ width: 1536, height: 878 });
   await page.goto('/');
+  await page.locator('.loading-screen').waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
   await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\.|Good work/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /Welcome back|Welcome in/i })).toBeVisible();
   await expect(page.locator('.login-feature')).toHaveCount(3);
@@ -68,6 +69,7 @@ test('login reference composition is measured and captured on desktop', async ({
 test('login reference composition is captured and readable on mobile', async ({ page }, testInfo) => {
   testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile reference screenshot is captured in mobile Chromium.');
   await page.goto('/');
+  await page.locator('.loading-screen').waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
   await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\.|Good work/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /Welcome back|Welcome in/i })).toBeVisible();
   await expect(page.locator('.login-feature')).toHaveCount(3);
