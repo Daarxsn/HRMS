@@ -13,6 +13,7 @@ type PendingResponse = {
 
 export type EmailMessage = {
   to: string[];
+  cc?: string[] | null;
   subject: string;
   text: string;
   html: string;
@@ -222,14 +223,16 @@ const startTls = async (client: SmtpClient, config): Promise<SmtpClient> => {
 
 const dotStuff = (body) => body.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
 
-const buildMessage = (message: EmailMessage, senderOverride: string | null = null) => {
+export const buildMessage = (message: EmailMessage, senderOverride: string | null = null) => {
   const from = emailAddress(senderOverride || getConfig().from);
   const fromName = message.fromName ? String(message.fromName).replace(/[\r\n"]/g, '').trim().slice(0, 120) : '';
   const fromHeader = fromName ? '"' + fromName + '" <' + from + '>' : from;
-  const to = message.to.map(emailAddress).filter(Boolean);
+  const to = (message.to || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
+  const cc = (message.cc || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
   return [
     'From: ' + fromHeader,
     'To: ' + to.join(', '),
+    ...(cc.length ? ['Cc: ' + cc.join(', ')] : []),
     ...(message.replyTo ? ['Reply-To: ' + emailAddress(message.replyTo)] : []),
     'Subject: ' + message.subject.replace(/[\r\n]/g, ' '),
     ...(message.messageId ? ['Message-ID: <' + String(message.messageId).replace(/[\r\n<>]/g, '') + '>'] : []),
@@ -260,7 +263,9 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
   }
 
   const config = getConfig();
-  const recipients = (message.to || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
+  const toRecipients = (message.to || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
+  const ccRecipients = (message.cc || []).flatMap((item) => String(item).split(',')).map(emailAddress).filter(Boolean);
+  const recipients = [...new Set([...toRecipients, ...ccRecipients])];
   if (!recipients.length) throw new Error('No SMTP recipients were provided.');
 
   let client = await openSocket(config);
@@ -270,7 +275,6 @@ export async function sendEmail(message: EmailMessage): Promise<{ sent: boolean;
       if (!ehlo.lines.some((line) => /^STARTTLS(?: |$)/i.test(line.trim()))) throw new Error('SMTP server does not advertise STARTTLS.');
       client = await startTls(client, config);
     }
-
 
     const authPlain = Buffer.from('\0' + config.user + '\0' + config.password).toString('base64');
     await client.command('AUTH PLAIN ' + authPlain, [235]);
@@ -303,4 +307,134 @@ export async function sendHrNotificationEmail(message: Omit<EmailMessage, 'to'>)
   if (!recipient) return { sent:false, skipped:true, recipient:null };
   const result = await sendEmail({ ...message, to:[recipient] });
   return { sent:result.sent, skipped:result.skipped, recipient };
+}
+
+export type BrandedEmailOptions = {
+  kicker?: string;
+  heading: string;
+  subheading?: string;
+  statusBadge?: {
+    label: string;
+    variant: 'pending' | 'success' | 'danger' | 'neutral';
+  };
+  details: Array<{ label: string; value: string }>;
+  action?: {
+    label: string;
+    url: string;
+  };
+  footerNote?: string;
+};
+
+export function renderBrandedEmailHtml(options: BrandedEmailOptions): string {
+  const badgeStyle = options.statusBadge ? {
+    success: 'background:#DCFCE7;color:#166534;border:1px solid #BBF7D0;',
+    danger: 'background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;',
+    pending: 'background:#FEF9C3;color:#854D0E;border:1px solid #FEF08A;',
+    neutral: 'background:#F4F4F5;color:#3F3F46;border:1px solid #E4E4E7;'
+  }[options.statusBadge.variant] : '';
+
+  const detailsRows = options.details.map((d, index) => {
+    const bg = index % 2 === 0 ? '#FFFFFF' : '#FAFAFA';
+    return `<tr>
+      <td style="padding:10px 14px;font-size:13px;color:#71717A;width:38%;border-bottom:1px solid #F4F4F5;background:${bg};font-weight:600">${escapeHtml(d.label)}</td>
+      <td style="padding:10px 14px;font-size:13px;color:#18181B;border-bottom:1px solid #F4F4F5;background:${bg};font-weight:600">${escapeHtml(d.value)}</td>
+    </tr>`;
+  }).join('');
+
+  const actionBlock = options.action ? `
+    <div style="margin:24px 0 12px;text-align:left">
+      <a href="${escapeHtml(options.action.url)}" style="display:inline-block;background:#DAAF51;color:#111111;text-decoration:none;font-weight:800;font-size:13px;letter-spacing:0.04em;padding:12px 24px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1)">
+        ${escapeHtml(options.action.label)} &rarr;
+      </a>
+    </div>` : '';
+
+  const statusBadgeHtml = options.statusBadge ? `
+    <div style="margin-top:12px">
+      <span style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:800;letter-spacing:0.06em;border-radius:999px;text-transform:uppercase;${badgeStyle}">
+        ${escapeHtml(options.statusBadge.label)}
+      </span>
+    </div>` : '';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escapeHtml(options.heading)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F4F4F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181B;line-height:1.5">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#FFFFFF;border-radius:10px;overflow:hidden;border:1px solid #E4E4E7;box-shadow:0 4px 12px rgba(0,0,0,0.05)">
+          <!-- Brand Header -->
+          <tr>
+            <td style="background-color:#111111;padding:22px 28px;border-bottom:3px solid #DAAF51">
+              <span style="font-size:11px;font-weight:800;letter-spacing:0.16em;color:#DAAF51;text-transform:uppercase;display:block">
+                ${escapeHtml(options.kicker || 'FALCHION XENIAA · HRMS')}
+              </span>
+              <h1 style="margin:6px 0 0;font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em">
+                ${escapeHtml(options.heading)}
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding:28px">
+              ${options.subheading ? `<p style="margin:0 0 16px;font-size:14px;color:#52525B;line-height:1.6">${escapeHtml(options.subheading)}</p>` : ''}
+              ${statusBadgeHtml}
+
+              <!-- Details Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border:1px solid #E4E4E7;border-radius:8px;overflow:hidden;border-collapse:collapse">
+                ${detailsRows}
+              </table>
+
+              ${actionBlock}
+
+              ${options.footerNote ? `<p style="margin:18px 0 0;font-size:12px;color:#71717A;line-height:1.5">${escapeHtml(options.footerNote)}</p>` : ''}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#FAFAFA;padding:18px 28px;border-top:1px solid #E4E4E7;text-align:left">
+              <p style="margin:0;font-size:11px;color:#A1A1AA;line-height:1.5">
+                Falchion Xeniaa HRMS &middot; People Operations<br>
+                This is an automated operational notification. You can reply directly to this email to contact the sender.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function renderBrandedEmailText(options: BrandedEmailOptions): string {
+  const lines: string[] = [
+    'FALCHION XENIAA · HRMS',
+    options.kicker ? `[${options.kicker}]` : '',
+    '',
+    options.heading.toUpperCase(),
+    options.subheading || '',
+    options.statusBadge ? `Status: ${options.statusBadge.label}` : '',
+    '------------------------------------------------------------',
+    ...options.details.map((d) => `${d.label}: ${d.value}`),
+    '------------------------------------------------------------'
+  ];
+  if (options.action) {
+    lines.push('', `${options.action.label}: ${options.action.url}`);
+  }
+  if (options.footerNote) {
+    lines.push('', options.footerNote);
+  }
+  lines.push(
+    '',
+    'Falchion Xeniaa HRMS · People Operations',
+    'Replies to this email route directly to the designated contact via Reply-To.'
+  );
+  return lines.filter(Boolean).join('\n');
 }

@@ -80,6 +80,8 @@ jobs:
           DB_USER: root
           DB_PASSWORD: root
         run: npm run test:migration-rehearsal --workspace server
+      - name: Run policy math and unit tests (Vitest)
+        run: npm run test:policy
       - name: Run backend unit and contract tests
         run: npm test
       - name: Install MySQL client tools for logical backup and restore

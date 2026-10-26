@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -22,15 +25,27 @@ const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 const BUILD_SHA = process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || (process.env.NODE_ENV === 'production' ? 'production-unversioned' : 'development');
 const startedAt = Date.now();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistCandidates = [
+  path.resolve(process.cwd(), 'client/dist'),
+  path.resolve(__dirname, '../../client/dist'),
+  path.resolve(__dirname, '../../../client/dist')
+];
+const clientDistPath = clientDistCandidates.find(dir => fs.existsSync(dir)) || clientDistCandidates[0];
 const logProcessFailure = (type: string, error: unknown) => {
   console.error(JSON.stringify({ type, error: String((error as any)?.stack || (error as any)?.message || error) }));
 };
 process.on('uncaughtException', (error) => logProcessFailure('uncaught_exception', error));
 process.on('unhandledRejection', (error) => logProcessFailure('unhandled_rejection', error));
 app.disable('x-powered-by');
-// Trust the forwarded client IP only on Vercel, which overwrites X-Forwarded-For at its edge.
-// Local/direct deployments must not let a client-supplied forwarding header choose req.ip.
-app.set('trust proxy', process.env.VERCEL === '1' ? 1 : false);
+// Trust the forwarded client IP on Vercel, which overwrites X-Forwarded-For at its edge,
+// or when explicitly configured via TRUST_PROXY for container / reverse-proxy deployments.
+const trustProxyConfig = process.env.TRUST_PROXY
+  ? (process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1' ? 1 : (Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY))
+  : (process.env.VERCEL === '1' ? 1 : false);
+app.set('trust proxy', trustProxyConfig);
 assertProductionConfiguration(process.env);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 app.use((req,res,next)=>{
@@ -120,14 +135,48 @@ app.use('/api/admin',adminRoutes);
 app.use('/api/account',accountRoutes);
 app.use('/api/internal/email-outbox',emailOutboxRoutes);
 app.use('/api/enterprise',enterpriseRoutes);
-app.use((req,res)=>res.status(404).json({error:'That API route was not found.',requestId:req.requestId}));
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath, {
+    index: false,
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0
+  }));
+}
+
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'That API route was not found.', requestId: req.requestId });
+});
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  if (req.path.startsWith('/api')) return next();
+  const indexPath = path.join(clientDistPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.sendFile(indexPath);
+  }
+  next();
+});
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'That API route was not found.', requestId: req.requestId });
+  }
+  const indexPath = path.join(clientDistPath, 'index.html');
+  if (req.method === 'GET' && fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(indexPath);
+  }
+  return res.status(404).json({ error: 'That route was not found.', requestId: req.requestId });
+});
 app.use(errorHandler);
 
 export default app;
 
 // Vercel imports the Express application as a function. Local development and
 // container deployments retain the listener and graceful shutdown behavior.
-if (process.env.VERCEL !== '1') {
+if (process.env.VERCEL !== '1' && process.env.NODE_ENV !== 'test') {
   const port=Number(process.env.PORT || 8080);
   const server=app.listen(port,()=>console.log(JSON.stringify({type:'server_started',service:'falchion-xeniaa-api',port,node_env:process.env.NODE_ENV||'development'})));
   server.requestTimeout=30000;

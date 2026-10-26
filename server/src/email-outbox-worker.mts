@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { pool } from './db.mts';
-import { processEmailOutboxBatch } from './email-outbox.mts';
+import { processEmailOutboxBatch, recoverAbandonedOutboxJobs, getEmailOutboxSummary } from './email-outbox.mts';
 
 const pollMs=Number(process.env.EMAIL_OUTBOX_POLL_MS||5000);
 if(!Number.isInteger(pollMs)||pollMs<1000||pollMs>60000)throw new Error('EMAIL_OUTBOX_POLL_MS must be between 1000 and 60000.');
@@ -24,11 +24,27 @@ process.on('SIGTERM',()=>void shutdown('SIGTERM'));
 process.on('SIGINT',()=>void shutdown('SIGINT'));
 
 console.log(JSON.stringify({type:'email_outbox_worker_started',poll_interval_ms:pollMs}));
+let lastRecoveryAt = 0;
+let lastHeartbeatAt = 0;
+
 while(!stopping){
   active=true;
   try {
+    // Run recovery of abandoned jobs on startup and every 60 seconds (HRMS-DEF-027)
+    if (Date.now() - lastRecoveryAt > 60_000) {
+      await recoverAbandonedOutboxJobs(300);
+      lastRecoveryAt = Date.now();
+    }
+
     const result=await processEmailOutboxBatch();
-    if(result.claimed)console.log(JSON.stringify({type:'email_outbox_batch_complete',...result}));
+    if(result.claimed) {
+      console.log(JSON.stringify({type:'email_outbox_batch_complete',...result}));
+    } else if (Date.now() - lastHeartbeatAt > 300_000) {
+      // Periodic 5-minute idle worker health heartbeat
+      const summary = await getEmailOutboxSummary();
+      console.log(JSON.stringify({type:'email_outbox_worker_heartbeat',poll_interval_ms:pollMs,...summary}));
+      lastHeartbeatAt = Date.now();
+    }
   } catch(error) {
     console.error(JSON.stringify({type:'email_outbox_worker_error',error:String((error as any)?.message||error)}));
   } finally {

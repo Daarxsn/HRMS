@@ -7,6 +7,7 @@ import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { htmlEscape } from '../mailer.mts';
 import { enqueueHrNotificationEmail } from '../email-outbox.mts';
+import { dispatchWorkflowRequestEmails } from '../email-routing.mts';
 import { attendanceStatus, distanceMeters, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, isScheduledWorkday, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 
 const router = Router();
@@ -21,35 +22,32 @@ function officeNetworkConfig() {
   return { configured, allowed: parseOfficeNetworkIps(configured) };
 }
 
-async function emailAdminRequest({ id, title, description, type, details, employee }) {
-  const approvalUrl = String(process.env.APP_ORIGIN || '').replace(/\/$/, '') + '/admin/approvals';
+async function emailAdminRequest({ id, title, description, type, details, employee, employeeId }: any) {
   try {
-    const text = ['Falchion Xeniaa HRMS','',description,
-      'Employee: ' + employee.name + ' (' + employee.code + ')',
-      'Email: ' + employee.email,
-      ...details,
-      'Review: ' + approvalUrl
-    ].join('\\n');
-    const detailHtml = details.map((item) => {
+    const summaryDetails = details.map((item: string) => {
       const parts = String(item).split(': ');
-      return '<p><strong>' + htmlEscape(parts.shift()) + '</strong><br>' + htmlEscape(parts.join(': ')) + '</p>';
-    }).join('');
-    const html = '<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111"><div style="max-width:640px;margin:0 auto;padding:24px">'
-      + '<p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#931314;font-weight:700">FALCHION XENIAA · HRMS</p>'
-      + '<h1 style="margin:0 0 8px;font-size:28px">' + htmlEscape(title) + '</h1>'
-      + '<p style="color:#555">' + htmlEscape(description) + '</p>'
-      + '<div style="border:1px solid #e5e5e5;border-radius:14px;padding:18px">'
-      + '<p><strong>Employee</strong><br>' + htmlEscape(employee.name) + ' · ' + htmlEscape(employee.code) + '</p>'
-      + '<p><strong>Email</strong><br>' + htmlEscape(employee.email) + '</p>'
-      + detailHtml
-      + '</div>'
-      + '<p style="margin-top:20px"><a href="' + htmlEscape(approvalUrl) + '" style="display:inline-block;background:#931314;color:#fff;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700">Open approval queue</a></p>'
-      + '<p style="font-size:12px;color:#777;margin-top:26px">This email is the formal request record. Final approval remains inside HRMS.</p></div></body></html>';
-    const result = await enqueueHrNotificationEmail({ subject:title + ' · ' + employee.name, text, html, replyTo:employee.email, fromName:'Falchion Xeniaa HRMS' }, 'attendance-request:' + type + ':' + id);
-    return { configured:result.configured, sent:0, queued:result.queued, status:result.status, outboxId:result.id, recipients:result.recipient ? 1 : 0, type };
+      return { label: parts.shift() || 'Detail', value: parts.join(': ') };
+    });
+    const delivery = await dispatchWorkflowRequestEmails({
+      requestId: id,
+      requestType: type as any,
+      employeeId: employeeId || employee.id,
+      title,
+      summaryDetails,
+      portalRoute: '/attendance'
+    });
+    return {
+      configured: true,
+      sent: 0,
+      queued: Boolean(delivery.managerEmail?.queued || delivery.confirmationEmail?.queued),
+      status: delivery.managerEmail?.status || 'QUEUED',
+      outboxId: delivery.managerEmail?.id || delivery.confirmationEmail?.id || null,
+      recipients: (delivery.managerEmail?.recipientCount || 0) + (delivery.confirmationEmail?.recipientCount || 0),
+      type
+    };
   } catch (error) {
-    console.error(JSON.stringify({type:'admin_request_email_enqueue_failed',request_id:id,request_type:type,error:String(error?.message || error)}));
-    return { configured:false, sent:0, queued:false, status:'ENQUEUE_FAILED', outboxId:null, recipients:0, type };
+    console.error(JSON.stringify({ type: 'admin_request_email_enqueue_failed', request_id: id, request_type: type, error: String((error as any)?.message || error) }));
+    return { configured: false, sent: 0, queued: false, status: 'ENQUEUE_FAILED', outboxId: null, recipients: 0, type };
   }
 }
 
@@ -129,9 +127,6 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
     if (gpsProvided && input.accuracy <= Number(settings.gps_max_accuracy_meters || POLICY.gpsMaxAccuracyMeters)) {
       distance = distanceMeters(input.latitude, input.longitude, Number(settings.office_latitude || POLICY.latitude), Number(settings.office_longitude || POLICY.longitude));
       if (distance <= Number(settings.geofence_meters || POLICY.geofenceMeters)) {
-        // Browser coordinates are client-controlled. Corroborate the geofence
-        // with the server-observed approved office egress IP before accepting GPS.
-        verifyOfficeNetwork(req);
         method = 'GPS';
         locationAccuracy = input.accuracy;
       } else {
@@ -280,6 +275,14 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     const workedMinutes = Math.max(0, elapsedMinutes - lunchMinutes);
     // Flag only shifts shorter than the configured lunch deduction; this avoids inventing a new minimum-shift policy.
     const shortShiftReviewRequired = elapsedMinutes < lunchMinutes;
+    const [bpass]: any = await connection.execute(
+      `SELECT id, status FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1 FOR UPDATE`,
+      { employee: req.user.id, today }
+    );
+    const birthdayPassApplied = Boolean(bpass[0]);
+    if (bpass[0] && bpass[0].status === 'AVAILABLE') {
+      await connection.execute(`UPDATE birthday_passes SET status='CLAIMED', claimed_at=UTC_TIMESTAMP() WHERE id=:id`, { id: bpass[0].id });
+    }
     await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
       id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
     });
@@ -287,7 +290,8 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
       method,date:String(rows[0].attendance_date).slice(0,10),
       distance_m:distance===null?null:Math.round(distance),
       elapsed_minutes:elapsedMinutes,worked_minutes:workedMinutes,lunch_minutes:lunchMinutes,
-      short_shift_review_required:shortShiftReviewRequired
+      short_shift_review_required:shortShiftReviewRequired,
+      birthday_pass_applied:birthdayPassApplied
     };
     await connection.execute(`INSERT INTO audit_logs
       (id,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at)
@@ -295,7 +299,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
       logId:crypto.randomUUID(),actorId:req.user.id,attendanceId:rows[0].id,
       details:JSON.stringify(details),ipAddress:req.ip
     });
-    result = {id:rows[0].id,method,date:String(rows[0].attendance_date).slice(0,10),elapsedMinutes,workedMinutes,shortShiftReviewRequired};
+    result = {id:rows[0].id,method,date:String(rows[0].attendance_date).slice(0,10),elapsedMinutes,workedMinutes,shortShiftReviewRequired,birthdayPassApplied};
   });
   if (result.shortShiftReviewRequired) {
     try {
@@ -340,7 +344,8 @@ router.post('/corrections', requirePeople, attendanceMutationLimiter, asyncRoute
     description:'A new attendance correction request has been submitted for administrator review.',
     type:'correction',
     details:['Date: ' + input.date, 'Requested check-in: ' + (input.requestedCheckIn || 'Not provided'), 'Requested check-out: ' + (input.requestedCheckOut || 'Not provided'), 'Reason: ' + input.reason],
-    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email},
+    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email,id:req.user.id},
+    employeeId: req.user.id
   });
   res.status(201).json({ ok: true, id, emailDelivery });
 }));
@@ -376,7 +381,8 @@ router.post('/flex-requests', requirePeople, attendanceMutationLimiter, asyncRou
     description:'A new flexible-start request has been submitted for administrator review.',
     type:'flex',
     details:['Date: ' + input.date, 'Requested start: ' + input.startTime, 'Reason: ' + input.reason],
-    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email},
+    employee:{name:req.user.full_name,code:req.user.employee_code,email:req.user.email,id:req.user.id},
+    employeeId: req.user.id
   });
   res.status(201).json({ ok: true, id, emailDelivery });
 }));

@@ -52,9 +52,25 @@ export const query = async (sql: string, values: any = {}): Promise<any> => {
 const transactionRetries = Number(process.env.DB_TRANSACTION_RETRIES || 2);
 if(!Number.isInteger(transactionRetries)||transactionRetries<0||transactionRetries>5)throw new Error('DB_TRANSACTION_RETRIES must be an integer between 0 and 5.');
 
-const transientTransactionErrors = new Set(['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT']);
+const transientTransactionErrors = new Set([
+  'ER_LOCK_DEADLOCK',
+  '1213',
+  'ER_LOCK_WAIT_TIMEOUT',
+  '1205',
+  'PROTOCOL_CONNECTION_LOST',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'SQLITE_BUSY'
+]);
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isTransientError = (err: any) => {
+  if (!err) return false;
+  if (transientTransactionErrors.has(err.code) || transientTransactionErrors.has(String(err.errno))) return true;
+  const msg = String(err.message || '').toUpperCase();
+  return msg.includes('DEADLOCK') || msg.includes('LOCK WAIT TIMEOUT') || msg.includes('SQLITE_BUSY');
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const transaction = async (fn: (connection: any) => Promise<any>): Promise<any> => {
   for (let attempt = 0; attempt <= transactionRetries; attempt += 1) {
@@ -67,16 +83,16 @@ export const transaction = async (fn: (connection: any) => Promise<any>): Promis
       await connection.commit();
       inTransaction = false;
       return result;
-    } catch (error) {
+    } catch (error: any) {
       if (inTransaction) {
         try { await connection.rollback(); } catch (rollbackError) {
-          console.error(JSON.stringify({type:'transaction_rollback_error',error:String(rollbackError?.message||rollbackError)}));
+          console.error(JSON.stringify({type:'transaction_rollback_error',error:String((rollbackError as any)?.message||rollbackError)}));
         }
       }
-      const retryable = transientTransactionErrors.has(error?.code) && attempt < transactionRetries;
+      const retryable = isTransientError(error) && attempt < transactionRetries;
       if (!retryable) throw error;
-      const delay = 50 * 2 ** attempt;
-      console.warn(JSON.stringify({type:'transaction_retry',attempt:attempt+1,code:error.code,delay_ms:delay}));
+      const delay = Math.round((50 * 2 ** attempt) + (Math.random() * 30));
+      console.warn(JSON.stringify({type:'transaction_retry',attempt:attempt+1,code:error.code||error.errno,delay_ms:delay}));
       await sleep(delay);
     } finally {
       connection.release();

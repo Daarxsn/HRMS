@@ -155,3 +155,48 @@ export function earnedLeaveAccrual(asOfDate: string, joinedOn: string | null | u
   const cap = Number.isFinite(entitlement) ? Math.max(0,entitlement) : POLICY.leaveEntitlements.EARNED;
   return Math.max(0,Math.min(cap,lastAccrualMonth-firstEligibleMonth+1));
 }
+
+export function isBirthdayToday(dateOfBirth: string | Date | null | undefined, asOf: Date | string = new Date()): boolean {
+  if (!dateOfBirth) return false;
+  const dobStr = typeof dateOfBirth === 'string' ? dateOfBirth.slice(0, 10) : dateOfBirth.toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dobStr)) return false;
+  const p = indiaParts(asOf);
+  const dobMonthDay = dobStr.slice(5, 10);
+  const todayMonthDay = `${p.month}-${p.day}`;
+  return dobMonthDay === todayMonthDay;
+}
+
+export function calculateTenureMonths(joinedOn: string | Date | null | undefined, asOf: Date | string = new Date()): number {
+  if (!joinedOn) return 0;
+  const joinStr = typeof joinedOn === 'string' ? joinedOn.slice(0, 10) : joinedOn.toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinStr)) return 0;
+  const p = indiaParts(asOf);
+  const joinYear = Number(joinStr.slice(0, 4));
+  const joinMonth = Number(joinStr.slice(5, 7));
+  const joinDay = Number(joinStr.slice(8, 10));
+  const currentYear = Number(p.year);
+  const currentMonth = Number(p.month);
+  const currentDay = Number(p.day);
+
+  let months = (currentYear - joinYear) * 12 + (currentMonth - joinMonth);
+  if (currentDay < joinDay) {
+    months -= 1;
+  }
+  return Math.max(0, months);
+}
+
+export function isEligibleForLeaveEncashment(joinedOn: string | Date | null | undefined, earnedBalance: number, asOf: Date | string = new Date()): boolean {
+  return calculateTenureMonths(joinedOn, asOf) >= 12 && Number(earnedBalance) >= 1;
+}
+
+export function internLeaveEntitlement(joinedOn: string | Date | null | undefined, asOf: Date | string = new Date()): number {
+  if (!joinedOn) return 1;
+  const tenureMonths = calculateTenureMonths(joinedOn, asOf);
+  // Interns accrue leave at 1 day per month worked, min 1 day upon joining, capped at 12 days per year.
+  return Math.max(1, Math.min(12, tenureMonths + 1));
+}
+
+export function getCalendarQuarter(dateStr: string): number {
+  const month = Number(dateStr.slice(5, 7));
+  return Math.floor((month - 1) / 3) + 1;
+}

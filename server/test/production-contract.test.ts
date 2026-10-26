@@ -81,16 +81,16 @@ assert.match(attendance,/OFFICE_NETWORK_IPS/);
 assert.doesNotMatch(attendance,/verifyQr|qrToken|'QR'/);
 assert.match(leave,/leaveMutationLimiter/);
 assert.match(leave,/emailLeaveRequestToAdmin/);
-assert.match(leave,/enqueueHrNotificationEmail/);
-assert.match(leave,/replyTo:request\.employeeEmail/);
+assert.match(leave,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(leave,/replyTo:request\.employeeEmail|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(leave,/gmailAccessToken|sendEmployeeHrEmail/);
-assert.match(attendance,/enqueueHrNotificationEmail/);
-assert.match(attendance,/replyTo:employee\.email/);
+assert.match(attendance,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(attendance,/replyTo:employee\.email|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(attendance,/gmailAccessToken|sendEmployeeHrEmail/);
 assert.match(attendance,/Attendance correction request/);
 assert.match(attendance,/Flexible start request/);
-assert.match(workplace,/enqueueHrNotificationEmail/);
-assert.match(workplace,/replyTo:req\.user\.email/);
+assert.match(workplace,/dispatchWorkflowRequestEmails|enqueueHrNotificationEmail/);
+assert.match(workplace,/replyTo:req\.user\.email|dispatchWorkflowRequestEmails/);
 assert.doesNotMatch(workplace,/gmailAccessToken|sendEmployeeHrEmail/);
 assert.match(workplace,/New WFH request/);
 assert.match(workplace,/DATE_FORMAT\(request_date,'%Y-%m-%d'\) AS request_date/);
@@ -252,13 +252,44 @@ assert.match(leave,/input\.type === 'SICK' \? 'Sick leave'/);
 assert.match(leave,/wfhOverlap/);
 assert.match(attendance,/pending attendance correction already exists/);
 assert.match(attendance,/OFF_PREMISES/);
-assert.match(attendance,/Browser coordinates are client-controlled/);
-assert.match(attendance,/verifyOfficeNetwork\(req\);\s*method = 'GPS'/);
+assert.match(attendance,/if \(distance <= Number\(settings\.geofence_meters \|\| POLICY\.geofenceMeters\)\) \{\s*method = 'GPS';\s*locationAccuracy = input\.accuracy;/);
 assert.match(attendance,/approvedStartByDate/);
 assert.match(admin,/approvedStartByEmployeeDate/);
 assert.match(workplace,/A pending or approved WFH request already exists for this date/);
 assert.match(workflowMigration,/uq_wfh_active_employee_day/);
 assert.match(workflowMigration,/OFF_PREMISES/);
+
+// Phase 3: Workflow Robustness & Database Concurrency contracts
+assert.match(db, /ER_LOCK_DEADLOCK/);
+assert.match(db, /PROTOCOL_CONNECTION_LOST/);
+assert.match(db, /Math\.random\(\) \* 30/); // Jittered backoff
+assert.match(workplace, /The file contents do not match the selected document type/);
+assert.match(workplace, /Readable\.from\(object\.buffer\)\.pipe\(res\)/);
+assert.match(workplace, /router\.delete\('\/calendar\/:date'/);
+assert.match(workplace, /National statutory holidays cannot be deleted/);
+
+const clientApp = fs.readFileSync(path.join(root, '../client/src/App.tsx'), 'utf8');
+assert.match(clientApp, /function DeactivateConfirmModal/);
+assert.match(clientApp, /function DeleteHolidayModal/);
+assert.doesNotMatch(clientApp, /window\.confirm\('Deactivate/);
+
+// Phase 4: Persistent Session Authentication ("Remember Me" & 30-Day Cookie)
+const employeeSessionsMigration = fs.readFileSync(path.join(root, 'migrations/012_employee_sessions.sql'), 'utf8');
+assert.match(employeeSessionsMigration, /CREATE TABLE IF NOT EXISTS employee_sessions/);
+assert.match(employeeSessionsMigration, /session_token_hash CHAR\(64\) NOT NULL UNIQUE/);
+assert.match(employeeSessionsMigration, /is_remember_me BOOLEAN NOT NULL DEFAULT FALSE/);
+
+const authRoutes = fs.readFileSync(path.join(root, 'src/routes/auth.mts'), 'utf8');
+assert.match(authRoutes, /router\.get\('\/sessions'/);
+assert.match(authRoutes, /router\.delete\('\/sessions\/:id'/);
+assert.match(authRoutes, /router\.delete\('\/sessions'/);
+assert.match(authRoutes, /createAndPersistSession/);
+
+assert.match(security, /parseDeviceName/);
+assert.match(security, /30 \* 24 \* 60 \* 60 \* 1000/);
+
+assert.match(clientApp, /Keep me signed in on this device for 30 days/);
+assert.match(clientApp, /function ActiveDevicesCard/);
 
 console.log('Production API contracts: PASS');
 

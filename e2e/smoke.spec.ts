@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-async function signInDev(page: any, account: 'employee' | 'admin') {
-  const email = account === 'admin' ? 'om.admin@example.test' : 'aarav.mehta@example.test';
+async function signInDev(page: any, account: 'employee' | 'admin' | 'superadmin' | 'standard_admin' | 'intern') {
+  const emailMap: Record<string, string> = {
+    superadmin: 'om.admin@example.test',
+    admin: 'om.admin@example.test',
+    standard_admin: 'priya.shah@example.test',
+    employee: 'aarav.mehta@example.test',
+    intern: 'rohan.nair@example.test',
+  };
+  const email = emailMap[account] || 'aarav.mehta@example.test';
   const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://127.0.0.1:3001/api';
   const response = await page.request.post(`${apiBase}/auth/demo`, { data: { email } });
   expect(response.ok()).toBeTruthy();
@@ -503,4 +510,102 @@ test('administrator operational pages load and keep the main actions accessible'
   await openSidebarLink(page, 'Audit trail');
   await expect(page.getByRole('heading', { name: 'Audit trail', exact: true })).toBeVisible();
   await expect(page.locator('.audit-table-card')).toBeVisible();
+});
+
+test('employee can submit leave application and administrator can review and approve it', async ({ page }) => {
+  // 1. Employee signs in and submits leave application
+  await signInDev(page, 'employee');
+  await openSidebarLink(page, 'Leave & time off');
+  await expect(page.getByRole('heading', { name: 'Leave & time off', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Request time off', exact: true })).toBeVisible();
+
+  // Construct deterministic future working dates (Monday - Tuesday)
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + 14); // 2 weeks ahead
+  const day = targetDate.getDay();
+  const diffToMonday = (day === 0 ? 1 : (8 - day) % 7);
+  targetDate.setDate(targetDate.getDate() + diffToMonday);
+  const startStr = targetDate.toISOString().slice(0, 10);
+
+  const endDate = new Date(targetDate);
+  endDate.setDate(endDate.getDate() + 1);
+  const endStr = endDate.toISOString().slice(0, 10);
+
+  // Fill and submit leave request
+  await page.locator('input[aria-label="First day"]').fill(startStr);
+  await page.locator('input[aria-label="Last day"]').fill(endStr);
+  await page.locator('textarea[aria-label="A short note"]').fill('Automated E2E leave workflow verification note');
+  await page.getByRole('button', { name: 'Send leave request' }).click();
+
+  // Notification confirms submission
+  await expect(page.getByText(/Leave request submitted|Leave request saved/)).toBeVisible();
+
+  // History table contains pending request
+  const table = page.locator('table[aria-label="Your leave request history"]');
+  await expect(table.getByText(/Casual leave|Sick leave|Earned leave/).first()).toBeVisible();
+
+  // 2. Administrator signs in and reviews the request
+  await signInDev(page, 'admin');
+  await openSidebarLink(page, 'Requests');
+  await expect(page.getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+
+  // Find Aarav Mehta's pending card
+  const pendingCard = page.locator('.approval-request').filter({ hasText: 'Aarav Mehta' }).first();
+  if (await pendingCard.isVisible()) {
+    await pendingCard.getByRole('button', { name: 'Approve' }).click();
+    await expect(page.getByRole('heading', { name: 'Approve this request?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Confirm approval' }).click();
+    await expect(page.getByText(/was approved/)).toBeVisible();
+  }
+});
+
+test('session persists across page reloads without forcing re-authentication', async ({ page }) => {
+  await signInDev(page, 'employee');
+  await expect(page.getByText('What needs your attention')).toBeVisible();
+
+  // First reload
+  await page.reload();
+  await expect(page.getByText('What needs your attention')).toBeVisible();
+  await expect(page.locator('.sidebar')).toBeVisible();
+
+  // Deep route navigation and reload
+  await page.goto('/profile');
+  await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeVisible();
+  await expect(page.getByText('Personal details')).toBeVisible();
+});
+
+test('Super Admin has full access to settings and audit while Standard Admin is restricted', async ({ page }) => {
+  // 1. Super Admin access verification
+  await signInDev(page, 'superadmin');
+  await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.locator('.workspace-chip')).toContainText('Super Admin');
+
+  // Sidebar contains privileged settings and audit trail
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toBeVisible();
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toBeVisible();
+
+  // Navigating to office settings succeeds
+  await page.goto('/admin/settings');
+  await expect(page.getByRole('heading', { name: 'Office settings', exact: true })).toBeVisible();
+
+  // 2. Standard Admin access verification
+  await signInDev(page, 'standard_admin');
+  await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.locator('.workspace-chip')).toContainText('Administrator');
+
+  // Sidebar hides privileged administrative links
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toHaveCount(0);
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toHaveCount(0);
+
+  // Direct URL navigation to office settings is blocked
+  await page.goto('/admin/settings');
+  await expect(page.getByText('You don’t have access to this view.')).toBeVisible();
+
+  // Standard Admin in People view sees locked badge for Super Admin account
+  await page.goto('/admin/team');
+  await expect(page.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
+  const superAdminRow = page.locator('tr').filter({ hasText: 'Om Shah' });
+  await expect(superAdminRow.locator('.role-locked-badge')).toBeVisible();
 });

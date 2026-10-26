@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
+import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { pool, query, transaction } from '../db.mts';
-import { audit, notify, requireAdmin, requireAuth } from '../security.mts';
+import { audit, isSuperAdmin, notify, notifyAdmins, requireAdmin, requireAuth, requireSuperAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { attendanceStatus, hasPassedAbsenceCutoff, indiaDate, indiaTime, isAttendanceAllowed, isOfficeNetworkIpAllowed, netWorkedMinutes, normalizeClientIp, parseOfficeNetworkIps, POLICY } from '../policy.mts';
 import { deleteProfilePhoto, profilePhotoUpload, readProfilePhoto, saveProfilePhoto, verifyImageSignature } from '../profile-photo.mts';
 import { htmlEscape, sendEmail, sendHrNotificationEmail, smtpConfigured, getHrNotificationEmail } from '../mailer.mts';
 import { getEmailOutboxSummary, retryFailedEmail } from '../email-outbox.mts';
+import { dispatchWorkflowStatusEmail } from '../email-routing.mts';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -180,21 +182,25 @@ router.get('/system-health', asyncRoute(async (req, res) => {
 router.get('/users', asyncRoute(async (req, res) => {
   const users = await query(`SELECT e.id, e.employee_code, e.full_name, e.email, e.role, e.user_type, e.status, e.title, e.position, e.branch, e.department, e.phone, e.profile_photo_key, e.wfh_enabled, e.joined_on,
     e.probation_end_date, (SELECT COUNT(*) FROM attendance_records a WHERE a.employee_id=e.id AND a.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND a.status='LATE_ENTRY') AS late_count
-    FROM employees e ORDER BY e.role DESC, e.full_name`);
+    FROM employees e ORDER BY FIELD(e.role, 'SUPER_ADMIN', 'ADMIN', 'EMPLOYEE', 'INTERN'), e.full_name`);
   res.json({ users });
 }));
 router.post('/users', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ employeeCode: z.string().trim().min(2).max(24), fullName: z.string().trim().min(2).max(120), email: z.string().trim().email().max(254),
-    userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).default('EMPLOYEE'), title: z.string().trim().max(120).default('Employee'), position: z.string().trim().min(2).max(120).default('Employee'), branch: z.string().trim().min(2).max(100).default('Pune'), department: z.string().trim().min(2).max(120).default('General'), phone: z.string().trim().max(32).optional(),
+    userType: z.enum(['SUPER_ADMIN','ADMIN','EMPLOYEE','INTERN']).default('EMPLOYEE'), title: z.string().trim().max(120).default('Employee'), position: z.string().trim().min(2).max(120).default('Employee'), branch: z.string().trim().min(2).max(100).default('Pune'), department: z.string().trim().min(2).max(120).default('General'), phone: z.string().trim().max(32).optional(),
     wfhEnabled: z.boolean().default(false), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
   }), req.body);
+  if (input.userType === 'SUPER_ADMIN' && !isSuperAdmin(req.user)) {
+    throw Object.assign(new Error('Only a Super Administrator can provision a Super Administrator account.'), { status: 403 });
+  }
   const id = crypto.randomUUID();
   const userType = input.userType;
+  const role = userType;
   const joined = input.joinedOn || indiaDate();
   const probation = input.probationEndDate ?? (() => { const d = new Date(`${joined}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 4); return d.toISOString().slice(0,10); })();
   await query(`INSERT INTO employees (id, employee_code, full_name, email, role, user_type, title, position, branch, department, phone, joined_on, probation_end_date, wfh_enabled)
     VALUES (:id,:code,:name,:email,:role,:userType,:title,:position,:branch,:department,:phone,:joined,:probation,:wfh)`, {
-    id, code: input.employeeCode, name: input.fullName, email: input.email.toLowerCase(), role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE', userType,
+    id, code: input.employeeCode, name: input.fullName, email: input.email.toLowerCase(), role, userType,
     title: input.title || input.position || 'Employee', position: input.position || input.title || 'Employee', branch: input.branch, department: input.department, phone: input.phone || null, joined, probation, wfh: input.wfhEnabled
   });
   await transaction(async (connection) => {
@@ -210,29 +216,172 @@ router.post('/users', adminMutationLimiter, asyncRoute(async (req, res) => {
       ]);
     }
   });
-  await audit({ actorId: req.user.id, action: 'EMPLOYEE_CREATED', entityType: 'employee', entityId: id, details: { employee_code: input.employeeCode, role: userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE' }, ipAddress: req.ip });
+  await audit({ actorId: req.user.id, action: 'EMPLOYEE_CREATED', entityType: 'employee', entityId: id, details: { employee_code: input.employeeCode, role }, ipAddress: req.ip });
   res.status(201).json({ ok: true, id });
 }));
 router.patch('/users/:id', adminMutationLimiter, asyncRoute(async (req, res) => {
   const input = validate(z.object({ fullName: z.string().trim().min(2).max(120).optional(), email: z.string().trim().email().max(254).optional(), title: z.string().trim().max(120).optional(), position: z.string().trim().min(2).max(120).optional(), branch: z.string().trim().min(2).max(100).optional(), department: z.string().trim().min(2).max(120).optional(),
-    phone: z.string().trim().max(32).nullable().optional(), userType: z.enum(['EMPLOYEE','INTERN','ADMIN']).optional(), status: z.enum(['ACTIVE','INACTIVE']).optional(),
+    phone: z.string().trim().max(32).nullable().optional(), userType: z.enum(['SUPER_ADMIN','ADMIN','EMPLOYEE','INTERN']).optional(), status: z.enum(['ACTIVE','INACTIVE']).optional(),
     wfhEnabled: z.boolean().optional(), joinedOn: dateSchema.optional(), probationEndDate: dateSchema.nullable().optional()
   }).refine((body) => Object.keys(body).length > 0, 'Make at least one change.'), req.body);
-  if (req.params.id === req.user.id && input.status === 'INACTIVE') throw Object.assign(new Error('You cannot deactivate your own administrator account.'), { status: 400 });
-  const [user] = await query('SELECT id FROM employees WHERE id=:id', { id: req.params.id });
-  if (!user) throw Object.assign(new Error('Employee not found.'), { status: 404 });
-  const fields = {
-    fullName:['full_name',input.fullName], email:['email',input.email?.toLowerCase()], title:['title',input.title], position:['position',input.position], branch:['branch',input.branch], department:['department',input.department], phone:['phone',input.phone],
-    userType:['user_type',input.userType], status:['status',input.status], wfhEnabled:['wfh_enabled',input.wfhEnabled], joinedOn:['joined_on',input.joinedOn], probationEndDate:['probation_end_date',input.probationEndDate]
-  };
-  const values: any[] = [];
-  const sets: string[] = []
-  for (const [key, [column, value]] of Object.entries(fields)) if (value !== undefined) { sets.push(`${column}=?`); values.push(value); }
-  if (input.userType !== undefined) { sets.push('role=?'); values.push(input.userType === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE'); }
-  values.push(req.params.id);
-  await query(`UPDATE employees SET ${sets.join(',')} WHERE id=?`, values);
+  await transaction(async (connection) => {
+    const [userRows]: any = await connection.execute('SELECT id, employee_code, full_name, email, role, user_type, status, session_version FROM employees WHERE id=:id FOR UPDATE', { id: req.params.id });
+    if (!userRows[0]) throw Object.assign(new Error('Employee not found.'), { status: 404 });
+    const target = userRows[0];
+    const targetIsSuperAdmin = target.role === 'SUPER_ADMIN' || target.user_type === 'SUPER_ADMIN';
+    const actorIsSuperAdmin = isSuperAdmin(req.user);
+
+    if (req.params.id === req.user.id) {
+      if (input.status === 'INACTIVE') throw Object.assign(new Error('You cannot deactivate your own administrator account.'), { status: 400 });
+      if (input.userType !== undefined) {
+        if (!actorIsSuperAdmin) throw Object.assign(new Error('You cannot change the role of your own administrator account.'), { status: 400 });
+        if (input.userType !== 'SUPER_ADMIN') {
+          const [superCountRows]: any = await connection.execute(
+            "SELECT COUNT(*) AS count FROM employees WHERE (role = 'SUPER_ADMIN' OR user_type = 'SUPER_ADMIN') AND status = 'ACTIVE'"
+          );
+          if (Number(superCountRows[0]?.count || 0) <= 1) {
+            throw Object.assign(new Error('Cannot demote the last active Super Administrator in the organization.'), { status: 400 });
+          }
+        }
+      }
+    } else {
+      if (targetIsSuperAdmin && !actorIsSuperAdmin) {
+        throw Object.assign(new Error('Only a Super Administrator can modify another Super Administrator account.'), { status: 403 });
+      }
+      if (input.userType === 'SUPER_ADMIN' && !actorIsSuperAdmin) {
+        throw Object.assign(new Error('Only a Super Administrator can promote a user to Super Administrator.'), { status: 403 });
+      }
+    }
+
+    if (input.email && input.email.toLowerCase() !== String(target.email).toLowerCase()) {
+      const [existingEmail]: any = await connection.execute('SELECT id FROM employees WHERE email=:email AND id!=:id LIMIT 1', { email: input.email.toLowerCase(), id: req.params.id });
+      if (existingEmail[0]) throw Object.assign(new Error('This email address is already assigned to another employee.'), { status: 409 });
+    }
+    const fields = {
+      fullName:['full_name',input.fullName], email:['email',input.email?.toLowerCase()], title:['title',input.title], position:['position',input.position], branch:['branch',input.branch], department:['department',input.department], phone:['phone',input.phone],
+      userType:['user_type',input.userType], status:['status',input.status], wfhEnabled:['wfh_enabled',input.wfhEnabled], joinedOn:['joined_on',input.joinedOn], probationEndDate:['probation_end_date',input.probationEndDate]
+    };
+    const values: any[] = [];
+    const sets: string[] = [];
+    for (const [key, [column, value]] of Object.entries(fields)) if (value !== undefined) { sets.push(`${column}=?`); values.push(value); }
+    if (input.userType !== undefined) {
+      sets.push('role=?');
+      values.push(input.userType);
+      sets.push('session_version = session_version + 1');
+    }
+    values.push(req.params.id);
+    await connection.execute(`UPDATE employees SET ${sets.join(',')} WHERE id=?`, values);
+    if (input.userType !== undefined) {
+      try {
+        await connection.execute('UPDATE employee_sessions SET revoked_at = UTC_TIMESTAMP() WHERE employee_id = :id AND revoked_at IS NULL', { id: req.params.id });
+      } catch {}
+    }
+  });
   await audit({ actorId: req.user.id, action: 'EMPLOYEE_UPDATED', entityType: 'employee', entityId: req.params.id, details: { fields: Object.keys(input) }, ipAddress: req.ip });
   res.json({ ok: true });
+}));
+
+router.put(['/employees/:id/role', '/users/:id/role'], adminMutationLimiter, asyncRoute(async (req, res) => {
+  const schema = z.object({
+    role: z.enum(['SUPER_ADMIN', 'ADMIN', 'EMPLOYEE', 'INTERN'])
+  });
+  const input = validate(schema, req.body);
+  const targetId = req.params.id;
+  const newRole = input.role;
+
+  await transaction(async (connection) => {
+    // Guard 1: Target existence and active status
+    const [rows]: any = await connection.execute(
+      'SELECT id, employee_code, full_name, email, role, user_type, status, session_version FROM employees WHERE id = :id FOR UPDATE',
+      { id: targetId }
+    );
+    const target = rows[0];
+    if (!target) {
+      throw Object.assign(new Error('Employee not found.'), { status: 404 });
+    }
+    if (target.status !== 'ACTIVE') {
+      throw Object.assign(new Error('Cannot change the role of an inactive account.'), { status: 400 });
+    }
+
+    const targetIsSuperAdmin = target.role === 'SUPER_ADMIN' || target.user_type === 'SUPER_ADMIN';
+    const actorIsSuperAdmin = isSuperAdmin(req.user);
+
+    // Guard 2: Protecting Super Admins (Only Super Admins can alter or demote a Super Admin)
+    if (targetIsSuperAdmin && !actorIsSuperAdmin) {
+      throw Object.assign(new Error('Only a Super Administrator can modify another Super Administrator account.'), { status: 403 });
+    }
+
+    // Guard 3: Blocking unauthorized promotions (Standard Admins cannot grant SUPER_ADMIN)
+    if (newRole === 'SUPER_ADMIN' && !actorIsSuperAdmin) {
+      throw Object.assign(new Error('Only a Super Administrator can promote a user to Super Administrator.'), { status: 403 });
+    }
+
+    // Guard 4: Self-demotion lockout prevention (Last active Super Admin in the organization cannot demote themselves)
+    if (req.user.id === target.id && actorIsSuperAdmin && newRole !== 'SUPER_ADMIN') {
+      const [superCountRows]: any = await connection.execute(
+        "SELECT COUNT(*) AS count FROM employees WHERE (role = 'SUPER_ADMIN' OR user_type = 'SUPER_ADMIN') AND status = 'ACTIVE'"
+      );
+      const activeSuperCount = Number(superCountRows[0]?.count || 0);
+      if (activeSuperCount <= 1) {
+        throw Object.assign(new Error('Cannot demote the last active Super Administrator in the organization.'), { status: 400 });
+      }
+    }
+
+    // Guard 5: Self-promotion prevention (Standard Admins cannot alter or elevate their own privileges)
+    if (req.user.id === target.id && !actorIsSuperAdmin) {
+      throw Object.assign(new Error('Administrators cannot alter or elevate their own privileges.'), { status: 403 });
+    }
+
+    // Invalidate sessions immediately via session_version = session_version + 1
+    await connection.execute(
+      'UPDATE employees SET role = :newRole, user_type = :newRole, session_version = session_version + 1 WHERE id = :id',
+      { newRole, id: targetId }
+    );
+
+    // Revoke any active session tokens in employee_sessions
+    try {
+      await connection.execute(
+        'UPDATE employee_sessions SET revoked_at = UTC_TIMESTAMP() WHERE employee_id = :id AND revoked_at IS NULL',
+        { id: targetId }
+      );
+    } catch {
+      // Table may not exist in mock or pre-012 environments
+    }
+
+    // Dispatch audit log
+    await audit({
+      actorId: req.user.id,
+      action: 'ROLE_CHANGED',
+      entityType: 'employee',
+      entityId: targetId,
+      details: {
+        targetEmail: target.email,
+        targetCode: target.employee_code,
+        previousRole: target.role,
+        previousUserType: target.user_type,
+        newRole
+      },
+      ipAddress: req.ip
+    });
+
+    // In-app notifications
+    const displayRole = newRole === 'SUPER_ADMIN' ? 'Super Administrator' : newRole === 'ADMIN' ? 'Administrator' : newRole === 'INTERN' ? 'Intern' : 'Employee';
+    await notify(
+      targetId,
+      'Organizational Role Updated',
+      `Your account role has been updated to ${displayRole}. Active sessions have been refreshed.`,
+      'UPDATE',
+      { type: 'role_changed', newRole }
+    );
+    await notifyAdmins(
+      'Workforce Role Updated',
+      `${req.user.full_name} updated ${target.full_name}'s role to ${displayRole}.`,
+      'UPDATE',
+      { type: 'role_changed', targetId, newRole }
+    );
+  });
+
+  res.json({ ok: true, id: targetId, role: newRole, userType: newRole });
 }));
 
 router.post('/users/:id/photo', adminMutationLimiter, profilePhotoUpload.single('photo'), asyncRoute(async (req,res)=>{
@@ -265,7 +414,7 @@ router.get('/users/:id/photo', asyncRoute(async (req,res)=>{
   res.setHeader('Content-Type',photo.profile_photo_content_type||'image/jpeg');
   res.setHeader('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(photo.profile_photo_filename||'profile-photo'));
   res.setHeader('Cache-Control','private, no-store');
-  if (file.kind === 'buffer') res.send(file.buffer);
+  if (file.kind === 'buffer') Readable.from(file.buffer).pipe(res);
   else file.stream.on('error', () => {
     console.error(JSON.stringify({type:'admin_profile_photo_stream_failed',request_id:req.requestId}));
     if (!res.headersSent) res.status(503).json({error:'Private document storage is temporarily unavailable.',requestId:req.requestId});
@@ -296,6 +445,7 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
   if (!['leave','wfh','correction','flex'].includes(kind)) throw Object.assign(new Error('Unknown approval type.'), { status: 400 });
   let employeeId = null;
   let recordDate = null;
+  let itemRecord: any = null;
   await transaction(async (connection) => {
     const table = { leave:'leave_requests', wfh:'wfh_requests', correction:'attendance_correction_requests', flex:'flex_start_requests' }[kind];
     // Consistent employee-first lock order serializes approvals against submissions.
@@ -305,6 +455,7 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
     const [rows] = await connection.execute(`SELECT * FROM ${table} WHERE id=:id AND status='PENDING' FOR UPDATE`, { id: req.params.id });
     if (!rows[0]) throw Object.assign(new Error('This request is no longer pending.'), { status: 409 });
     const item = rows[0];
+    itemRecord = item;
     employeeId = item.employee_id;
     recordDate = item.start_date || item.request_date || item.attendance_date;
     if (input.decision === 'APPROVED' && kind === 'leave') {
@@ -377,6 +528,54 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
   await notify(employeeId, `${requestLabel} ${input.decision === 'APPROVED' ? 'approved' : 'declined'}`,
     input.decision === 'APPROVED' ? 'Your request has been approved.' : `Your request was declined.${input.note ? ` Note: ${input.note}` : ''}`, 'APPROVAL', { type:kind, id:req.params.id, decision:input.decision });
   await audit({ actorId:req.user.id, action:`${kind.toUpperCase()}_${input.decision}`, entityType:`${kind}_request`, entityId:req.params.id, details:{ decision:input.decision, date:recordDate }, ipAddress:req.ip });
+
+  if (employeeId) {
+    const summaryDetails: Array<{ label: string; value: string }> = [];
+    if (kind === 'leave' && itemRecord) {
+      summaryDetails.push(
+        { label: 'Leave Type', value: itemRecord.leave_type || 'Leave' },
+        { label: 'Duration', value: `${itemRecord.days || 1} day(s) (${String(itemRecord.start_date || '').slice(0, 10)} to ${String(itemRecord.end_date || '').slice(0, 10)})` }
+      );
+    } else if (kind === 'wfh' && itemRecord) {
+      summaryDetails.push(
+        { label: 'Category', value: itemRecord.request_kind || 'Work From Home' },
+        { label: 'Date', value: String(itemRecord.request_date || '').slice(0, 10) }
+      );
+    } else if (kind === 'correction' && itemRecord) {
+      summaryDetails.push(
+        { label: 'Attendance Date', value: String(itemRecord.attendance_date || '').slice(0, 10) },
+        { label: 'Reason', value: itemRecord.reason || 'N/A' }
+      );
+    } else if (kind === 'flex' && itemRecord) {
+      summaryDetails.push(
+        { label: 'Requested Date', value: String(itemRecord.request_date || '').slice(0, 10) },
+        { label: 'Requested Start Time', value: String(itemRecord.requested_start_time || '').slice(0, 5) }
+      );
+    } else if (recordDate) {
+      summaryDetails.push({ label: 'Date', value: String(recordDate).slice(0, 10) });
+    }
+
+    try {
+      await dispatchWorkflowStatusEmail({
+        requestId: req.params.id,
+        requestType: kind as any,
+        employeeId,
+        title: requestLabel,
+        decision: input.decision,
+        summaryDetails,
+        reviewerNote: input.note || null,
+        portalRoute: kind === 'leave' ? '/leave' : kind === 'wfh' ? '/wfh' : '/attendance'
+      });
+    } catch (e: any) {
+      console.error(JSON.stringify({
+        type: 'approval_status_email_dispatch_failed',
+        request_id: req.params.id,
+        kind,
+        error: String(e?.message || e)
+      }));
+    }
+  }
+
   res.json({ ok:true });
 }));
 
@@ -384,7 +583,7 @@ router.get('/settings', asyncRoute(async (req,res) => {
   const rows = await query('SELECT setting_key,setting_value,updated_at FROM system_settings ORDER BY setting_key');
   res.json({ settings:Object.fromEntries(rows.map((r)=>[r.setting_key, Number.isFinite(Number(r.setting_value)) && r.setting_value.trim() !== '' ? Number(r.setting_value) : r.setting_value])), updatedAt:rows[0]?.updated_at || null });
 }));
-router.put('/settings', adminMutationLimiter, asyncRoute(async (req,res) => {
+router.put('/settings', adminMutationLimiter, requireSuperAdmin, asyncRoute(async (req,res) => {
   const schema = z.object({ office_name:z.string().trim().min(2).max(120).optional(), office_latitude:z.number().min(-90).max(90).optional(), office_longitude:z.number().min(-180).max(180).optional(),
     geofence_meters:z.number().int().min(20).max(1000).optional(), wfh_monthly_cap:z.number().int().min(1).max(15).optional(),
     gps_max_accuracy_meters:z.number().int().min(20).max(250).optional(), late_threshold:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).optional(),
@@ -422,7 +621,7 @@ router.get('/reports.csv', asyncRoute(async (req,res) => {
   res.send(`\uFEFF${lines.join('\r\n')}`);
 }));
 
-router.get('/audit', asyncRoute(async(req,res)=>{
+router.get('/audit', requireSuperAdmin, asyncRoute(async(req,res)=>{
   const before=String(req.query.before || '');
   const rows=await query(`SELECT l.id,l.action,l.entity_type,l.entity_id,l.details_json,l.ip_address,l.created_at,e.full_name AS actor_name,e.employee_code
     FROM audit_logs l LEFT JOIN employees e ON e.id=l.actor_id ${before?'WHERE l.created_at<:before':''} ORDER BY l.created_at DESC LIMIT 150`, before?{before}:{});

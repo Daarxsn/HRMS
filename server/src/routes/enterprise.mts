@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
+import { Readable } from 'node:stream';
 import multer from 'multer';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
 import { audit, notify, requireAuth, requireAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { saveObject, deleteObject, readObject, getObjectStorageReadiness } from '../object-storage.mts';
+import { indiaDate, isBirthdayToday } from '../policy.mts';
+import { enqueueHrNotificationEmail } from '../email-outbox.mts';
+import { dispatchWorkflowRequestEmails, dispatchWorkflowStatusEmail } from '../email-routing.mts';
 
 const router = Router();
 router.use(requireAuth);
@@ -43,7 +47,7 @@ router.get('/employee/documents/:id', asyncRoute(async(req,res)=>{
   res.setHeader('Content-Disposition',`attachment; filename*=UTF-8''${encodeURIComponent(rows[0].original_filename||'document')}`);
   res.setHeader('Cache-Control','private, no-store');
   if (file.kind === 'buffer') {
-    res.send(file.buffer);
+    Readable.from(file.buffer).pipe(res);
   } else {
     file.stream.on('error', () => {
       console.error(JSON.stringify({type:'private_document_stream_failed',request_id:req.requestId}));
@@ -54,15 +58,35 @@ router.get('/employee/documents/:id', asyncRoute(async(req,res)=>{
 }));
 
 router.get('/policies', asyncRoute(async(req,res)=>{
-  const rows=await query(`SELECT p.id,p.title,p.category,p.version,p.body,p.status,p.published_at,CASE WHEN a.id IS NULL THEN 0 ELSE 1 END acknowledged FROM company_policies p LEFT JOIN policy_acknowledgements a ON a.policy_id=p.id AND a.employee_id=:employee WHERE p.status='PUBLISHED' ORDER BY p.published_at DESC,p.created_at DESC`,{employee:req.user.id});
+  const rows=await query(`SELECT p.id,p.title,p.category,p.version,p.body,p.status,p.published_at,
+    CASE WHEN a.id IS NULL THEN 0 ELSE 1 END acknowledged,
+    a.acknowledged_at, a.ip_address, a.user_agent
+    FROM company_policies p
+    LEFT JOIN policy_acknowledgements a ON a.policy_id=p.id AND a.employee_id=:employee
+    WHERE p.status='PUBLISHED'
+    ORDER BY p.published_at DESC,p.created_at DESC`,{employee:req.user.id});
   res.json({policies:rows});
 }));
 router.post('/policies/:id/acknowledge', asyncRoute(async(req,res)=>{
   const rows=await query('SELECT id,title FROM company_policies WHERE id=:id AND status=\'PUBLISHED\' LIMIT 1',{id:req.params.id});
   if(!rows[0]) throw Object.assign(new Error('Policy not found or not published.'),{status:404});
-  await query(`INSERT INTO policy_acknowledgements (id,policy_id,employee_id,acknowledged_at,ip_address) VALUES (:id,:policy,:employee,UTC_TIMESTAMP(),:ip) ON DUPLICATE KEY UPDATE acknowledged_at=VALUES(acknowledged_at),ip_address=VALUES(ip_address)`,{id:crypto.randomUUID(),policy:req.params.id,employee:req.user.id,ip:req.ip});
-  await audit({actorId:req.user.id,action:'POLICY_ACKNOWLEDGED',entityType:'company_policy',entityId:req.params.id,details:{title:rows[0].title},ipAddress:req.ip});
+  const userAgent = req.get('user-agent')?.slice(0, 500) || null;
+  await query(`INSERT INTO policy_acknowledgements (id,policy_id,employee_id,acknowledged_at,ip_address,user_agent)
+    VALUES (:id,:policy,:employee,UTC_TIMESTAMP(),:ip,:ua)
+    ON DUPLICATE KEY UPDATE acknowledged_at=VALUES(acknowledged_at),ip_address=VALUES(ip_address),user_agent=VALUES(user_agent)`,
+    {id:crypto.randomUUID(),policy:req.params.id,employee:req.user.id,ip:req.ip,ua:userAgent});
+  await audit({actorId:req.user.id,action:'POLICY_ACKNOWLEDGED',entityType:'company_policy',entityId:req.params.id,details:{title:rows[0].title,userAgent},ipAddress:req.ip});
   res.json({ok:true});
+}));
+router.get('/admin/policies/:id/acknowledgements', adminLimiter, asyncRoute(async(req,res)=>{
+  adminOnly(req);
+  const rows=await query(`SELECT a.id,a.acknowledged_at,a.ip_address,a.user_agent,
+    e.id AS employee_id,e.full_name,e.employee_code,e.email,e.department
+    FROM policy_acknowledgements a
+    JOIN employees e ON e.id=a.employee_id
+    WHERE a.policy_id=:id
+    ORDER BY a.acknowledged_at DESC`,{id:req.params.id});
+  res.json({acknowledgements:rows});
 }));
 
 router.get('/admin/overview',adminLimiter,asyncRoute(async(req,res)=>{
@@ -158,7 +182,7 @@ router.get('/admin/documents/:id',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); const rows=await query('SELECT object_key,original_filename,content_type FROM employee_documents WHERE id=:id LIMIT 1',{id:req.params.id}); if(!rows[0]?.object_key) return res.status(404).end();
   const file=await readObject(rows[0].object_key); res.setHeader('Content-Type',rows[0].content_type||file.contentType||'application/octet-stream'); res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(rows[0].original_filename||'document')}`); res.setHeader('Cache-Control','private, no-store');
   if (file.kind === 'buffer') {
-    res.send(file.buffer);
+    Readable.from(file.buffer).pipe(res);
   } else {
     file.stream.on('error', () => {
       console.error(JSON.stringify({type:'private_document_stream_failed',request_id:req.requestId}));
@@ -258,6 +282,7 @@ router.get('/admin/security',adminLimiter,asyncRoute(async(req,res)=>{
 router.post('/admin/security/revoke/:employeeId',adminLimiter,asyncRoute(async(req,res)=>{
   adminOnly(req); if(req.params.employeeId===req.user.id) throw Object.assign(new Error('Use sign out instead of revoking your own current session.'),{status:400});
   const result=await query('UPDATE employees SET session_version=session_version+1 WHERE id=:id AND status=\'ACTIVE\'',{id:req.params.employeeId}); if(!result.affectedRows) throw Object.assign(new Error('Active employee not found.'),{status:404});
+  try { await query('UPDATE employee_sessions SET revoked_at=UTC_TIMESTAMP() WHERE employee_id=:id AND revoked_at IS NULL', { id:req.params.employeeId }); } catch {}
   await audit({actorId:req.user.id,action:'SESSION_REVOKED',entityType:'employee',entityId:req.params.employeeId,details:{reason:'administrator_revocation'},ipAddress:req.ip}); res.json({ok:true});
 }));
 router.get('/admin/readiness',adminLimiter,asyncRoute(async(req,res)=>{
@@ -267,6 +292,325 @@ router.get('/admin/readiness',adminLimiter,asyncRoute(async(req,res)=>{
   const storage=getObjectStorageReadiness();
   add('private_object_storage',storage.status,storage.detail);
   res.json({status:checks.every((x)=>x.status==='PASS')?'READY':'DEGRADED',checks,checkedAt:new Date().toISOString()});
+}));
+
+// ==========================================
+// Phase 7: Learning & Development Allowance
+// ==========================================
+router.get('/learning/budget', asyncRoute(async(req,res)=>{
+  const today = indiaDate();
+  const currentYear = Number(today.slice(0, 4));
+  const claims = await query(
+    `SELECT l.id,l.fiscal_year,l.title,l.provider,l.amount_inr,l.invoice_attachment_id,l.notes,l.status,
+      l.rejection_reason,l.reviewed_at,l.created_at,a.original_filename AS attachment_name
+     FROM learning_allowances l
+     LEFT JOIN attachments a ON a.id=l.invoice_attachment_id
+     WHERE l.employee_id=:employee AND l.fiscal_year=:year
+     ORDER BY l.created_at DESC`,
+    { employee:req.user.id, year:currentYear }
+  );
+  let approved = 0;
+  let pending = 0;
+  for (const c of claims) {
+    const amt = Number(c.amount_inr || 0);
+    if (c.status === 'APPROVED') approved += amt;
+    else if (c.status === 'PENDING') pending += amt;
+  }
+  const annualAllowance = 24000;
+  const remaining = Math.max(0, annualAllowance - approved - pending);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({
+    fiscal_year: currentYear,
+    annual_allowance: annualAllowance,
+    approved_amount: approved,
+    pending_amount: pending,
+    remaining_balance: remaining,
+    claims
+  });
+}));
+
+router.post('/learning/claims', asyncRoute(async(req,res)=>{
+  const input = validate(z.object({
+    title: z.string().trim().min(2).max(180),
+    provider: z.string().trim().min(2).max(120),
+    amount_inr: z.number().positive().max(24000),
+    invoice_attachment_id: z.string().uuid().nullable().optional(),
+    notes: z.string().trim().max(1000).nullable().optional()
+  }), req.body);
+
+  const today = indiaDate();
+  const currentYear = Number(today.slice(0, 4));
+
+  if (input.invoice_attachment_id) {
+    const file = await query('SELECT id FROM attachments WHERE id=:id AND uploaded_by=:employee', { id: input.invoice_attachment_id, employee: req.user.id });
+    if (!file[0]) throw Object.assign(new Error('Supporting receipt is not available for your account.'), { status: 403 });
+  }
+
+  const id = crypto.randomUUID();
+  await transaction(async (connection) => {
+    const [existing] = await connection.execute(
+      `SELECT status, amount_inr FROM learning_allowances WHERE employee_id=:employee AND fiscal_year=:year FOR UPDATE`,
+      { employee: req.user.id, year: currentYear }
+    );
+    let committed = 0;
+    for (const row of existing as any[]) {
+      if (row.status === 'APPROVED' || row.status === 'PENDING') {
+        committed += Number(row.amount_inr || 0);
+      }
+    }
+    const annualAllowance = 24000;
+    const remaining = Math.max(0, annualAllowance - committed);
+    if (input.amount_inr > remaining) {
+      throw Object.assign(new Error(`Claim of ₹${input.amount_inr} exceeds remaining annual learning budget (₹${remaining} available).`), { status: 400 });
+    }
+    await connection.execute(
+      `INSERT INTO learning_allowances (id, employee_id, fiscal_year, title, provider, amount_inr, invoice_attachment_id, notes, status)
+       VALUES (:id, :employee, :year, :title, :provider, :amount, :attachment, :notes, 'PENDING')`,
+      { id, employee: req.user.id, year: currentYear, title: input.title, provider: input.provider, amount: input.amount_inr, attachment: input.invoice_attachment_id || null, notes: input.notes || null }
+    );
+  });
+
+  await audit({ actorId: req.user.id, action: 'LEARNING_CLAIM_SUBMITTED', entityType: 'learning_allowance', entityId: id, details: { title: input.title, amount: input.amount_inr, provider: input.provider }, ipAddress: req.ip });
+  try {
+    await dispatchWorkflowRequestEmails({
+      requestId: id,
+      requestType: 'learning_claim',
+      employeeId: req.user.id,
+      title: 'Learning & Development Reimbursement Claim',
+      summaryDetails: [
+        { label: 'Course / Certification', value: input.title },
+        { label: 'Provider / Institution', value: input.provider },
+        { label: 'Reimbursement Amount', value: `₹${input.amount_inr.toLocaleString('en-IN')}` }
+      ],
+      reason: input.notes || null,
+      portalRoute: '/profile',
+      adminApprovalRoute: `/admin/hr?tab=learning&id=${id}`
+    });
+  } catch (e: any) {
+    console.error(JSON.stringify({
+      type: 'learning_claim_email_dispatch_failed',
+      claim_id: id,
+      error: String(e?.message || e)
+    }));
+  }
+
+  res.status(201).json({ ok: true, id });
+}));
+
+router.get('/admin/learning/claims', adminLimiter, asyncRoute(async(req,res)=>{
+  adminOnly(req);
+  const statusFilter = req.query.status && ['PENDING','APPROVED','REJECTED'].includes(String(req.query.status)) ? String(req.query.status) : null;
+  const rows = await query(
+    `SELECT l.id, l.fiscal_year, l.title, l.provider, l.amount_inr, l.invoice_attachment_id, l.notes,
+      l.status, l.rejection_reason, l.reviewed_at, l.created_at,
+      e.id AS employee_id, e.full_name, e.employee_code, e.email, e.department,
+      a.original_filename AS attachment_name
+     FROM learning_allowances l
+     JOIN employees e ON e.id=l.employee_id
+     LEFT JOIN attachments a ON a.id=l.invoice_attachment_id
+     WHERE (:status IS NULL OR l.status=:status)
+     ORDER BY l.created_at DESC LIMIT 100`,
+    { status: statusFilter }
+  );
+  res.json({ claims: rows });
+}));
+
+router.post('/admin/learning/claims/:id/review', adminLimiter, asyncRoute(async(req,res)=>{
+  adminOnly(req);
+  const input = validate(z.object({
+    status: z.enum(['APPROVED','REJECTED']),
+    rejection_reason: z.string().trim().max(1000).nullable().optional()
+  }), req.body);
+  const [claim] = await query('SELECT id, employee_id, title, amount_inr, status FROM learning_allowances WHERE id=:id LIMIT 1', { id: req.params.id });
+  if (!claim) throw Object.assign(new Error('Claim not found.'), { status: 404 });
+  if (claim.status !== 'PENDING') throw Object.assign(new Error('Only pending claims can be reviewed.'), { status: 409 });
+
+  await query(
+    `UPDATE learning_allowances SET status=:status, reviewed_by=:admin, reviewed_at=UTC_TIMESTAMP(), rejection_reason=:reason WHERE id=:id`,
+    { id: req.params.id, status: input.status, admin: req.user.id, reason: input.rejection_reason || null }
+  );
+  await audit({ actorId: req.user.id, action: `LEARNING_CLAIM_${input.status}`, entityType: 'learning_allowance', entityId: req.params.id, details: { status: input.status, reason: input.rejection_reason }, ipAddress: req.ip });
+  await notify(claim.employee_id, `L&D claim ${input.status.toLowerCase()}`, `Your claim for "${claim.title}" was ${input.status.toLowerCase()}.`, 'UPDATE', { type: 'learning_claim', id: req.params.id });
+
+  try {
+    await dispatchWorkflowStatusEmail({
+      requestId: req.params.id,
+      requestType: 'learning_claim',
+      employeeId: claim.employee_id,
+      title: 'Learning & Development Claim',
+      decision: input.status,
+      summaryDetails: [
+        { label: 'Course / Certification', value: claim.title },
+        { label: 'Reimbursement Amount', value: `₹${Number(claim.amount_inr).toLocaleString('en-IN')}` }
+      ],
+      reviewerNote: input.rejection_reason || null,
+      portalRoute: '/profile'
+    });
+  } catch (e: any) {
+    console.error(JSON.stringify({
+      type: 'learning_claim_status_email_failed',
+      claim_id: req.params.id,
+      error: String(e?.message || e)
+    }));
+  }
+
+  res.json({ ok: true });
+}));
+
+// ==========================================
+// Phase 7: Birthday Early Sign-Off Pass
+// ==========================================
+router.get('/birthday-pass', asyncRoute(async(req,res)=>{
+  const [emp] = await query('SELECT date_of_birth FROM employees WHERE id=:id LIMIT 1', { id: req.user.id });
+  const dob = emp?.date_of_birth;
+  const isBirthday = isBirthdayToday(dob);
+  const today = indiaDate();
+
+  if (!isBirthday) {
+    return res.json({ isBirthday: false, pass: null });
+  }
+
+  const [existing] = await query('SELECT id, pass_date, status, claimed_at FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1', { employee: req.user.id, today });
+  if (existing) {
+    return res.json({ isBirthday: true, pass: { ...existing, hours_early: 2 } });
+  }
+
+  const passId = crypto.randomUUID();
+  await query('INSERT IGNORE INTO birthday_passes (id, employee_id, pass_date, status) VALUES (:id, :employee, :today, \'AVAILABLE\')', { id: passId, employee: req.user.id, today });
+  res.json({ isBirthday: true, pass: { id: passId, pass_date: today, status: 'AVAILABLE', hours_early: 2, claimed_at: null } });
+}));
+
+router.post('/birthday-pass/claim', asyncRoute(async(req,res)=>{
+  const [emp] = await query('SELECT date_of_birth FROM employees WHERE id=:id LIMIT 1', { id: req.user.id });
+  const dob = emp?.date_of_birth;
+  if (!isBirthdayToday(dob)) {
+    throw Object.assign(new Error('Birthday pass is valid only on your birthday.'), { status: 400 });
+  }
+  const today = indiaDate();
+  const passId = crypto.randomUUID();
+  await query(
+    `INSERT INTO birthday_passes (id, employee_id, pass_date, status, claimed_at)
+     VALUES (:id, :employee, :today, 'CLAIMED', UTC_TIMESTAMP())
+     ON DUPLICATE KEY UPDATE status='CLAIMED', claimed_at=COALESCE(claimed_at, UTC_TIMESTAMP())`,
+    { id: passId, employee: req.user.id, today }
+  );
+  await audit({ actorId: req.user.id, action: 'BIRTHDAY_PASS_CLAIMED', entityType: 'birthday_pass', entityId: passId, details: { pass_date: today }, ipAddress: req.ip });
+  res.json({ ok: true, status: 'CLAIMED', pass_date: today, hours_early: 2 });
+}));
+
+// ==========================================
+// Phase 7: Confidential Grievances & Speak-Up
+// ==========================================
+router.post('/grievances', asyncRoute(async(req,res)=>{
+  const input = validate(z.object({
+    category: z.enum(['POSH','GOOD_SAMARITAN','GENERAL_GRIEVANCE']),
+    subject: z.string().trim().min(3).max(180),
+    description: z.string().trim().min(10).max(5000),
+    is_anonymous: z.boolean().default(true)
+  }), req.body);
+
+  const reference_code = 'FX-GRIEV-' + crypto.randomBytes(3).toString('hex').toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const id = crypto.randomUUID();
+  const reporter_id = input.is_anonymous ? null : req.user.id;
+  const reporter_name = input.is_anonymous ? null : req.user.full_name;
+  const reporter_email = input.is_anonymous ? null : req.user.email;
+  const assigned_to_icc = input.category === 'POSH' || input.category === 'GOOD_SAMARITAN';
+
+  await query(
+    `INSERT INTO confidential_grievances
+     (id, reference_code, category, subject, description, is_anonymous, reporter_employee_id, reporter_name, reporter_email, status, assigned_to_icc)
+     VALUES (:id, :ref, :cat, :subj, :desc, :anon, :reporterId, :name, :email, 'OPEN', :icc)`,
+    {
+      id, ref: reference_code, cat: input.category, subj: input.subject, desc: input.description,
+      anon: input.is_anonymous ? 1 : 0, reporterId: reporter_id, name: reporter_name, email: reporter_email,
+      icc: assigned_to_icc ? 1 : 0
+    }
+  );
+
+  await audit({
+    actorId: input.is_anonymous ? null : req.user.id,
+    action: 'CONFIDENTIAL_GRIEVANCE_SUBMITTED',
+    entityType: 'confidential_grievance',
+    entityId: id,
+    details: { reference_code, category: input.category, is_anonymous: input.is_anonymous },
+    ipAddress: input.is_anonymous ? 'REDACTED' : req.ip
+  });
+
+  try {
+    const notifySubject = `Confidential grievance [${input.category}] · ${reference_code}`;
+    const reportIdentity = input.is_anonymous ? 'Anonymous submission' : `${req.user.full_name} (${req.user.email})`;
+    await enqueueHrNotificationEmail({
+      subject: notifySubject,
+      text: `Falchion Xeniaa HRMS · Confidential Grievance & Speak-Up Channel\n\nA confidential report has been submitted.\nReference code: ${reference_code}\nCategory: ${input.category}\nReporter: ${reportIdentity}\nSubject: ${input.subject}\nAssigned to ICC: ${assigned_to_icc ? 'YES' : 'NO'}\n\nPlease inspect securely in the HRMS Admin Grievance Portal.`,
+      html: `<p>A new confidential grievance has been submitted under category <strong>${input.category}</strong>. Reference code: <code>${reference_code}</code>.</p>`,
+      replyTo: input.is_anonymous ? undefined : req.user.email,
+      fromName: 'Falchion Xeniaa Speak-Up Channel'
+    }, `grievance:${id}`);
+  } catch {}
+
+  res.status(201).json({
+    ok: true,
+    reference_code,
+    category: input.category,
+    status: 'OPEN',
+    message: 'Your report has been submitted with cryptographic confidentiality. Please copy your reference code to check progress.'
+  });
+}));
+
+router.get('/grievances/track/:code', asyncRoute(async(req,res)=>{
+  const code = String(req.params.code || '').trim().toUpperCase();
+  const [row] = await query(
+    `SELECT reference_code, category, subject, status, assigned_to_icc, resolution_notes, resolved_at, created_at
+     FROM confidential_grievances WHERE reference_code=:code LIMIT 1`,
+    { code }
+  );
+  if (!row) throw Object.assign(new Error('Grievance with that reference code was not found.'), { status: 404 });
+  res.json({ grievance: row });
+}));
+
+router.get('/admin/grievances', adminLimiter, asyncRoute(async(req,res)=>{
+  adminOnly(req);
+  const rows = await query(
+    `SELECT id, reference_code, category, subject, description, is_anonymous,
+      CASE WHEN is_anonymous THEN NULL ELSE reporter_name END AS reporter_name,
+      CASE WHEN is_anonymous THEN NULL ELSE reporter_email END AS reporter_email,
+      status, assigned_to_icc, resolution_notes, resolved_at, created_at, updated_at
+     FROM confidential_grievances
+     ORDER BY created_at DESC LIMIT 100`
+  );
+  res.json({ grievances: rows });
+}));
+
+router.patch('/admin/grievances/:id', adminLimiter, asyncRoute(async(req,res)=>{
+  adminOnly(req);
+  const input = validate(z.object({
+    status: z.enum(['OPEN','UNDER_INVESTIGATION','RESOLVED','CLOSED']).optional(),
+    assigned_to_icc: z.boolean().optional(),
+    resolution_notes: z.string().trim().max(2000).nullable().optional()
+  }), req.body);
+
+  const [existing] = await query('SELECT id, status FROM confidential_grievances WHERE id=:id LIMIT 1', { id: req.params.id });
+  if (!existing) throw Object.assign(new Error('Grievance not found.'), { status: 404 });
+
+  const resolved = input.status === 'RESOLVED' || input.status === 'CLOSED';
+  await query(
+    `UPDATE confidential_grievances
+     SET status=COALESCE(:status, status),
+         assigned_to_icc=COALESCE(:icc, assigned_to_icc),
+         resolution_notes=COALESCE(:notes, resolution_notes),
+         resolved_at=CASE WHEN :isResolved THEN COALESCE(resolved_at, UTC_TIMESTAMP()) ELSE resolved_at END
+     WHERE id=:id`,
+    {
+      id: req.params.id,
+      status: input.status || null,
+      icc: input.assigned_to_icc !== undefined ? (input.assigned_to_icc ? 1 : 0) : null,
+      notes: input.resolution_notes !== undefined ? input.resolution_notes : null,
+      isResolved: resolved ? 1 : 0
+    }
+  );
+
+  await audit({ actorId: req.user.id, action: 'CONFIDENTIAL_GRIEVANCE_UPDATED', entityType: 'confidential_grievance', entityId: req.params.id, details: { status: input.status, assigned_to_icc: input.assigned_to_icc }, ipAddress: req.ip });
+  res.json({ ok: true });
 }));
 
 export default router;

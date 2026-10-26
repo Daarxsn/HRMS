@@ -18,3 +18,9 @@ server/dist/
 
 # Local patch/backup files
 *.patch
+
+# Local Vercel configuration
+.vercel/
+
+# Local migration environment
+.env.runtime-migrate

@@ -11,17 +11,17 @@ if (process.env.HRMS_TEST_SEED_ENABLED !== 'true') {
 }
 
 const people = [
-  ['FX-0001','Om Shah','om.admin@example.test','ADMIN','ADMIN','Founder & administrator',false],
+  ['FX-0001','Om Shah','om.admin@example.test','SUPER_ADMIN','SUPER_ADMIN','Founder & super administrator',false],
   ['FX-0002','Aarav Mehta','aarav.mehta@example.test','EMPLOYEE','EMPLOYEE','Product designer',true],
-  ['FX-0003','Priya Shah','priya.shah@example.test','EMPLOYEE','EMPLOYEE','People operations',false],
+  ['FX-0003','Priya Shah','priya.shah@example.test','ADMIN','ADMIN','People operations',false],
   ['FX-0004','Kabir Joshi','kabir.joshi@example.test','EMPLOYEE','EMPLOYEE','Software engineer',false],
   ['FX-0005','Anaya Patel','anaya.patel@example.test','EMPLOYEE','EMPLOYEE','Customer success',false],
   ['FX-0006','Ishaan Kulkarni','ishaan.kulkarni@example.test','EMPLOYEE','EMPLOYEE','Operations associate',false],
   ['FX-0007','Mira Desai','mira.desai@example.test','EMPLOYEE','EMPLOYEE','Marketing associate',false],
-  ['FX-0008','Rohan Nair','rohan.nair@example.test','EMPLOYEE','EMPLOYEE','Engineering intern',false],
-  ['FX-0009','Sana Khan','sana.khan@example.test','INTERN','EMPLOYEE','Design intern',false],
-  ['FX-0010','Dev Malhotra','dev.malhotra@example.test','INTERN','EMPLOYEE','Business intern',false],
-  ['FX-0011','Tara Rao','tara.rao@example.test','INTERN','EMPLOYEE','Operations intern',false]
+  ['FX-0008','Rohan Nair','rohan.nair@example.test','INTERN','INTERN','Engineering intern',false],
+  ['FX-0009','Sana Khan','sana.khan@example.test','INTERN','INTERN','Design intern',false],
+  ['FX-0010','Dev Malhotra','dev.malhotra@example.test','INTERN','INTERN','Business intern',false],
+  ['FX-0011','Tara Rao','tara.rao@example.test','INTERN','INTERN','Operations intern',false]
 ];
 
 try {
