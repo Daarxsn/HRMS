@@ -134,7 +134,7 @@ async function main() {
   if (!missingTables.has('employees')) {
     try {
       const [activeAdminRows, employeeCountRows] = await Promise.all([
-        rows("SELECT COUNT(*) AS count FROM employees WHERE role='ADMIN' AND status='ACTIVE'"),
+        rows("SELECT COUNT(*) AS count FROM employees WHERE role IN ('ADMIN', 'SUPER_ADMIN') AND status='ACTIVE'"),
         rows("SELECT COUNT(*) AS count FROM employees")
       ]);
       const activeAdminCount = Number(activeAdminRows[0]?.count || 0);

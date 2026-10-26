@@ -15,6 +15,7 @@ server/dist/
 
 # Local database exports/backups
 *.sql
+!server/migrations/*.sql
 
 # Local patch/backup files
 *.patch
