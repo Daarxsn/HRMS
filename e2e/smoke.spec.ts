@@ -15,6 +15,92 @@ async function signInDev(page: any, account: 'employee' | 'admin' | 'superadmin'
   await page.goto('/');
 }
 
+test('login reference composition is measured and captured on desktop', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'chromium', 'Reference-sized screenshot is captured in desktop Chromium.');
+  await page.setViewportSize({ width: 1536, height: 878 });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.locator('.login-feature')).toHaveCount(3);
+  await expect(page.locator('.login-auth-card')).toBeVisible();
+  await expect(page.locator('.login-art-footer')).toContainText('CULTURE TODAY. STRONGER TOMORROW.');
+  await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
+  const desktopTrustBox = await page.locator('.login-trust').boundingBox();
+  const desktopFooterBox = await page.locator('.login-footer').boundingBox();
+  expect(desktopTrustBox).not.toBeNull();
+  expect(desktopFooterBox).not.toBeNull();
+  expect(desktopFooterBox!.y).toBeGreaterThanOrEqual(desktopTrustBox!.y + desktopTrustBox!.height - 1);
+  const desktopBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(desktopBackground).toContain('login-architectural-scene.webp');
+  await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
+  await expect(page.locator('.art-orbit')).toHaveCount(0);
+  expect(await page.locator('.login-feature').first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
+  const geometry = await page.locator('.login-page').evaluate((root) => {
+    const page = root.getBoundingClientRect();
+    const art = root.querySelector('.login-art')!.getBoundingClientRect();
+    const panel = root.querySelector('.login-panel')!.getBoundingClientRect();
+    const card = root.querySelector('.login-panel-inner')!.getBoundingClientRect();
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      page: { width: page.width, height: page.height },
+      art: { x: art.x, width: art.width, height: art.height },
+      panel: { x: panel.x, width: panel.width, height: panel.height },
+      card: { x: card.x, y: card.y, width: card.width, height: card.height },
+      overflowX: document.documentElement.scrollWidth > window.innerWidth
+    };
+  });
+  expect(geometry.art.width / geometry.page.width).toBeGreaterThan(0.57);
+  expect(geometry.art.width / geometry.page.width).toBeLessThan(0.62);
+  expect(geometry.panel.x).toBeGreaterThan(geometry.art.width - 1);
+  expect(geometry.art.height).toBe(878);
+  expect(geometry.overflowX).toBe(false);
+  await testInfo.attach('login-reference-desktop-1536x878.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+  await testInfo.attach('login-reference-desktop-geometry.json', {
+    body: Buffer.from(JSON.stringify(geometry, null, 2)),
+    contentType: 'application/json'
+  });
+});
+
+test('login reference composition is captured and readable on mobile', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile reference screenshot is captured in mobile Chromium.');
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.locator('.login-feature')).toHaveCount(3);
+  await expect(page.locator('.login-auth-card')).toBeVisible();
+  await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
+  const mobileTrustBox = await page.locator('.login-trust').boundingBox();
+  const mobileFooterBox = await page.locator('.login-footer').boundingBox();
+  expect(mobileTrustBox).not.toBeNull();
+  expect(mobileFooterBox).not.toBeNull();
+  expect(mobileFooterBox!.y).toBeGreaterThanOrEqual(mobileTrustBox!.y + mobileTrustBox!.height - 1);
+  const mobileBackground = await page.locator('.login-art').evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(mobileBackground).toContain('login-architectural-scene.webp');
+  await expect(page.locator('.fx-architectural-scene')).toHaveCount(0);
+  await expect(page.locator('.art-orbit')).toHaveCount(0);
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    documentHeight: document.documentElement.scrollHeight,
+    artHeight: document.querySelector('.login-art')!.getBoundingClientRect().height,
+    panelHeight: document.querySelector('.login-panel')!.getBoundingClientRect().height
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.artHeight).toBeGreaterThan(500);
+  expect(layout.panelHeight).toBeGreaterThan(500);
+  await testInfo.attach('login-reference-mobile.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+  await testInfo.attach('login-reference-mobile-geometry.json', {
+    body: Buffer.from(JSON.stringify(layout, null, 2)),
+    contentType: 'application/json'
+  });
+});
+
 function todayInIndia() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -43,10 +129,55 @@ test('employee can sign in and reach the action center', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Attendance/i }).first()).toBeVisible();
 });
 
-test('administrator can sign in and reach workplace pulse', async ({ page }) => {
+test('administrator overview is readable and captured on desktop', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'chromium', 'Admin overview reference screenshot is captured on desktop Chromium.');
+  await page.setViewportSize({ width: 1536, height: 1000 });
   await signInDev(page, 'admin');
+  await expect(page.locator('.admin-overview-page')).toBeVisible();
   await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Your workplace, in one calm view\.|Office holiday|Workplace metrics are temporarily unavailable/i })).toBeVisible();
+  await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
+  await expect(page.locator('.admin-overview-page .admin-hero')).toBeVisible();
+  const heroTextColor = await page.locator('.admin-overview-page .admin-hero').evaluate((hero) => getComputedStyle(hero).color);
+  const heroHeadingColor = await page.locator('.admin-overview-page .admin-hero-copy h2').evaluate((heading) => getComputedStyle(heading).color);
+  expect(heroTextColor).toBe('rgb(248, 247, 241)');
+  expect(heroHeadingColor).toBe('rgb(248, 247, 241)');
   await expect(page.getByRole('complementary').getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
+  const layout = await page.locator('.admin-overview-page').evaluate((root) => {
+    const hero = root.querySelector('.admin-hero')!.getBoundingClientRect();
+    const stats = root.querySelector('.stat-grid')!.getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, documentWidth: document.documentElement.scrollWidth, heroWidth: hero.width, statsWidth: stats.width };
+  });
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.heroWidth).toBeGreaterThan(900);
+  expect(layout.statsWidth).toBeGreaterThan(900);
+  await testInfo.attach('admin-overview-desktop-1536x1000.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
+});
+
+test('administrator overview is readable on mobile', async ({ page }, testInfo) => {
+  testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Admin overview responsive checks run on mobile Chromium.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInDev(page, 'admin');
+  await expect(page.locator('.admin-overview-page')).toBeVisible();
+  await expect(page.getByText('Workplace pulse')).toBeVisible();
+  await expect(page.locator('.admin-overview-page .stat-card')).toHaveCount(4);
+  await expect(page.locator('.admin-overview-page .admin-mobile-command-strip')).toBeVisible();
+  const mobileHeroTextColor = await page.locator('.admin-overview-page .admin-hero').evaluate((hero) => getComputedStyle(hero).color);
+  expect(mobileHeroTextColor).toBe('rgb(248, 247, 241)');
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    statColumns: getComputedStyle(document.querySelector('.admin-overview-page .stat-grid')!).gridTemplateColumns
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  expect(layout.statColumns.split(' ').length).toBe(2);
+  await testInfo.attach('admin-overview-mobile.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png'
+  });
 });
 
 test('mobile navigation opens and remains usable', async ({ page }, testInfo) => {
