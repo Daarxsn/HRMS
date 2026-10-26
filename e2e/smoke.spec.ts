@@ -646,16 +646,17 @@ test('administrator operational pages load and keep the main actions accessible'
   await expect(page.locator('.audit-table-card')).toBeVisible();
 });
 
-test('employee can submit leave application and administrator can review and approve it', async ({ page }) => {
+test('employee can submit leave application and administrator can review and approve it', async ({ page }, testInfo) => {
   // 1. Employee signs in and submits leave application
   await signInDev(page, 'employee');
   await openSidebarLink(page, 'Leave & time off');
   await expect(page.getByRole('heading', { name: 'Leave & time off', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Request time off', exact: true })).toBeVisible();
 
-  // Construct deterministic future working dates (Monday - Tuesday)
+  // Construct deterministic future working dates (Monday - Tuesday), separated by project to avoid overlap conflicts
   const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + 14); // 2 weeks ahead
+  const offsetWeeks = testInfo.project.name === 'mobile-chromium' ? 35 : 14;
+  targetDate.setDate(targetDate.getDate() + offsetWeeks);
   const day = targetDate.getDay();
   const diffToMonday = (day === 0 ? 1 : (8 - day) % 7);
   targetDate.setDate(targetDate.getDate() + diffToMonday);
