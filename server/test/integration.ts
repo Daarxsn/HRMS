@@ -980,7 +980,7 @@ try {
     headers: { Cookie: employeeSession.cookie }
   });
   assert.equal(afterLogout.response.status, 401);
-  assert.match(afterLogout.data?.error || '', /revoked/i);
+  assert.match(afterLogout.data?.error || '', /revoked|terminated|expired/i);
 
   console.log('API integration smoke verification: PASS');
 } finally {

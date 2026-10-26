@@ -154,7 +154,11 @@ export async function requireAuth(req: any, res: any, next: any) {
         const sessionRows = await query(`SELECT id, revoked_at, expires_at, TIMESTAMPDIFF(MINUTE, last_active_at, UTC_TIMESTAMP()) AS idle_minutes
           FROM employee_sessions WHERE session_token_hash = :hash LIMIT 1`, { hash });
         if (sessionRows[0]) {
-          if (sessionRows[0].revoked_at || new Date(sessionRows[0].expires_at).getTime() < Date.now()) {
+          if (sessionRows[0].revoked_at) {
+            res.clearCookie('fx_session', authCookieOptions());
+            return res.status(401).json({ error: 'Your session has been revoked. Sign in again.' });
+          }
+          if (new Date(sessionRows[0].expires_at).getTime() < Date.now()) {
             res.clearCookie('fx_session', authCookieOptions());
             return res.status(401).json({ error: 'Your session has expired or was terminated. Sign in again.' });
           }
