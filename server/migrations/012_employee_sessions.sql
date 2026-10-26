@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS employee_sessions (
-  id VARCHAR(36) PRIMARY KEY,
-  employee_id VARCHAR(36) NOT NULL,
+  id CHAR(36) PRIMARY KEY,
+  employee_id CHAR(36) NOT NULL,
   session_token_hash CHAR(64) NOT NULL UNIQUE,
   device_name VARCHAR(120) NOT NULL,
   user_agent VARCHAR(500) NULL,
@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS employee_sessions (
   CONSTRAINT fk_sessions_employee FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
   INDEX idx_sessions_employee_active (employee_id, revoked_at, expires_at),
   INDEX idx_sessions_hash (session_token_hash)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
