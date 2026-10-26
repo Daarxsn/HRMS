@@ -4505,7 +4505,7 @@ button.button-primary {
 
 .admin-hero {
   background: #111111 !important;
-  color: #FFFFFF !important;
+  color: #f8f7f1 !important;
   border: 1px solid rgba(218, 175, 81, 0.28) !important;
   border-radius: 14px !important;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
@@ -4520,7 +4520,7 @@ button.button-primary {
 .admin-hero h2 {
   font-family: var(--font-display, 'Sansation', sans-serif) !important;
   font-size: 24px !important;
-  color: #FFFFFF !important;
+  color: #f8f7f1 !important;
 }
 
 .admin-hero p {

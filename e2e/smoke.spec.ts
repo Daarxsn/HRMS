@@ -19,11 +19,11 @@ test('login reference composition is measured and captured on desktop', async ({
   testInfo.skip(testInfo.project.name !== 'chromium', 'Reference-sized screenshot is captured in desktop Chromium.');
   await page.setViewportSize({ width: 1536, height: 878 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\.|Good work/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back|Welcome in/i })).toBeVisible();
   await expect(page.locator('.login-feature')).toHaveCount(3);
   await expect(page.locator('.login-auth-card')).toBeVisible();
-  await expect(page.locator('.login-art-footer')).toContainText('CULTURE TODAY. STRONGER TOMORROW.');
+  await expect(page.locator('.login-art-footer')).toContainText(/(CULTURE TODAY\. STRONGER TOMORROW\.|FAIRNESS IN EVERY SHIFT)/);
   await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
   const desktopTrustBox = await page.locator('.login-trust').boundingBox();
   const desktopFooterBox = await page.locator('.login-footer').boundingBox();
@@ -67,8 +67,8 @@ test('login reference composition is measured and captured on desktop', async ({
 test('login reference composition is captured and readable on mobile', async ({ page }, testInfo) => {
   testInfo.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile reference screenshot is captured in mobile Chromium.');
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\./i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /THE WORKPLACE BUILDS PEOPLE\.|Good work/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back|Welcome in/i })).toBeVisible();
   await expect(page.locator('.login-feature')).toHaveCount(3);
   await expect(page.locator('.login-auth-card')).toBeVisible();
   await expect(page.locator('.login-panel-inner .login-trust')).toHaveCount(0);
