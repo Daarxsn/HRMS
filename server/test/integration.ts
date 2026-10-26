@@ -93,8 +93,10 @@ try {
   assert.equal(demoUsers.response.status, 200);
   assert.equal(demoUsers.data.enabled, true);
   const admin = demoUsers.data.users.find((user) => user.role === 'ADMIN');
+  const superAdmin = demoUsers.data.users.find((user) => user.role === 'SUPER_ADMIN') || admin;
   const employee = demoUsers.data.users.find((user) => user.role === 'EMPLOYEE');
   assert.ok(admin?.email, 'Seed must provide an administrator demo account.');
+  assert.ok(superAdmin?.email, 'Seed must provide a super administrator demo account.');
   assert.ok(employee?.email, 'Seed must provide an employee demo account.');
 
   const employeeSession = await signIn(employee.email);
@@ -166,6 +168,7 @@ try {
   assert.equal(unauthenticatedOutboxRun.response.status,401,'The background email worker endpoint must require its private bearer secret.');
 
   const adminSession = await signIn(admin.email);
+  const superAdminSession = await signIn(superAdmin.email);
 
   // Step 5 / 27-28: durable enqueue, dedupe, SMTP failure retries, recovery and concurrent delivery.
   const emailDedupeKey = 'integration-email-outbox:' + crypto.randomUUID();
@@ -822,17 +825,21 @@ try {
   const adminSettingsBefore = await request('/admin/settings',{headers:{Cookie:adminSession.cookie}});
   assert.equal(adminSettingsBefore.response.status,200);
   assert.ok(adminSettingsBefore.data.settings);
-  const settingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:35})});
+  const deniedSettingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:35})});
+  assert.equal(deniedSettingsUpdate.response.status,403,'Standard Admin must not be authorized to mutate system settings.');
+  const deniedAuditRead = await request('/admin/audit',{headers:{Cookie:adminSession.cookie}});
+  assert.equal(deniedAuditRead.response.status,403,'Standard Admin must not be authorized to read audit logs.');
+  const settingsUpdate = await request('/admin/settings',{method:'PUT',headers:{Cookie:superAdminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:35})});
   assert.equal(settingsUpdate.response.status,200,'Settings updates must persist through the real API: '+JSON.stringify(settingsUpdate.data));
   const persistedSetting = await query("SELECT setting_value FROM system_settings WHERE setting_key='fixed_lunch_minutes'");
   assert.equal(persistedSetting[0]?.setting_value,'35');
-  const restoreSetting = await request('/admin/settings',{method:'PUT',headers:{Cookie:adminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:30})});
+  const restoreSetting = await request('/admin/settings',{method:'PUT',headers:{Cookie:superAdminSession.cookie},body:JSON.stringify({fixed_lunch_minutes:30})});
   assert.equal(restoreSetting.response.status,200);
   const report = await request('/admin/leave-report?from=2026-01-01&to=2099-12-31',{headers:{Cookie:adminSession.cookie}});
   assert.equal(report.response.status,200);
   assert.ok(report.data.summary);
   assert.ok(Array.isArray(report.data.requests));
-  const auditBefore = await request('/admin/audit',{headers:{Cookie:adminSession.cookie}});
+  const auditBefore = await request('/admin/audit',{headers:{Cookie:superAdminSession.cookie}});
   assert.equal(auditBefore.response.status,200);
   assert.ok(Array.isArray(auditBefore.data.logs));
 
