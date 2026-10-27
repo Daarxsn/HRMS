@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X, GraduationCap, ShieldAlert, Award, Sparkles, Filter, ChevronRight, Eye, CheckCircle2 } from 'lucide-react';
+import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X, GraduationCap, ShieldAlert, Award, Filter, ChevronRight, Eye, CheckCircle2 } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
 
 const adminTabs: [string, string, React.ElementType][] = [
@@ -130,7 +130,7 @@ export default function EnterpriseHRPage() {
   if(error&&!data)return <section className="card"><div className="eyebrow">PEOPLE OPERATIONS</div><h2>Workspace unavailable</h2><p>{error}</p><button className="button button-primary" onClick={load}>Retry</button></section>;
   return <div className="enterprise-page">
     <section className="enterprise-hero">
-      <div><div className="eyebrow">PHASES 44–48 · ENTERPRISE HR</div><h1>People operations, in one place.</h1><p>Lifecycle records, onboarding, workforce intelligence, assets, policies, offboarding and security — designed as one operating layer.</p></div>
+      <div><div className="eyebrow">ENTERPRISE OPERATIONS · WORKFORCE INTELLIGENCE</div><h1>People operations, in one place.</h1><p>Lifecycle records, onboarding, workforce intelligence, assets, policies, offboarding and security — designed as one operating layer.</p></div>
       <div className="enterprise-hero-meta"><span><i className="pulse-dot"/> Live controls</span><small>{data?.overview?.headcount?.active||0} active people</small></div>
     </section>
     <div className="enterprise-tabs" role="tablist">{adminTabs.map(([key,label,Icon])=><button key={key} role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>setTab(key)}><Icon size={16}/>{label}</button>)}</div>

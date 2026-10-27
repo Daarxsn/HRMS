@@ -4,10 +4,10 @@ import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, use
 import { GoogleLogin } from '@react-oauth/google';
 import {
   Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, Camera, Calendar,
-  CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck,
-  CircleHelp, CircleUserRound, ClipboardCheck, Clock3, Command, Download, FileClock, FileText, Filter,
+  CalendarDays, CalendarHeart, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck,
+  CircleHelp, CircleUserRound, ClipboardCheck, Clock3, Command, Download, FileClock, FileQuestion, FileText, Filter,
   Fingerprint, Gauge, House, Laptop, LogIn, LogOut, MapPin, Menu, Megaphone, MoreHorizontal, Moon, Pencil, Plus,
-  RefreshCw, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Timer, Trash2, Users, X,
+  RefreshCw, Search, Send, Settings, ShieldCheck, Sun, Timer, Trash2, Users, X,
   PanelLeftClose, UserRound, XCircle, ShieldAlert, GraduationCap
 } from 'lucide-react';
 import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
@@ -202,27 +202,26 @@ function LoginScreen() {
   };
   return <div className="login-page">
     <section className="login-art" aria-label="Welcome to the Falchion Xeniaa people portal">
-      <div className="login-art-top"><IconLogo/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
+      <div className="login-art-top"><img className="login-reference-brand" src="/falchion-xeniaa-horizontal.svg" alt="Falchion Xeniaa"/><span className="login-brand-divider"/><span className="login-brand-caption">PEOPLE<br/> & CULTURE</span></div>
       <div className="login-art-copy">
         <div className="art-label"><span className="pulse-dot"/> PEOPLE · WORKPLACE · TRUST</div>
-        <h1>Good work<br/><em>starts here.</em></h1>
-        <p>Everything that makes your workday work — thoughtfully brought together in one place.</p>
+        <h1>THE<br/>WORKPLACE<br/>BUILDS<br/><em>PEOPLE.</em></h1>
+        <p>A modern HR platform for teams that aim higher.</p>
         <div className="login-feature-row" aria-label="People portal features">
           <div className="login-feature"><span className="login-feature-icon"><CalendarDays size={17}/></span><span><b>Your time</b><small>Attendance & leave</small></span></div>
           <div className="login-feature"><span className="login-feature-icon"><Users size={17}/></span><span><b>Your people</b><small>Team & workplace</small></span></div>
-          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Private by design</small></span></div>
+          <div className="login-feature"><span className="login-feature-icon"><ShieldCheck size={17}/></span><span><b>Your space</b><small>Secure by design</small></span></div>
         </div>
-        <div className="art-note"><Sparkles size={15}/> Built around people, not presence</div>
       </div>
-      <div className="login-art-footer"><span>FAIRNESS IN EVERY SHIFT</span><span>EST. PUNE · INDIA</span></div>
+      <div className="login-art-footer"><span>CULTURE TODAY. STRONGER TOMORROW.</span><span>EST. PUNE · INDIA</span></div>
     </section>
     <section className="login-panel" aria-label="Sign in">
       <div className="login-panel-inner">
         <div className="mobile-login-brand"><IconLogo/><span>FALCHION XENIAA</span></div>
         <div className="login-access-mark"><span className="login-access-icon"><ShieldCheck size={17}/></span><span>YOUR WORKSPACE, SECURED</span></div>
         <div className="eyebrow">THE PEOPLE PORTAL</div>
-        <h2>Welcome in<span className="login-title-period">.</span></h2>
-        <p className="login-lede">A better workday starts with the right people. Sign in with the Google account your administrator has added.</p>
+        <h2>Welcome back<span className="login-title-period">.</span></h2>
+        <p className="login-lede">Sign in with your Google account to access Falchion Xeniaa HRMS.</p>
         <div className="login-auth-card">
           <div className="login-auth-card-heading"><span className="login-google-g">G</span><span><b>Continue with Google</b><small>Use your authorised work account</small></span><ShieldCheck size={17} className="login-auth-shield"/></div>
           {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
@@ -240,7 +239,7 @@ function LoginScreen() {
           <div className="login-auth-assurance"><LockKeyholeIcon/> Your account is verified securely by Google.</div>
         </div>
       </div>
-      <div className="login-trust"><span><ShieldCheck size={14}/> Secure Google sign-in</span><span><MapPin size={14}/> Location only when you check in</span></div>
+      <div className="login-trust"><span aria-label="Secure Google sign-in"><ShieldCheck size={14}/> Secure Google sign-in</span><span><LockKeyholeIcon/> Encrypted data</span><span><MapPin size={14}/> Location only when you check in</span></div>
       <div className="login-footer"><span>Need access?</span> Contact your Falchion Xeniaa administrator.</div>
     </section>
   </div>;
@@ -276,7 +275,7 @@ function NotFoundPage({ isAdmin }: { isAdmin?: boolean }) {
     <div className="not-found-page" style={{ maxWidth: 540, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
       <Card style={{ padding: '48px 32px', borderRadius: '16px', border: '1px solid var(--color-border, #E4E4E7)' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 14px', borderRadius: '999px', background: 'rgba(218, 175, 81, 0.14)', color: 'var(--fx-gold, #DAAF51)', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', marginBottom: '18px' }}>
-          <Sparkles size={14} /> 404 NOT FOUND
+          <ShieldAlert size={14} /> 404 NOT FOUND
         </div>
         <h1 style={{ fontFamily: "var(--font-display, 'Sansation', sans-serif)", fontSize: '28px', color: 'var(--color-text, #18181B)', margin: '0 0 12px', letterSpacing: '-0.03em' }}>
           We couldn’t find that page
@@ -339,7 +338,7 @@ function Shell(){
       <div className="nav-caption">WORKSPACE</div>
       <nav className="main-nav" aria-label="Workspace">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
       <div className="nav-bottom"><div className="nav-caption">ACCOUNT</div><NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><CircleUserRound size={18} strokeWidth={1.8}/><span>My profile</span></NavLink><button className="nav-link nav-logout" onClick={logout}><LogOut size={18} strokeWidth={1.8}/><span>Sign out</span></button></div>
-      <div className="sidebar-note"><div className="note-spark"><Sparkles size={15}/></div><p><b>Work with trust.</b><br/>Presence is shared when you choose to check in. No background tracking.</p></div>
+      <div className="sidebar-note"><div className="note-spark"><ShieldCheck size={16}/></div><p><b>Work with trust.</b><br/>Presence is shared when you choose to check in. No background tracking.</p></div>
       <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt="" loading="lazy" decoding="async"/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
     <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Search"><Command size={15}/><span>Search</span><kbd aria-hidden="true">⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo" aria-label="My profile">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:<span aria-hidden="true">{initials(user.full_name)}</span>}</Link></div></header>
@@ -1073,7 +1072,7 @@ function LeavePage(){
   return <><PageTitle eyebrow="TIME TO REST & RESET" title="Leave & time off" description="Your balances, requests and time away—all in one place." action={<span className="policy-chip"><ShieldCheck size={14}/> Clear balances, no surprises</span>}/>
     {error&&<InlineError>{error}</InlineError>}
     {loadError&&<div className="employee-page-error" role="alert"><CircleAlert size={16}/><span>{loadError}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading||refreshing}><RefreshCw size={14} className={refreshing?'spin':''}/>{loading||refreshing?'Refreshing…':'Retry leave data'}</button></div>}
-    <div className="leave-balance-grid">{loading?<Card className="balance-loading"><Spinner/></Card>:balanceCards.map((b,i)=><Card className={`leave-balance-tile leave-balance-${i}`} key={b.type}><div className="leave-tile-top"><span>{b.type==='CASUAL'?'Casual + sick':b.label}</span><span className="leave-tile-icon">{b.type==='CASUAL'?<Sun size={17}/>:b.type==='EARNED'?<BriefcaseBusiness size={17}/>:<Sparkles size={17}/>}</span></div><div className="leave-tile-value">{b.reviewRequired?'HR review':b.remaining}<small>{b.reviewRequired?'balance provisional':'days available'}</small></div><div className="leave-progress"><span style={{width:`${b.entitlement?Math.max(4,Math.min(100,(b.remaining/b.entitlement)*100)):0}%`}}/></div><div className="leave-tile-foot"><span>{b.used} used</span><span>{b.pending?`${b.pending} pending`:`${b.accrued} allocated`}</span></div><p className="leave-tile-note">{b.type==='CASUAL'?'Shared 8-day annual balance for casual and sick leave.':b.type==='EARNED'?(b.reviewRequired?'HR review required before using this provisional balance.':'Accrues 1 day/month after probation, up to 15 days/year.'):'For cultural, religious or personal days.'}</p></Card>)}</div>
+    <div className="leave-balance-grid">{loading?<Card className="balance-loading"><Spinner/></Card>:balanceCards.map((b,i)=><Card className={`leave-balance-tile leave-balance-${i}`} key={b.type}><div className="leave-tile-top"><span>{b.type==='CASUAL'?'Casual + sick':b.label}</span><span className="leave-tile-icon">{b.type==='CASUAL'?<Sun size={17}/>:b.type==='EARNED'?<BriefcaseBusiness size={17}/>:<CalendarHeart size={17}/>}</span></div><div className="leave-tile-value">{b.reviewRequired?'HR review':b.remaining}<small>{b.reviewRequired?'balance provisional':'days available'}</small></div><div className="leave-progress"><span style={{width:`${b.entitlement?Math.max(4,Math.min(100,(b.remaining/b.entitlement)*100)):0}%`}}/></div><div className="leave-tile-foot"><span>{b.used} used</span><span>{b.pending?`${b.pending} pending`:`${b.accrued} allocated`}</span></div><p className="leave-tile-note">{b.type==='CASUAL'?'Shared 8-day annual balance for casual and sick leave.':b.type==='EARNED'?(b.reviewRequired?'HR review required before using this provisional balance.':'Accrues 1 day/month after probation, up to 15 days/year.'):'For cultural, religious or personal days.'}</p></Card>)}</div>
     {upcomingLeave.length>0&&<section className="leave-upcoming-strip"><div className="leave-upcoming-heading"><span className="eyebrow">UP NEXT</span><b>Your approved time away</b><small>Planned days already cleared by your approver.</small></div><div className="leave-upcoming-list">{upcomingLeave.map((r)=><Link to="/leave" key={r.id} className="leave-upcoming-item"><span className="leave-upcoming-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating',LEARNING:'Learning'}[r.leave_type]||'Leave'}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})} · {r.days} day{Number(r.days)===1?'':'s'}</small></span><ArrowRight size={14}/></Link>)}</div></section>}
     <div className="leave-layout"><Card className="leave-form-card"><CardHeading title="Request time off" subtitle="Share the dates and a little context."/><form className="form-stack leave-request-form" onSubmit={submit}>
       <div className="leave-type-group"><div className="form-field"><span>Casual + sick</span><div className="leave-type-switch" role="group" aria-label="Casual and sick leave selection"><button type="button" className={type==='CASUAL'?'active':''} onClick={()=>setType('CASUAL')}>Casual</button><button type="button" className={type==='SICK'?'active':''} onClick={()=>setType('SICK')}>Sick</button></div><small className="field-help">Both use the same shared 8-day annual balance. Sick leave of 3+ consecutive calendar days requires a doctor’s note.</small></div><div className="form-field"><span>Other leave</span><div className="select-wrap"><select aria-label="Other leave type" value={type==='CASUAL'||type==='SICK'?'EARNED':type} onChange={(e)=>setType(e.target.value)}><option value="EARNED">Earned leave</option><option value="FLOATING">Floating leave</option><option value="LEARNING">Learning time off (up to 2d/quarter)</option></select><ChevronDown size={15}/></div></div></div>
@@ -1641,7 +1640,7 @@ function ProfilePage(){
     {loadError&&<div className="profile-load-error" role="alert"><span><CircleAlert size={17}/></span><div><b>We couldn’t refresh your profile.</b><p>{loadError}</p><Button variant="soft" size="small" icon={RefreshCw} onClick={()=>setProfileRetry((v)=>v+1)} disabled={profileLoading}>Retry profile details</Button></div></div>}
     {error&&<InlineError>{error}</InlineError>}
 
-    {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><Sparkles size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress" role="progressbar" aria-label="Profile completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(profileCompletion)}><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
+    {profileCompletion<100&&<Card className="profile-onboarding-card"><div className="profile-onboarding-icon"><CheckCircle2 size={18}/></div><div className="profile-onboarding-copy"><span className="eyebrow">WORKSPACE SETUP</span><h2>Make your profile feel complete.</h2><p>Add a photo and mobile number so your People Portal identity is ready when your team needs it.</p><div className="profile-onboarding-progress" role="progressbar" aria-label="Profile completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(profileCompletion)}><i style={{width:profileCompletion+"%"}}/></div><small>{Math.round(profileCompletion)}% complete · {profile.profile_photo_available?'Photo added':'Photo missing'} · {profile.phone?'Mobile added':'Mobile missing'}</small></div><div className="profile-onboarding-actions">{!profile.profile_photo_available&&<label className="photo-button"><Camera size={14}/> Add photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy}/></label>} {!profile.phone&&<a className="button button-soft button-small" href="#contact-details">Add mobile</a>}</div></Card>}
 
     <div className="profile-page" aria-busy={profileLoading}>
       <Card className="profile-identity-card">

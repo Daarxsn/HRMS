@@ -21,7 +21,7 @@ test.describe('Automated Accessibility (A11y) Regression Suite - WCAG 2.1 AA', (
   test('login page meets WCAG 2.1 AA accessibility standards in light and dark mode', async ({ page }) => {
     await page.goto('/login');
     await page.locator('.loading-screen').waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
-    await expect(page.getByRole('heading', { name: /Welcome in/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome (back|in)/i })).toBeVisible();
 
     // Scan Light Mode
     const lightScan = await createAxeScanner(page).analyze();
