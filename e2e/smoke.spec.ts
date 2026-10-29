@@ -778,7 +778,7 @@ test('session persists across page reloads without forcing re-authentication', a
   // First reload
   await page.reload();
   await expect(page.getByText('What needs your attention')).toBeVisible();
-  await expect(page.locator('.topbar.top-hub, .sidebar').first()).toBeVisible();
+  await expect(page.locator('.topbar.top-hub')).toBeVisible();
 
   // Deep route navigation and reload
   await page.goto('/profile');
@@ -801,6 +801,8 @@ test('Super Admin has full access to settings and audit while Standard Admin is 
     await expect(page.getByRole('link', { name: /Office Geofence & Settings/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Immutable Audit Trail/i })).toBeVisible();
   } else {
+    const openNav = page.getByRole('button', { name: 'Open navigation' });
+    if (await openNav.isVisible()) await openNav.click();
     await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toBeVisible();
     await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toBeVisible();
   }
@@ -821,6 +823,8 @@ test('Super Admin has full access to settings and audit while Standard Admin is 
     await expect(page.getByRole('link', { name: /Office Geofence & Settings/i })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Immutable Audit Trail/i })).toHaveCount(0);
   } else {
+    const openNav = page.getByRole('button', { name: 'Open navigation' });
+    if (await openNav.isVisible()) await openNav.click();
     await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toHaveCount(0);
     await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toHaveCount(0);
   }

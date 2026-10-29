@@ -364,11 +364,16 @@ function Shell(){
       clearTimeout(menuTimerRef.current);
       menuTimerRef.current = null;
     }
-    // If the menu was just opened by hover within 600ms, clicking confirms open rather than closing it
-    if (activeMenu === menuKey && Date.now() - lastHoverOpenRef.current < 600) {
-      return;
-    }
-    setActiveMenu((prev) => (prev === menuKey ? null : menuKey));
+    setActiveMenu((prev) => {
+      if (prev === menuKey) {
+        // If the menu was opened by hover within the last 1200ms, user click confirms open rather than toggling closed
+        if (Date.now() - lastHoverOpenRef.current < 1200) {
+          return menuKey;
+        }
+        return null;
+      }
+      return menuKey;
+    });
   };
 
   useEffect(() => {
