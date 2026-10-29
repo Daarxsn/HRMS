@@ -6633,12 +6633,14 @@ html[data-theme="dark"] .mega-dropdown {
   padding: 26px 32px !important;
   position: relative !important;
   overflow: hidden !important;
+  color: #f8f7f1 !important;
 }
 
 .admin-hero-copy h2 {
   font-size: 26px !important;
   letter-spacing: -0.04em !important;
   font-weight: 800 !important;
+  color: #f8f7f1 !important;
 }
 
 .admin-hero-score {
@@ -7642,7 +7644,6 @@ html[data-theme="dark"] .inline-alert.alert-success {
    ========================================================================== */
 
 /* 1. Harmonized Light/Dark Executive Heroes */
-html[data-theme="light"] .admin-hero,
 html[data-theme="light"] .day-hero {
   background: linear-gradient(135deg, #FFFFFF 0%, #FAF6ED 100%) !important;
   border: 1px solid rgba(218, 175, 81, 0.35) !important;
@@ -7650,38 +7651,14 @@ html[data-theme="light"] .day-hero {
   color: #18181B !important;
 }
 
-html[data-theme="light"] .admin-hero h2,
-html[data-theme="light"] .admin-hero-copy h2,
 html[data-theme="light"] .day-hero h2,
 html[data-theme="light"] .hero-text h2 {
   color: #111111 !important;
   font-weight: 800 !important;
 }
 
-html[data-theme="light"] .admin-hero p,
-html[data-theme="light"] .admin-hero-copy p,
 html[data-theme="light"] .day-hero p {
   color: #52525B !important;
-}
-
-html[data-theme="light"] .admin-hero-score {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(218, 175, 81, 0.35) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
-}
-
-html[data-theme="light"] .admin-hero-score span {
-  color: #71717A !important;
-}
-
-html[data-theme="light"] .admin-hero-score small {
-  color: #71717A !important;
-}
-
-html[data-theme="light"] .admin-hero-secondary {
-  color: #3F3F46 !important;
-  background: rgba(255, 255, 255, 0.85) !important;
-  border-color: rgba(218, 175, 81, 0.35) !important;
 }
 
 html[data-theme="light"] .hero-pulse-strip {

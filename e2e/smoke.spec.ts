@@ -202,6 +202,13 @@ async function openSidebarLink(page: any, name: string) {
     return;
   }
 
+  // Desktop sidebar navigation:
+  const sidebarLink = page.locator('.sidebar').getByRole('link', { name, exact: true });
+  if (await sidebarLink.isVisible()) {
+    await sidebarLink.click();
+    return;
+  }
+
   // Top Hub navigation on desktop:
   const directNav = page.locator('.top-nav-clusters').getByRole('link', { name: new RegExp(`^${name}$`, 'i') });
   if (await directNav.first().isVisible()) {
@@ -216,26 +223,26 @@ async function openSidebarLink(page: any, name: string) {
     }
   }
 
-  const clusters: Record<string, { clusterName: string; linkPattern: RegExp }> = {
-    'Attendance': { clusterName: 'Time & Presence', linkPattern: /Daily Attendance & Punch|Master Attendance Register/i },
-    'Out of office': { clusterName: 'Time & Presence', linkPattern: /Temporary Exit \/ Step Out/i },
-    'Leave & time off': { clusterName: 'Leave & Remote', linkPattern: /Leave Applications/i },
-    'Work from home': { clusterName: 'Leave & Remote', linkPattern: /Work From Home/i },
-    'Holiday calendar': { clusterName: 'Leave & Remote', linkPattern: /Holiday Calendar/i },
-    'My documents': { clusterName: 'Company & Desk', linkPattern: /Documents Vault/i },
-    'Policy center': { clusterName: 'Company & Desk', linkPattern: /Policy Center/i },
-    'Speak-Up & Grievance': { clusterName: 'Company & Desk', linkPattern: /Confidential Grievance/i },
-    'My profile': { clusterName: 'Company & Desk', linkPattern: /My Profile & Security/i },
-    'People': { clusterName: 'People & Operations', linkPattern: /Team Directory & 4-Tier RBAC/i },
-    'HR operations': { clusterName: 'People & Operations', linkPattern: /Enterprise Benefits & L&D/i },
-    'Reports': { clusterName: 'Finance & Governance', linkPattern: /Payroll & Attendance Reports/i },
-    'Office settings': { clusterName: 'Finance & Governance', linkPattern: /Office Geofence & Settings/i },
-    'Audit trail': { clusterName: 'Finance & Governance', linkPattern: /Immutable Audit Trail/i },
+  const clusters: Record<string, { clusterName: RegExp; linkPattern: RegExp }> = {
+    'Attendance': { clusterName: /Time & Presence|People & Operations/i, linkPattern: /Daily Attendance & Punch|Master Attendance Register/i },
+    'Out of office': { clusterName: /Time & Presence/i, linkPattern: /Temporary Exit \/ Step Out/i },
+    'Leave & time off': { clusterName: /Leave & Remote/i, linkPattern: /Leave Applications/i },
+    'Work from home': { clusterName: /Leave & Remote/i, linkPattern: /Work From Home/i },
+    'Holiday calendar': { clusterName: /Leave & Remote/i, linkPattern: /Holiday Calendar/i },
+    'My documents': { clusterName: /Company & Desk/i, linkPattern: /Documents Vault/i },
+    'Policy center': { clusterName: /Company & Desk/i, linkPattern: /Policy Center/i },
+    'Speak-Up & Grievance': { clusterName: /Company & Desk/i, linkPattern: /Confidential Grievance/i },
+    'My profile': { clusterName: /Company & Desk/i, linkPattern: /My Profile & Security/i },
+    'People': { clusterName: /People & Operations/i, linkPattern: /Team Directory & 4-Tier RBAC/i },
+    'HR operations': { clusterName: /People & Operations/i, linkPattern: /Enterprise Benefits & L&D/i },
+    'Reports': { clusterName: /Finance & Governance/i, linkPattern: /Payroll & Attendance Reports/i },
+    'Office settings': { clusterName: /Finance & Governance/i, linkPattern: /Office Geofence & Settings/i },
+    'Audit trail': { clusterName: /Finance & Governance/i, linkPattern: /Immutable Audit Trail/i },
   };
 
   const config = clusters[name];
   if (config) {
-    const clusterBtn = page.locator('.top-nav-clusters').getByRole('button', { name: new RegExp(config.clusterName, 'i') });
+    const clusterBtn = page.locator('.top-nav-clusters').getByRole('button', { name: config.clusterName });
     if (await clusterBtn.isVisible()) {
       await clusterBtn.click();
       const dropLink = page.locator('.mega-dropdown').getByRole('link', { name: config.linkPattern });
@@ -246,11 +253,12 @@ async function openSidebarLink(page: any, name: string) {
     }
   }
 
+  const isAdmin = page.url().includes('/admin') || (await page.locator('.admin-overview-page').isVisible().catch(() => false));
   const routeMap: Record<string, string> = {
     'My profile': '/profile',
-    'Holiday calendar': '/calendar',
+    'Holiday calendar': isAdmin ? '/admin/calendar' : '/calendar',
     'Policy center': '/policies',
-    'Attendance': '/attendance',
+    'Attendance': isAdmin ? '/admin/attendance' : '/attendance',
     'Leave & time off': '/leave',
     'Out of office': '/out',
     'Notifications': '/notifications',
@@ -770,7 +778,7 @@ test('session persists across page reloads without forcing re-authentication', a
   // First reload
   await page.reload();
   await expect(page.getByText('What needs your attention')).toBeVisible();
-  await expect(page.locator('.topbar.top-hub, .sidebar')).toBeVisible();
+  await expect(page.locator('.topbar.top-hub, .sidebar').first()).toBeVisible();
 
   // Deep route navigation and reload
   await page.goto('/profile');

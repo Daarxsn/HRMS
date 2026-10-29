@@ -327,6 +327,7 @@ function Shell(){
   const [topAvatarError, setTopAvatarError] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
   const menuTimerRef = useRef(null);
+  const lastHoverOpenRef = useRef(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('fx_sidebar_collapsed') === 'true';
@@ -347,6 +348,7 @@ function Shell(){
       clearTimeout(menuTimerRef.current);
       menuTimerRef.current = null;
     }
+    lastHoverOpenRef.current = Date.now();
     setActiveMenu(menuKey);
   };
 
@@ -354,13 +356,17 @@ function Shell(){
     if (menuTimerRef.current) clearTimeout(menuTimerRef.current);
     menuTimerRef.current = window.setTimeout(() => {
       setActiveMenu(null);
-    }, 200);
+    }, 250);
   };
 
   const handleMenuToggle = (menuKey) => {
     if (menuTimerRef.current) {
       clearTimeout(menuTimerRef.current);
       menuTimerRef.current = null;
+    }
+    // If the menu was just opened by hover within 600ms, clicking confirms open rather than closing it
+    if (activeMenu === menuKey && Date.now() - lastHoverOpenRef.current < 600) {
+      return;
     }
     setActiveMenu((prev) => (prev === menuKey ? null : menuKey));
   };
