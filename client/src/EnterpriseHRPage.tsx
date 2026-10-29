@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Activity, ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, FileText, Laptop, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserPlus, Users, X, GraduationCap, ShieldAlert, Award, Filter, ChevronRight, Eye, CheckCircle2 } from 'lucide-react';
 import { get, post, patch, formatDate, assetUrl } from './api';
 
@@ -79,20 +80,31 @@ function documentExpiry(value) {
   return {label:'Expires '+formatDate(value),state:'valid'};
 }
 
+const VALID_TABS = ['overview','people','onboarding','assets','policies','learning','grievances','encashments','offboarding','security'];
+
 export default function EnterpriseHRPage() {
-  const [tab, setTabState] = useState(() => {
+  const { subTab } = useParams<{ subTab?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const resolveTab = () => {
+    if (subTab && VALID_TABS.includes(subTab)) return subTab;
     try {
-      const q = new URLSearchParams(window.location.search).get('tab');
-      return q && ['overview','people','onboarding','assets','policies','learning','grievances','encashments','offboarding','security'].includes(q) ? q : 'overview';
-    } catch { return 'overview'; }
-  });
+      const q = new URLSearchParams(location.search).get('tab');
+      if (q && VALID_TABS.includes(q)) return q;
+    } catch {}
+    return 'overview';
+  };
+
+  const [tab, setTabState] = useState(resolveTab);
+
+  useEffect(() => {
+    setTabState(resolveTab());
+  }, [subTab, location.search]);
+
   const setTab = (nextTab: string) => {
     setTabState(nextTab);
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', nextTab);
-      window.history.replaceState(null, '', url.pathname + url.search);
-    } catch {}
+    navigate(`/admin/hr/${nextTab}`, { replace: false });
   };
   const [data,setData]=useState(null), [error,setError]=useState(''), [loading,setLoading]=useState(true), [selectedId,setSelectedId]=useState(''), [lifecycle,setLifecycle]=useState(null), [modal,setModal]=useState(null), [notice,setNotice]=useState('');
   const people=data?.people||[];

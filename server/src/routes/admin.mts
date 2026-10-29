@@ -161,6 +161,11 @@ router.get('/system-health', asyncRoute(async (req, res) => {
   const configuredNetwork = String(process.env.OFFICE_NETWORK_IPS || (process.env.NODE_ENV === 'development' ? '127.0.0.1,::1' : '')).trim();
   const configuredNetworkIps = parseOfficeNetworkIps(configuredNetwork);
   const currentNetworkIp = normalizeClientIp(req.ip);
+  let pendingEmails = 0;
+  try {
+    const [outboxRows]: any = await pool.query("SELECT COUNT(*) AS pending FROM email_outbox WHERE status = 'PENDING'");
+    pendingEmails = Number(outboxRows[0]?.pending || 0);
+  } catch {}
   res.json({
     status: 'ok',
     service: 'falchion-xeniaa-api',
@@ -170,6 +175,10 @@ router.get('/system-health', asyncRoute(async (req, res) => {
     nodeVersion: process.version,
     mysqlVersion: rows[0]?.mysql_version || null,
     databaseLatencyMs: latencyMs,
+    emailOutbox: {
+      pendingCount: pendingEmails,
+      stalled: pendingEmails > 10
+    },
     officeNetwork: {
       configured: configuredNetworkIps.length > 0,
       matchedCurrentRequest: configuredNetworkIps.length > 0 && isOfficeNetworkIpAllowed(currentNetworkIp, configuredNetwork),
@@ -619,6 +628,12 @@ router.get('/reports.csv', asyncRoute(async (req,res) => {
   const lines=[columns.map(safe).join(','),...rows.map((r)=>[r.employee_code,r.full_name,r.user_type,r.attendance_date,r.check_in_at,r.check_out_at,r.status,r.check_in_method,r.check_out_method,r.check_in_at&&r.check_out_at?netWorkedMinutes(r.check_in_at,r.check_out_at,lunch):null,r.check_in_distance_m,r.check_in_accuracy_m].map(safe).join(','))];
   res.setHeader('Content-Type','text/csv; charset=utf-8'); res.setHeader('Content-Disposition',`attachment; filename="falchion-attendance-${from}-${to}.csv"`); res.setHeader('Cache-Control','private, no-store');
   res.send(`\uFEFF${lines.join('\r\n')}`);
+}));
+
+router.get('/recent-activity', asyncRoute(async(req,res)=>{
+  const rows=await query(`SELECT l.id,l.action,l.entity_type,l.entity_id,l.created_at,e.full_name AS actor_name,e.employee_code
+    FROM audit_logs l LEFT JOIN employees e ON e.id=l.actor_id ORDER BY l.created_at DESC LIMIT 10`);
+  res.json({logs:rows});
 }));
 
 router.get('/audit', requireSuperAdmin, asyncRoute(async(req,res)=>{

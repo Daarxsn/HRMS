@@ -53,6 +53,17 @@
   --color-danger: #B91C1C;
   --focus-ring: #DAAF51;
 
+  /* Sovereign Luxury Palette Extensions */
+  --fx-surface-obsidian: #080B11;
+  --fx-surface-midnight: #0D131F;
+  --fx-surface-elevated: #131A29;
+  --fx-champagne-gold: #DAAF51;
+  --fx-champagne-bright: #F5D77F;
+  --fx-champagne-subtle: rgba(218, 175, 81, 0.12);
+  --fx-champagne-glow: rgba(218, 175, 81, 0.28);
+  --fx-emerald-glow: rgba(16, 185, 129, 0.35);
+  --fx-hairline-border: rgba(0, 0, 0, 0.08);
+
   /* Accessible Status Badge Tokens (>4.5:1 WCAG AA) */
   --badge-active-bg: #ECFDF5;
   --badge-active-text: #065F46;
@@ -85,6 +96,12 @@ html[data-theme="dark"] {
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
   --focus-ring: #DAAF51;
+
+  /* Sovereign Luxury Dark Overrides */
+  --fx-surface-obsidian: #080B11;
+  --fx-surface-midnight: #0D131F;
+  --fx-surface-elevated: #131A29;
+  --fx-hairline-border: rgba(255, 255, 255, 0.08);
 
   --badge-active-bg: rgba(34, 197, 94, 0.16);
   --badge-active-text: #86EFAC;

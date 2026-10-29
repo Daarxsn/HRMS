@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
-import { audit, requireAuth, notify, notifyAdmins, requirePeople } from '../security.mts';
+import { audit, requireAuth, notify, notifyAdmins, requirePeople, isAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { calculateTenureMonths, earnedLeaveAccrualForEmployment, indiaDate, internLeaveEntitlement, workingDaysInclusive } from '../policy.mts';
 import { htmlEscape } from '../mailer.mts';
@@ -11,7 +11,10 @@ import { enqueueHrNotificationEmail } from '../email-outbox.mts';
 import { dispatchWorkflowRequestEmails, dispatchWorkflowStatusEmail } from '../email-routing.mts';
 
 const router = Router();
-router.use(requireAuth, requirePeople);
+router.use(requireAuth, (req, res, next) => {
+  if (req.path.startsWith('/admin/')) return next();
+  return requirePeople(req, res, next);
+});
 const leaveMutationLimiter = rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
 
 async function emailLeaveRequestToAdmin(request) {
@@ -304,7 +307,7 @@ router.get('/encashments', asyncRoute(async (req, res) => {
 }));
 
 router.get('/admin/encashments', asyncRoute(async (req, res) => {
-  if (req.user?.role !== 'ADMIN' || req.user?.user_type !== 'ADMIN') {
+  if (!isAdmin(req.user)) {
     throw Object.assign(new Error('Administrator access is required.'), { status: 403 });
   }
   const rows = await query(
@@ -318,7 +321,7 @@ router.get('/admin/encashments', asyncRoute(async (req, res) => {
 }));
 
 router.post('/admin/encashments/:id/review', asyncRoute(async (req, res) => {
-  if (req.user?.role !== 'ADMIN' || req.user?.user_type !== 'ADMIN') {
+  if (!isAdmin(req.user)) {
     throw Object.assign(new Error('Administrator access is required.'), { status: 403 });
   }
   const input = validate(z.object({

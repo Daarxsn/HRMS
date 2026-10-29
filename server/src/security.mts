@@ -163,7 +163,12 @@ export async function requireAuth(req: any, res: any, next: any) {
             return res.status(401).json({ error: 'Your session has expired or was terminated. Sign in again.' });
           }
           if (Number(sessionRows[0].idle_minutes || 0) >= 5) {
-            void query('UPDATE employee_sessions SET last_active_at = UTC_TIMESTAMP() WHERE id = :id', { id: sessionRows[0].id }).catch(() => {});
+            const remainingHours = (new Date(sessionRows[0].expires_at).getTime() - Date.now()) / (3600 * 1000);
+            if (remainingHours < 2) {
+              void query('UPDATE employee_sessions SET last_active_at = UTC_TIMESTAMP(), expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) WHERE id = :id', { id: sessionRows[0].id }).catch(() => {});
+            } else {
+              void query('UPDATE employee_sessions SET last_active_at = UTC_TIMESTAMP() WHERE id = :id', { id: sessionRows[0].id }).catch(() => {});
+            }
           }
         }
       } catch {

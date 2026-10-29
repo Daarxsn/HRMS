@@ -5,7 +5,7 @@ import { Readable } from 'node:stream';
 import multer from 'multer';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
-import { audit, notify, requireAuth, requireAdmin } from '../security.mts';
+import { audit, notify, requireAuth, requireAdmin, isAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { saveObject, deleteObject, readObject, getObjectStorageReadiness } from '../object-storage.mts';
 import { indiaDate, isBirthdayToday } from '../policy.mts';
@@ -22,7 +22,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (req,file,cb) => { const allowed=['application/pdf','image/jpeg','image/png','image/webp']; cb(allowed.includes(file.mimetype) ? null : Object.assign(new Error('HR documents must be PDF, JPG, PNG, or WebP files.'),{status:400}), allowed.includes(file.mimetype)); }
 });
-const adminOnly = (req) => { if(req.user?.role!=='ADMIN'||req.user?.user_type!=='ADMIN') throw Object.assign(new Error('Administrator access is required.'),{status:403}); };
+const adminOnly = (req) => { if(!isAdmin(req.user)) throw Object.assign(new Error('Administrator access is required.'),{status:403}); };
 const signatureOk = (buffer,contentType) => {
   if(contentType==='application/pdf') return buffer.subarray(0,4).equals(Buffer.from('%PDF'));
   if(contentType==='image/jpeg') return buffer.subarray(0,3).equals(Buffer.from([0xff,0xd8,0xff]));

@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { query, transaction } from '../db.mts';
-import { requireAuth, audit, notifyAdmins, requirePeople } from '../security.mts';
+import { requireAuth, audit, notifyAdmins, requirePeople, isAdmin } from '../security.mts';
 import { asyncRoute, dateSchema, validate } from '../validate.mts';
 import { htmlEscape } from '../mailer.mts';
 import { enqueueHrNotificationEmail } from '../email-outbox.mts';
@@ -12,7 +12,7 @@ import { attendanceStatus, distanceMeters, hasPassedAbsenceCutoff, indiaDate, in
 
 const router = Router();
 router.use(requireAuth, (req, res, next) => {
-  if (req.user?.role === 'ADMIN' && req.user?.user_type === 'ADMIN') return next();
+  if (isAdmin(req.user)) return next();
   return requirePeople(req, res, next);
 });
 const attendanceMutationLimiter = rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:true,legacyHeaders:false,keyGenerator:(req)=>`user:${req.user.id}`});
