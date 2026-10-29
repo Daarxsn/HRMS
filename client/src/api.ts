@@ -8,7 +8,7 @@ export async function request(path: string, options: RequestOptions = {}): Promi
   const headers = new Headers(options.headers || {});
   const hasJsonBody = Boolean(options.body) && !(options.body instanceof FormData);
   if (hasJsonBody && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (!headers.has('Accept')) headers.set('Accept', 'application/json, text/csv');
+  if (!headers.has('Accept')) headers.set('Accept', 'application/json, text/csv, application/pdf');
 
   const controller = options.signal ? null : new AbortController();
   const timeout = controller ? globalThis.setTimeout(() => controller.abort(), 15000) : null;
@@ -35,7 +35,7 @@ export async function request(path: string, options: RequestOptions = {}): Promi
       throw error;
     }
 
-    if (type.includes('text/csv')) return response.blob();
+    if (type.includes('text/csv') || type.includes('application/pdf')) return response.blob();
     return type.includes('application/json') ? response.json() : response;
   } catch (error) {
     const err = error as Error & { code?: string; name?: string };
