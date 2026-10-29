@@ -484,22 +484,22 @@ function Shell(){
                   <Users size={15}/> <span>People & Operations</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='people' && (
-                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('people')} onMouseLeave={handleMenuLeave}>
-                    <Link to="/admin/attendance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                  <div className="mega-dropdown" onMouseEnter={()=>handleMenuEnter('people')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/admin/attendance" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Clock3 size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Master Attendance Register</div>
                         <div className="dropdown-item-desc">Live team punches, shift hours & network IP logs</div>
                       </div>
                     </Link>
-                    <Link to="/admin/team" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/admin/team" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Users size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Team Directory & 4-Tier RBAC</div>
                         <div className="dropdown-item-desc">Staff profiles, role privileges & shift exceptions</div>
                       </div>
                     </Link>
-                    <Link to="/admin/hr" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/admin/hr" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><GraduationCap size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Enterprise Benefits & L&D</div>
@@ -514,8 +514,8 @@ function Shell(){
                   <Activity size={15}/> <span>Finance & Governance</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='finance' && (
-                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('finance')} onMouseLeave={handleMenuLeave}>
-                    <Link to="/admin/reports" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                  <div className="mega-dropdown" onMouseEnter={()=>handleMenuEnter('finance')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/admin/reports" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><FileText size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Payroll & Attendance Reports</div>
@@ -523,7 +523,7 @@ function Shell(){
                       </div>
                     </Link>
                     {(isSuperAdmin || user.capabilities?.includes('office_settings')) && (
-                      <Link to="/admin/settings" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                      <Link to="/admin/settings" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><Settings size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Office Geofence & Settings</div>
@@ -532,7 +532,7 @@ function Shell(){
                       </Link>
                     )}
                     {(isSuperAdmin || user.capabilities?.includes('audit_trail')) && (
-                      <Link to="/admin/audit" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                      <Link to="/admin/audit" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><ShieldAlert size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Immutable Audit Trail</div>
@@ -554,15 +554,15 @@ function Shell(){
                   <Clock3 size={15}/> <span>Time & Presence</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='time' && (
-                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('time')} onMouseLeave={handleMenuLeave}>
-                    <Link to="/attendance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                  <div className="mega-dropdown" onMouseEnter={()=>handleMenuEnter('time')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/attendance" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Fingerprint size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Daily Attendance & Punch</div>
                         <div className="dropdown-item-desc">Log punches, verify GPS geofence or scan office QR</div>
                       </div>
                     </Link>
-                    <Link to="/out" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/out" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><ArrowUpRight size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Temporary Exit / Step Out</div>
@@ -577,8 +577,8 @@ function Shell(){
                   <CalendarDays size={15}/> <span>Leave & Remote</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='leave' && (
-                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('leave')} onMouseLeave={handleMenuLeave}>
-                    <Link to="/leave" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                  <div className="mega-dropdown" onMouseEnter={()=>handleMenuEnter('leave')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/leave" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><CalendarDays size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Leave & Encashment</div>
@@ -586,7 +586,7 @@ function Shell(){
                       </div>
                     </Link>
                     {user.wfh_enabled && (
-                      <Link to="/wfh" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                      <Link to="/wfh" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><House size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Work From Home (WFH)</div>
@@ -594,7 +594,7 @@ function Shell(){
                         </div>
                       </Link>
                     )}
-                    <Link to="/calendar" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/calendar" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Calendar size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Holiday Calendar</div>
@@ -609,29 +609,29 @@ function Shell(){
                   <FileText size={15}/> <span>Company & Desk</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='desk' && (
-                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('desk')} onMouseLeave={handleMenuLeave}>
-                    <Link to="/documents" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                  <div className="mega-dropdown" onMouseEnter={()=>handleMenuEnter('desk')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/documents" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Download size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Documents Vault</div>
                         <div className="dropdown-item-desc">Download salary slips, letters & agreements</div>
                       </div>
                     </Link>
-                    <Link to="/policies" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/policies" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><FileText size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Policy Center</div>
                         <div className="dropdown-item-desc">Browse 14 official employee guidelines</div>
                       </div>
                     </Link>
-                    <Link to="/grievance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/grievance" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><ShieldCheck size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Confidential Grievance</div>
                         <div className="dropdown-item-desc">Encrypted HR and POSH redressal channel</div>
                       </div>
                     </Link>
-                    <Link to="/profile" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
+                    <Link to="/profile" className="dropdown-item-link" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><CircleUserRound size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">My Profile & Sessions</div>
