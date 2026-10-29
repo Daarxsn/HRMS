@@ -10,7 +10,7 @@ import {
   RefreshCw, Search, Send, Settings, ShieldCheck, Sun, Timer, Trash2, Users, X,
   PanelLeftClose, UserRound, XCircle, ShieldAlert, GraduationCap
 } from 'lucide-react';
-import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl } from './api';
+import { get, post, patch, put, del, formatDate, formatTime, formatMinutes, todayLocal, initials, assetUrl, toTimeInputValue } from './api';
 import EnterpriseHRPage, { EmployeeDocumentsPage, EmployeePoliciesPage, GrievancePage } from './EnterpriseHRPage';
 
 const AppContext = createContext(null);
@@ -322,6 +322,12 @@ function Shell(){
       })
     : employeeNav.filter((item)=>item.to!=='/wfh'||user.wfh_enabled);
   const logout=async()=>{try{await post('/auth/logout');}catch{}setUser(null);};
+  const [sideAvatarError, setSideAvatarError] = useState(false);
+  const [topAvatarError, setTopAvatarError] = useState(false);
+  const userPhotoSrc = user?.profile_photo_available
+    ? `${assetUrl('/account/profile/photo')}?v=${user.photo_version || '1'}`
+    : (user?.avatar_url || null);
+  useEffect(()=>{setSideAvatarError(false);setTopAvatarError(false);},[user?.photo_version, user?.avatar_url, user?.profile_photo_available]);
   useEffect(()=>{setMobileOpen(false);setBellOpen(false);setCommandOpen(false);},[location.pathname]);
   useEffect(()=>{const handler=(event)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommandOpen(true);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
@@ -339,9 +345,9 @@ function Shell(){
       <nav className="main-nav" aria-label="Workspace">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
       <div className="nav-bottom"><div className="nav-caption">ACCOUNT</div><NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><CircleUserRound size={18} strokeWidth={1.8}/><span>My profile</span></NavLink><button className="nav-link nav-logout" onClick={logout}><LogOut size={18} strokeWidth={1.8}/><span>Sign out</span></button></div>
       <div className="sidebar-note"><div className="note-spark"><ShieldCheck size={16}/></div><p><b>Sovereign Privacy Architecture</b><br/>Presence is logged only on explicit check-in. Zero background tracking.</p></div>
-      <div className="sidebar-user"><div className="avatar avatar-sand avatar-with-photo">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt="" loading="lazy" decoding="async"/>:initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
+      <div className="sidebar-user"><div className={`avatar avatar-sand${userPhotoSrc && !sideAvatarError ? ' avatar-with-photo' : ''}`}>{userPhotoSrc && !sideAvatarError ? <img src={userPhotoSrc} alt="" loading="lazy" decoding="async" onError={()=>setSideAvatarError(true)}/> : initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
-    <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Search"><Command size={15}/><span>Search</span><kbd aria-hidden="true">⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className="avatar avatar-top avatar-with-photo" aria-label="My profile">{user.profile_photo_available?<img src={assetUrl('/account/profile/photo')} alt=""/>:<span aria-hidden="true">{initials(user.full_name)}</span>}</Link></div></header>
+    <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Search"><Command size={15}/><span>Search</span><kbd aria-hidden="true">⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className={`avatar avatar-top${userPhotoSrc && !topAvatarError ? ' avatar-with-photo' : ''}`} aria-label="My profile">{userPhotoSrc && !topAvatarError ? <img src={userPhotoSrc} alt="" onError={()=>setTopAvatarError(true)}/> : <span aria-hidden="true">{initials(user.full_name)}</span>}</Link></div></header>
       <div className="page-wrap"><Suspense fallback={<PageSkeletonLoader/>}><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
         <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/><Route path="/grievance" element={<GrievancePage/>}/>
         <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/team/:id" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('office_settings'))?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/hr/:subTab" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('audit_trail'))?<AuditPage/>:<NoAccess/>}/>
@@ -1309,6 +1315,7 @@ function ApprovalsPage(){
     const found = items.find((x: any) => x.id === targetId && (!targetType || String(x.type).toLowerCase() === targetType));
     if (found) {
       deepLinkedProcessed.current = true;
+      setModalError('');
       setReviewing({ item: found, decision: 'APPROVED' });
     }
   }, [items, targetId, targetType]);
@@ -1316,10 +1323,14 @@ function ApprovalsPage(){
   useEffect(() => {
     if (!targetId && reviewing) {
       setReviewing(null);
+      setModalError('');
     }
   }, [targetId]);
 
+  const [modalError, setModalError] = useState('');
+
   const openReview = (item: any, decision: string) => {
+    setModalError('');
     setReviewing({ item, decision });
     setSearchParams(prev => {
       const n = new URLSearchParams(prev);
@@ -1331,6 +1342,7 @@ function ApprovalsPage(){
 
   const closeReview = () => {
     setReviewing(null);
+    setModalError('');
     setSearchParams(prev => {
       const n = new URLSearchParams(prev);
       n.delete('id');
@@ -1350,7 +1362,25 @@ function ApprovalsPage(){
   useEffect(()=>{void load();return()=>{approvalsRequest.current+=1;};},[]);
   const visible=items.filter((x)=>{const matchFilter=filter==='ALL'||String(x.type||'').toUpperCase()===filter;const text=((x.full_name||'')+' '+(x.employee_code||'')+' '+(x.category||'')+' '+(x.reason||'')).toLowerCase();return matchFilter&&text.includes(search.toLowerCase());});
   const counts={all:items.length,leave:items.filter(x=>x.type==='leave').length,wfh:items.filter(x=>x.type==='wfh').length,correction:items.filter(x=>x.type==='correction').length,flex:items.filter(x=>x.type==='flex').length};
-  const review=async(item,decision,note)=>{if(busy)return;setBusy(true);setError('');try{await post('/admin/approvals/'+item.type+'/'+item.id,{decision,note});setItems((current)=>current.filter((entry)=>!(entry.id===item.id&&entry.type===item.type)));closeReview();await load();refresh();notify(item.full_name+'’s '+item.type+' request was '+(decision==='APPROVED'?'approved':'declined')+'.');}catch(e){setError(e.message||'The decision could not be saved. Refresh the queue and verify the request status.');}finally{setBusy(false);}};
+  const review=async(item,decision,note,extra={})=>{
+    if(busy)return;
+    setBusy(true);
+    setError('');
+    setModalError('');
+    try{
+      await post('/admin/approvals/'+item.type+'/'+item.id,{decision,note,...extra});
+      setItems((current)=>current.filter((entry)=>!(entry.id===item.id&&entry.type===item.type)));
+      closeReview();
+      await load();
+      refresh();
+      notify(item.full_name+'’s '+item.type+' request was '+(decision==='APPROVED'?'approved':'declined')+'.');
+    }catch(e){
+      setModalError(e.message||'The decision could not be saved.');
+      setError(e.message||'The decision could not be saved. Refresh the queue and verify the request status.');
+    }finally{
+      setBusy(false);
+    }
+  };
   return <><PageTitle eyebrow="YOUR REVIEW MAKES A DIFFERENCE" title="Requests" description="Review leave, WFH, attendance corrections and flexible-start requests with context." action={<Button variant="soft" icon={RefreshCw} onClick={()=>void load()} disabled={loading}>{loading?'Refreshing…':'Refresh'}</Button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}>Retry queue</button></div>}
     <div className="approval-command-bar">
       <div className="approval-command-intro"><span className="approval-command-icon"><ClipboardCheck size={19}/></span><div><span className="eyebrow">REVIEW QUEUE</span><b>{counts.all?counts.all+' request'+(counts.all===1?'':'s')+' need your attention':'Queue is clear'}</b><small>{counts.all?'Approve or decline after considering the employee’s context.':'Nothing is waiting for a decision right now.'}</small></div></div>
@@ -1359,17 +1389,76 @@ function ApprovalsPage(){
     <Card className="approval-workspace"><div className="approval-workspace-toolbar"><div className="search-box"><Search size={15}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search people or request context…" aria-label="Search requests"/></div><span>{visible.length} visible</span></div>
       {loading?<div className="approval-skeleton"><Spinner/></div>:loadFailed?<div className="admin-empty-recovery"><CircleAlert size={18}/><b>Review queue unavailable</b><span>We could not determine whether requests are waiting. Refresh to try again.</span><Button size="small" variant="soft" onClick={()=>void load()}>Retry queue</Button></div>:visible.length?<div className="approval-list">{visible.map((item)=><ApprovalCard key={item.type+'-'+item.id} item={item} onReview={(decision)=>openReview(item,decision)}/>)}</div>:<EmptyState icon={CheckCheck} title={filter==='ALL'&& !search?'You’re all caught up.':'Nothing matches this view.'} body={filter==='ALL'&&!search?'Every request has been reviewed. Your team will see you when something needs attention.':'Try another request type or search term.'}/>}
     </Card>
-    {reviewing&&<ReviewModal item={reviewing.item} initialDecision={reviewing.decision} busy={busy} close={closeReview} onReview={(decision,note)=>review(reviewing.item,decision,note)}/>}
+    {reviewing&&<ReviewModal item={reviewing.item} initialDecision={reviewing.decision} busy={busy} modalError={modalError} close={closeReview} onReview={(decision,note,extra)=>review(reviewing.item,decision,note,extra)}/>}
   </>;
 }
 function ApprovalCard({item,onReview}){
   const icon=item.type==='leave'?CalendarDays:item.type==='wfh'?House:item.type==='flex'?Timer:Clock3;const Icon=icon;const [downloading,setDownloading]=useState(false);const {notify}=useApp();
   const attachment=async()=>{if(!item.attachment_id)return;setDownloading(true);try{const response=await get('/files/'+item.attachment_id);const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=item.attachment_name||'leave-document';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){notify(e.message,'error');}finally{setDownloading(false);}};
-  return <Card className="approval-request"><div className="approval-request-icon"><Icon size={19}/></div><div className="approval-request-main"><div className="approval-request-top"><span className="approval-category">{item.category}</span><span className="approval-request-date">Received {formatDate(String(item.created_at).slice(0,10),{day:'numeric',month:'short'})}</span></div><h3>{item.full_name}<small>{item.employee_code}</small></h3><div className="approval-request-meta">{item.date&&<span><Calendar size={14}/>{formatDate(item.date,{day:'numeric',month:'short',year:'numeric'})}{item.end_date&&item.end_date!==item.date?' – '+formatDate(item.end_date,{day:'numeric',month:'short'}):''}</span>}{item.days!=null&&<span><Timer size={14}/>{item.days} day{Number(item.days)===1?'':'s'}</span>}</div><p className="approval-reason">{item.reason||'No additional context provided.'}</p>{item.attachment_name&&<button className="attachment-link" onClick={attachment} disabled={downloading}><FileText size={14}/>{downloading?'Opening…':item.attachment_name}<Download size={13}/></button>}</div><div className="approval-actions"><button className="button button-soft button-small" onClick={()=>onReview('REJECTED')}>Decline</button><button className="button button-primary button-small" onClick={()=>onReview('APPROVED')}><Check size={15}/> Approve</button></div></Card>;
+  return <Card className="approval-request"><div className="approval-request-icon"><Icon size={19}/></div><div className="approval-request-main"><div className="approval-request-top"><span className="approval-category">{item.category}</span><span className="approval-request-date">Received {formatDate(String(item.created_at).slice(0,10),{day:'numeric',month:'short'})}</span></div><h3>{item.full_name}<small>{item.employee_code}</small></h3><div className="approval-request-meta">{item.date&&<span><Calendar size={14}/>{formatDate(item.date,{day:'numeric',month:'short',year:'numeric'})}{item.end_date&&item.end_date!==item.date?' – '+formatDate(item.end_date,{day:'numeric',month:'short'}):''}</span>}{item.days!=null&&<span><Timer size={14}/>{item.days} day{Number(item.days)===1?'':'s'}</span>}{item.type==='correction'&&(item.requested_check_in_at||item.requested_check_out_at)&&<span><Clock3 size={14}/>Requested: {item.requested_check_in_at?formatTime(item.requested_check_in_at):'—'} – {item.requested_check_out_at?formatTime(item.requested_check_out_at):'—'}</span>}</div><p className="approval-reason">{item.reason||'No additional context provided.'}</p>{item.attachment_name&&<button className="attachment-link" onClick={attachment} disabled={downloading}><FileText size={14}/>{downloading?'Opening…':item.attachment_name}<Download size={13}/></button>}</div><div className="approval-actions"><button className="button button-soft button-small" onClick={()=>onReview('REJECTED')}>Decline</button><button className="button button-primary button-small" onClick={()=>onReview('APPROVED')}><Check size={15}/> Approve</button></div></Card>;
 }
-function ReviewModal({item,initialDecision,busy,close,onReview}){
-  const [note,setNote]=useState('');const [decision,setDecision]=useState(initialDecision||'APPROVED');
-  return <Modal title={decision==='APPROVED'?'Approve this request?':'Decline this request?'} subtitle={item.full_name+' · '+item.category} close={close}><div className="review-summary"><span className="review-summary-icon">{item.type==='wfh'?<House size={17}/>:item.type==='flex'?<Timer size={17}/>:item.type==='correction'?<Clock3 size={17}/>:<CalendarDays size={17}/>}</span><div><b>{item.date?formatDate(item.date,{weekday:'short',day:'numeric',month:'long',year:'numeric'}):'Attendance correction'}</b><p>{item.reason||'No additional context provided.'}</p></div></div><label className="form-field"><span>Note for the employee <small>(optional)</small></span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder={decision==='APPROVED'?'Add helpful context if useful.':'A short explanation will help them understand.'} maxLength="1000"/></label><div className="decision-toggle"><button type="button" className={decision==='APPROVED'?'decision-current':''} onClick={()=>setDecision('APPROVED')}><Check size={14}/> Approve</button><button type="button" className={decision==='REJECTED'?'decision-current decision-no':''} onClick={()=>setDecision('REJECTED')}><X size={14}/> Decline</button></div><div className="form-modal-actions"><Button variant="soft" type="button" onClick={close}>Cancel</Button><Button variant={decision==='APPROVED'?'primary':'danger'} loading={busy} onClick={()=>onReview(decision,note)}>{decision==='APPROVED'?'Confirm approval':'Confirm decline'}</Button></div></Modal>;
+function ReviewModal({item,initialDecision,busy,modalError,close,onReview}){
+  const [note,setNote]=useState('');
+  const [decision,setDecision]=useState(initialDecision||'APPROVED');
+  const defaultCheckIn = toTimeInputValue(item.requested_check_in_at || item.current_check_in_at) || '09:30';
+  const defaultCheckOut = toTimeInputValue(item.requested_check_out_at || item.current_check_out_at) || '18:30';
+  const [checkInTime, setCheckInTime] = useState(defaultCheckIn);
+  const [checkOutTime, setCheckOutTime] = useState(defaultCheckOut);
+
+  const handleSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    let extra = {};
+    if (item.type === 'correction' && decision === 'APPROVED') {
+      const dateStr = String(item.date || '').slice(0, 10);
+      extra = {
+        checkIn: checkInTime ? `${dateStr}T${checkInTime}:00+05:30` : null,
+        checkOut: checkOutTime ? `${dateStr}T${checkOutTime}:00+05:30` : null
+      };
+    }
+    onReview(decision, note, extra);
+  };
+
+  return <Modal title={decision==='APPROVED'?'Approve this request?':'Decline this request?'} subtitle={item.full_name+' · '+item.category} close={close}>
+    {modalError && (
+      <div className="admin-page-error" role="alert" style={{ marginBottom: '16px' }}>
+        <CircleAlert size={16}/>
+        <span>{modalError}</span>
+      </div>
+    )}
+    <div className="review-summary">
+      <span className="review-summary-icon">{item.type==='wfh'?<House size={17}/>:item.type==='flex'?<Timer size={17}/>:item.type==='correction'?<Clock3 size={17}/>:<CalendarDays size={17}/>}</span>
+      <div>
+        <b>{item.date?formatDate(item.date,{weekday:'short',day:'numeric',month:'long',year:'numeric'}):'Attendance correction'}</b>
+        <p>{item.reason||'No additional context provided.'}</p>
+      </div>
+    </div>
+    {item.type==='correction' && decision==='APPROVED' && (
+      <div className="correction-fields-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px', marginBottom: '12px' }}>
+        <label className="form-field">
+          <span>Approved Check-in time</span>
+          <input type="time" value={checkInTime} onChange={e=>setCheckInTime(e.target.value)} required aria-label="Approved Check-in time"/>
+          {item.current_check_in_at && <small style={{ color: 'var(--muted, #71717a)' }}>Original: {formatTime(item.current_check_in_at)}</small>}
+        </label>
+        <label className="form-field">
+          <span>Approved Check-out time</span>
+          <input type="time" value={checkOutTime} onChange={e=>setCheckOutTime(e.target.value)} required aria-label="Approved Check-out time"/>
+          {item.current_check_out_at && <small style={{ color: 'var(--muted, #71717a)' }}>Original: {formatTime(item.current_check_out_at)}</small>}
+        </label>
+      </div>
+    )}
+    <label className="form-field">
+      <span>Note for the employee <small>(optional)</small></span>
+      <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder={decision==='APPROVED'?'Add helpful context if useful.':'A short explanation will help them understand.'} maxLength="1000"/>
+    </label>
+    <div className="decision-toggle">
+      <button type="button" className={decision==='APPROVED'?'decision-current':''} onClick={()=>setDecision('APPROVED')}><Check size={14}/> Approve</button>
+      <button type="button" className={decision==='REJECTED'?'decision-current decision-no':''} onClick={()=>setDecision('REJECTED')}><X size={14}/> Decline</button>
+    </div>
+    <div className="form-modal-actions">
+      <Button variant="soft" type="button" onClick={close}>Cancel</Button>
+      <Button variant={decision==='APPROVED'?'primary':'danger'} loading={busy} onClick={handleSubmit}>{decision==='APPROVED'?'Confirm approval':'Confirm decline'}</Button>
+    </div>
+  </Modal>;
 }
 
 function LearningAllowanceSection({ notify }) {
@@ -1631,7 +1720,7 @@ function ProfilePage(){
       const form=new FormData();form.append('photo',file);
       await post('/account/profile/photo',form);
       setProfile((p)=>({...p,profile_photo_available:true}));
-      setUser((u)=>({...u,profile_photo_available:true}));
+      setUser((u)=>({...u,profile_photo_available:true,photo_version:Date.now()}));
       setPhotoVersion(Date.now());
       notify('Profile photo updated.');
     }catch(e){setError(e.message||'The profile photo could not be updated.');}
@@ -1644,7 +1733,7 @@ function ProfilePage(){
     try{
       await del('/account/profile/photo');
       setProfile((p)=>({...p,profile_photo_available:false}));
-      setUser((u)=>({...u,profile_photo_available:false}));
+      setUser((u)=>({...u,profile_photo_available:false,photo_version:Date.now()}));
       setPhotoVersion(Date.now());
       notify('Profile photo removed.');
     }catch(e){setError(e.message||'The profile photo could not be removed.');}

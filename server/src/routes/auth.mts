@@ -76,6 +76,7 @@ router.post('/google', googleLoginLimiter, asyncRoute(async (req, res) => {
   const claims = ticket.getPayload();
   if (!claims?.email || claims.email_verified !== true || !claims.sub) return res.status(401).json({ error: 'Google could not verify this account.' });
   const email = claims.email.trim().toLowerCase();
+  const googlePicture = typeof claims.picture === 'string' && claims.picture.startsWith('https://') ? claims.picture : null;
   const user = await transaction(async (connection) => {
     const [users] = await connection.execute(`SELECT ${userSelect}, google_subject FROM employees WHERE LOWER(email)=:email AND status='ACTIVE' LIMIT 1 FOR UPDATE`, { email });
     if (!users[0]) throw Object.assign(new Error('This Google account has not been authorized by Falchion Xeniaa. Ask an administrator to add it.'), { status: 403 });
@@ -88,6 +89,9 @@ router.post('/google', googleLoginLimiter, asyncRoute(async (req, res) => {
     delete current.google_subject;
     return current;
   });
+  if (googlePicture && !user.profile_photo_key) {
+    user.avatar_url = googlePicture;
+  }
   const session = await createAndPersistSession(user, req, rememberMe);
   res.cookie('fx_session', session.token, authCookieOptions(rememberMe)).json({ user: publicUser(user) });
   await audit({ actorId: user.id, action: 'AUTH_GOOGLE_SIGN_IN', entityType: 'employee', entityId: user.id, details: { rememberMe, sessionId: session.sessionId }, ipAddress: req.ip });

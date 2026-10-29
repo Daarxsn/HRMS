@@ -440,16 +440,33 @@ router.get('/attendance', asyncRoute(async (req, res) => {
 
 router.get('/approvals', asyncRoute(async (req, res) => {
   const [leave, wfh, correction, flex] = await Promise.all([
-    query(`SELECT r.id,'leave' AS type,r.employee_id,e.full_name,e.employee_code,r.leave_type AS category,r.start_date AS date,r.end_date,r.days,r.reason,r.created_at,r.attachment_id,a.original_filename AS attachment_name FROM leave_requests r JOIN employees e ON e.id=r.employee_id LEFT JOIN attachments a ON a.id=r.attachment_id WHERE r.status='PENDING' ORDER BY r.created_at`),
-    query(`SELECT r.id,'wfh' AS type,r.employee_id,e.full_name,e.employee_code,r.request_kind AS category,r.request_date AS date,NULL AS end_date,1 AS days,r.reason,r.created_at,NULL AS attachment_name FROM wfh_requests r JOIN employees e ON e.id=r.employee_id WHERE r.status='PENDING' ORDER BY r.created_at`),
-    query(`SELECT r.id,'correction' AS type,r.employee_id,e.full_name,e.employee_code,'Attendance correction' AS category,r.attendance_date AS date,NULL AS end_date,NULL AS days,r.reason,r.created_at,NULL AS attachment_name FROM attendance_correction_requests r JOIN employees e ON e.id=r.employee_id WHERE r.status='PENDING' ORDER BY r.created_at`),
-    query(`SELECT r.id,'flex' AS type,r.employee_id,e.full_name,e.employee_code,CONCAT('Flex start · ',TIME_FORMAT(r.requested_start_time,'%h:%i %p')) AS category,r.request_date AS date,NULL AS end_date,NULL AS days,r.reason,r.created_at,NULL AS attachment_name FROM flex_start_requests r JOIN employees e ON e.id=r.employee_id WHERE r.status='PENDING' ORDER BY r.created_at`)
+    query(`SELECT r.id,'leave' AS type,r.employee_id,e.full_name,e.employee_code,r.leave_type AS category,r.start_date AS date,r.end_date,r.days,r.reason,r.created_at,r.attachment_id,a.original_filename AS attachment_name,
+      NULL AS requested_check_in_at, NULL AS requested_check_out_at, NULL AS current_check_in_at, NULL AS current_check_out_at
+      FROM leave_requests r JOIN employees e ON e.id=r.employee_id LEFT JOIN attachments a ON a.id=r.attachment_id WHERE r.status='PENDING' ORDER BY r.created_at`),
+    query(`SELECT r.id,'wfh' AS type,r.employee_id,e.full_name,e.employee_code,r.request_kind AS category,r.request_date AS date,NULL AS end_date,1 AS days,r.reason,r.created_at,NULL AS attachment_name,
+      NULL AS requested_check_in_at, NULL AS requested_check_out_at, NULL AS current_check_in_at, NULL AS current_check_out_at
+      FROM wfh_requests r JOIN employees e ON e.id=r.employee_id WHERE r.status='PENDING' ORDER BY r.created_at`),
+    query(`SELECT r.id,'correction' AS type,r.employee_id,e.full_name,e.employee_code,'Attendance correction' AS category,r.attendance_date AS date,NULL AS end_date,NULL AS days,r.reason,r.created_at,NULL AS attachment_name,
+      r.requested_check_in_at, r.requested_check_out_at,
+      ar.check_in_at AS current_check_in_at, ar.check_out_at AS current_check_out_at
+      FROM attendance_correction_requests r
+      JOIN employees e ON e.id=r.employee_id
+      LEFT JOIN attendance_records ar ON ar.employee_id=r.employee_id AND ar.attendance_date=r.attendance_date
+      WHERE r.status='PENDING' ORDER BY r.created_at`),
+    query(`SELECT r.id,'flex' AS type,r.employee_id,e.full_name,e.employee_code,CONCAT('Flex start · ',TIME_FORMAT(r.requested_start_time,'%h:%i %p')) AS category,r.request_date AS date,NULL AS end_date,NULL AS days,r.reason,r.created_at,NULL AS attachment_name,
+      NULL AS requested_check_in_at, NULL AS requested_check_out_at, NULL AS current_check_in_at, NULL AS current_check_out_at
+      FROM flex_start_requests r JOIN employees e ON e.id=r.employee_id WHERE r.status='PENDING' ORDER BY r.created_at`)
   ]);
   res.json({ approvals: [...leave,...wfh,...correction,...flex].sort((a,b) => new Date(a.created_at).getTime()-new Date(b.created_at).getTime()) });
 }));
 
 router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req, res) => {
-  const input = validate(z.object({ decision: z.enum(['APPROVED','REJECTED']), note: z.string().trim().max(1000).optional() }), req.body);
+  const input = validate(z.object({
+    decision: z.enum(['APPROVED','REJECTED']),
+    note: z.string().trim().max(1000).optional(),
+    checkIn: z.string().optional().nullable(),
+    checkOut: z.string().optional().nullable()
+  }), req.body);
   const kind = req.params.type;
   if (!['leave','wfh','correction','flex'].includes(kind)) throw Object.assign(new Error('Unknown approval type.'), { status: 400 });
   let employeeId = null;
@@ -500,10 +517,17 @@ router.post('/approvals/:type/:id', adminMutationLimiter, asyncRoute(async (req,
       const [leaveConflict] = await connection.execute(`SELECT id FROM leave_requests WHERE employee_id=:employee AND status IN ('PENDING','APPROVED') AND start_date<=:date AND end_date>=:date LIMIT 1`, {employee:item.employee_id,date:item.attendance_date});
       if (leaveConflict[0]) throw Object.assign(new Error('This correction overlaps pending or approved leave. Resolve the leave request before adding attendance to this date.'), {status:409});
       const [existing] = await connection.execute('SELECT * FROM attendance_records WHERE employee_id=:employee AND attendance_date=:date FOR UPDATE', { employee: item.employee_id, date: item.attendance_date });
-      const checkIn = item.requested_check_in_at || existing[0]?.check_in_at;
-      const checkOut = item.requested_check_out_at || existing[0]?.check_out_at;
-      if (!checkIn) throw Object.assign(new Error('The correction needs a check-in time before it can be approved.'), { status: 400 });
-      if (checkOut && new Date(checkOut) < new Date(checkIn)) throw Object.assign(new Error('Check-out must be after check-in.'), { status: 400 });
+
+      let checkIn = input.checkIn ? new Date(input.checkIn) : (item.requested_check_in_at ? new Date(item.requested_check_in_at) : (existing[0]?.check_in_at ? new Date(existing[0].check_in_at) : null));
+      let checkOut = input.checkOut !== undefined ? (input.checkOut ? new Date(input.checkOut) : null) : (item.requested_check_out_at ? new Date(item.requested_check_out_at) : (existing[0]?.check_out_at ? new Date(existing[0].check_out_at) : null));
+
+      if (!checkIn) {
+        const [schedule] = await connection.execute('SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date', { employee: item.employee_id, date: item.attendance_date });
+        const shiftTime = schedule[0]?.approved_start_time || '09:30:00';
+        const dateStr = String(item.attendance_date).slice(0, 10);
+        checkIn = new Date(`${dateStr}T${shiftTime.length === 5 ? shiftTime + ':00' : shiftTime}+05:30`);
+      }
+      if (checkOut && checkOut < checkIn) throw Object.assign(new Error('Check-out must be after check-in. Please verify the timestamps.'), { status: 400 });
       const [schedule] = await connection.execute('SELECT approved_start_time FROM employee_schedule_exceptions WHERE employee_id=:employee AND exception_date=:date', { employee: item.employee_id, date: item.attendance_date });
       const settingsRows = await connection.execute('SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN (\'late_threshold\')');
       const settings = Object.fromEntries(settingsRows[0].map((row:any) => [row.setting_key, row.setting_value]));

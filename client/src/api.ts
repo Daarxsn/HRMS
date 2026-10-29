@@ -72,6 +72,17 @@ export function formatTime(value?: string | number | Date | null) {
   if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', { hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata' }).format(date);
 }
+export function toTimeInputValue(value?: string | number | Date | null): string {
+  if (value == null || value === '') return '';
+  let normalized: string | number | Date = value;
+  if (typeof value === 'string') {
+    const input = value.trim();
+    normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(input) ? input : `${input.replace(' ', 'T')}Z`;
+  }
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }).format(date);
+}
 export function formatMinutes(minutes?: number | null) { if (minutes == null) return '—'; return `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2,'0')}m`; }
 export const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kolkata', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 export const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]).join('').toUpperCase();

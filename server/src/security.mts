@@ -77,6 +77,7 @@ export function publicUser(user: any) {
     department: user.department,
     position: user.position,
     profile_photo_available: Boolean(user.profile_photo_key),
+    avatar_url: user.avatar_url || null,
     role: user.role,
     user_type: user.user_type,
     status: user.status,
@@ -115,6 +116,7 @@ export function signToken(user: any, rememberMe = false, sessionId?: string) {
       sid: sessionId || null,
       role: user.role,
       platform: platformFor(user),
+      avatar_url: user.avatar_url || null,
       session_version: Number(user.session_version || 0),
       remember_me: Boolean(rememberMe)
     },
@@ -177,6 +179,7 @@ export async function requireAuth(req: any, res: any, next: any) {
     }
 
     req.user = rows[0];
+    req.user.avatar_url = payload.avatar_url || null;
     req.sessionId = payload.sid || null;
     req.sessionRememberMe = Boolean(payload.remember_me);
     req.access = accessFor(rows[0]);
