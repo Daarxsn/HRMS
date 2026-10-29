@@ -449,12 +449,12 @@ function EmployeeHome(){
           :locationFailureMessage(geoError,'office check-in')));
       }
     };
-    watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:8000,maximumAge:0});
+    watchId=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
     timeoutId=globalThis.setTimeout(()=>{
       if(best&&best.accuracy<=100)finish(null,best);
       else if(best)finish(new Error('Your browser could not get a precise enough location for office check-in. Falling back to office Wi-Fi verification.'));
       else finish(new Error(locationFailureMessage({code:3},'office check-in')));
-    },8000);
+    },5000);
   });
   const quickPunch=async(type,workLocation)=>{
     if(punchBusy||holiday)return;
@@ -757,8 +757,8 @@ function AttendancePage(){
           :locationFailureMessage(geoError,'office attendance')));
       }
     };
-    watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:8000,maximumAge:0});
-    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Falling back to office Wi-Fi verification.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),8000);
+    watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,timeout:5000,maximumAge:0});
+    timeoutId=window.setTimeout(()=>best?(best.accuracy<=100?finish(null,best):finish(new Error('Your browser could not get a precise enough location. Falling back to office Wi-Fi verification.'))):finish(new Error(locationFailureMessage({code:3},'office attendance'))),5000);
   });
   const punch=async(type,workLocation)=>{
     setActionBusy(true);setActionError('');
