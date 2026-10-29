@@ -324,11 +324,24 @@ function Shell(){
   const logout=async()=>{try{await post('/auth/logout');}catch{}setUser(null);};
   const [sideAvatarError, setSideAvatarError] = useState(false);
   const [topAvatarError, setTopAvatarError] = useState(false);
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [clockTime, setClockTime] = useState(() => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' }));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setClockTime(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const userPhotoSrc = user?.profile_photo_available
     ? `${assetUrl('/account/profile/photo')}?v=${user.photo_version || '1'}`
     : (user?.avatar_url || null);
   useEffect(()=>{setSideAvatarError(false);setTopAvatarError(false);},[user?.photo_version, user?.avatar_url, user?.profile_photo_available]);
-  useEffect(()=>{setMobileOpen(false);setBellOpen(false);setCommandOpen(false);},[location.pathname]);
+  useEffect(()=>{setMobileOpen(false);setBellOpen(false);setCommandOpen(false);setActiveMenu(null);},[location.pathname]);
+  useEffect(()=>{
+    const closeDropdown=(e)=>{if(!e.target.closest('.nav-cluster-wrap'))setActiveMenu(null);};
+    document.addEventListener('click',closeDropdown);
+    return ()=>document.removeEventListener('click',closeDropdown);
+  },[]);
   useEffect(()=>{const handler=(event)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommandOpen(true);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
   return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a>
@@ -347,7 +360,213 @@ function Shell(){
       <div className="sidebar-note"><div className="note-spark"><ShieldCheck size={16}/></div><p><b>Sovereign Privacy Architecture</b><br/>Presence is logged only on explicit check-in. Zero background tracking.</p></div>
       <div className="sidebar-user"><div className={`avatar avatar-sand${userPhotoSrc && !sideAvatarError ? ' avatar-with-photo' : ''}`}>{userPhotoSrc && !sideAvatarError ? <img src={userPhotoSrc} alt="" loading="lazy" decoding="async" onError={()=>setSideAvatarError(true)}/> : initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
     </aside>
-    <main id="main-content" className="main-shell"><header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button><div className="breadcrumb"><span>Falchion Xeniaa</span><ChevronRight size={13}/><b>{pageName}</b></div></div><div className="topbar-right"><div className="office-status"><span className="pulse-dot"/> Pune office</div><button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Search"><Command size={15}/><span>Search</span><kbd aria-hidden="true">⌘ K</kbd></button><button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><div className="notification-wrap"><button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>{bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}</div><Link to="/profile" className={`avatar avatar-top${userPhotoSrc && !topAvatarError ? ' avatar-with-photo' : ''}`} aria-label="My profile">{userPhotoSrc && !topAvatarError ? <img src={userPhotoSrc} alt="" onError={()=>setTopAvatarError(true)}/> : <span aria-hidden="true">{initials(user.full_name)}</span>}</Link></div></header>
+    <main id="main-content" className="main-shell">
+      <header className="topbar top-hub">
+        <div className="topbar-left">
+          <button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button>
+          <Link to={isAdmin ? '/admin' : '/'} className="top-hub-brand" aria-label="Falchion Xeniaa People Portal">
+            <div className="top-hub-logo">FX</div>
+            <div className="top-hub-wordmark">
+              <b>Falchion Xeniaa</b>
+              <small>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrator' : 'Executive Portal'}</small>
+            </div>
+          </Link>
+        </div>
+
+        <nav className="top-nav-clusters" aria-label="Top navigation">
+          {isAdmin ? (
+            <>
+              <NavLink to="/admin" end className={({isActive})=>`nav-cluster-btn${isActive?' active-direct':''}`}>
+                <Gauge size={15}/> <span>Overview</span>
+              </NavLink>
+              <NavLink to="/admin/approvals" className={({isActive})=>`nav-cluster-btn${isActive?' active-direct':''}`}>
+                <ClipboardCheck size={15}/> <span>Approvals</span>
+                {notifications.unread > 0 && <span className="nav-cluster-badge">{notifications.unread}</span>}
+              </NavLink>
+              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('people')} onMouseLeave={()=>setActiveMenu(null)}>
+                <button type="button" className={`nav-cluster-btn${['/admin/attendance','/admin/team','/admin/hr'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='people'?null:'people')}>
+                  <Users size={15}/> <span>People & Operations</span> <ChevronDown size={13}/>
+                </button>
+                {activeMenu==='people' && (
+                  <div className="mega-dropdown">
+                    <Link to="/admin/attendance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><Clock3 size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Master Attendance Register</div>
+                        <div className="dropdown-item-desc">Live team punches, shift hours & network IP logs</div>
+                      </div>
+                    </Link>
+                    <Link to="/admin/team" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><Users size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Team Directory & 4-Tier RBAC</div>
+                        <div className="dropdown-item-desc">Staff profiles, role privileges & shift exceptions</div>
+                      </div>
+                    </Link>
+                    <Link to="/admin/hr" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><GraduationCap size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Enterprise Benefits & L&D</div>
+                        <div className="dropdown-item-desc">Course reimbursement claims & birthday passes</div>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('finance')} onMouseLeave={()=>setActiveMenu(null)}>
+                <button type="button" className={`nav-cluster-btn${['/admin/reports','/admin/settings','/admin/audit'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='finance'?null:'finance')}>
+                  <Activity size={15}/> <span>Finance & Governance</span> <ChevronDown size={13}/>
+                </button>
+                {activeMenu==='finance' && (
+                  <div className="mega-dropdown">
+                    <Link to="/admin/reports" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><FileText size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Payroll & Attendance Reports</div>
+                        <div className="dropdown-item-desc">Monthly payroll reconciliation & CSV export</div>
+                      </div>
+                    </Link>
+                    {(isSuperAdmin || user.capabilities?.includes('office_settings')) && (
+                      <Link to="/admin/settings" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                        <div className="dropdown-item-icon"><Settings size={17}/></div>
+                        <div className="dropdown-item-text">
+                          <div className="dropdown-item-title">Office Geofence & Settings</div>
+                          <div className="dropdown-item-desc">Configure GPS radius & Wi-Fi allow-lists</div>
+                        </div>
+                      </Link>
+                    )}
+                    {(isSuperAdmin || user.capabilities?.includes('audit_trail')) && (
+                      <Link to="/admin/audit" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                        <div className="dropdown-item-icon"><ShieldAlert size={17}/></div>
+                        <div className="dropdown-item-text">
+                          <div className="dropdown-item-title">Immutable Audit Trail</div>
+                          <div className="dropdown-item-desc">Security events & role escalation logs</div>
+                        </div>
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <NavLink to="/" end className={({isActive})=>`nav-cluster-btn${isActive?' active-direct':''}`}>
+                <House size={15}/> <span>Dashboard</span>
+              </NavLink>
+              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('time')} onMouseLeave={()=>setActiveMenu(null)}>
+                <button type="button" className={`nav-cluster-btn${['/attendance','/out'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='time'?null:'time')}>
+                  <Clock3 size={15}/> <span>Time & Presence</span> <ChevronDown size={13}/>
+                </button>
+                {activeMenu==='time' && (
+                  <div className="mega-dropdown">
+                    <Link to="/attendance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><Fingerprint size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Daily Attendance & Punch</div>
+                        <div className="dropdown-item-desc">Log punches, verify GPS geofence or scan office QR</div>
+                      </div>
+                    </Link>
+                    <Link to="/out" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><ArrowUpRight size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Temporary Exit / Step Out</div>
+                        <div className="dropdown-item-desc">Record lunch, errands, or client movement</div>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('leave')} onMouseLeave={()=>setActiveMenu(null)}>
+                <button type="button" className={`nav-cluster-btn${['/leave','/wfh','/calendar'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='leave'?null:'leave')}>
+                  <CalendarDays size={15}/> <span>Leave & Remote</span> <ChevronDown size={13}/>
+                </button>
+                {activeMenu==='leave' && (
+                  <div className="mega-dropdown">
+                    <Link to="/leave" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><CalendarDays size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Leave & Encashment</div>
+                        <div className="dropdown-item-desc">Apply for leaves or monetize unused earned days</div>
+                      </div>
+                    </Link>
+                    {user.wfh_enabled && (
+                      <Link to="/wfh" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                        <div className="dropdown-item-icon"><House size={17}/></div>
+                        <div className="dropdown-item-text">
+                          <div className="dropdown-item-title">Work From Home (WFH)</div>
+                          <div className="dropdown-item-desc">Request remote work days with quota tracking</div>
+                        </div>
+                      </Link>
+                    )}
+                    <Link to="/calendar" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><Calendar size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Holiday Calendar</div>
+                        <div className="dropdown-item-desc">Official Pune office holidays & festivals</div>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('desk')} onMouseLeave={()=>setActiveMenu(null)}>
+                <button type="button" className={`nav-cluster-btn${['/documents','/policies','/grievance','/profile'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='desk'?null:'desk')}>
+                  <FileText size={15}/> <span>Company & Desk</span> <ChevronDown size={13}/>
+                </button>
+                {activeMenu==='desk' && (
+                  <div className="mega-dropdown">
+                    <Link to="/documents" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><Download size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Documents Vault</div>
+                        <div className="dropdown-item-desc">Download salary slips, letters & agreements</div>
+                      </div>
+                    </Link>
+                    <Link to="/policies" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><FileText size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Policy Center</div>
+                        <div className="dropdown-item-desc">Browse 14 official employee guidelines</div>
+                      </div>
+                    </Link>
+                    <Link to="/grievance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><ShieldCheck size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">Confidential Grievance</div>
+                        <div className="dropdown-item-desc">Encrypted HR and POSH redressal channel</div>
+                      </div>
+                    </Link>
+                    <Link to="/profile" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <div className="dropdown-item-icon"><CircleUserRound size={17}/></div>
+                      <div className="dropdown-item-text">
+                        <div className="dropdown-item-title">My Profile & Sessions</div>
+                        <div className="dropdown-item-desc">Personal records & active device management</div>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </nav>
+
+        <div className="topbar-right">
+          <div className="top-quick-punch">
+            <span className="top-quick-clock"><Clock3 size={13}/> {clockTime} IST</span>
+            <Link to={isAdmin ? "/admin/attendance" : "/attendance"} className="top-punch-btn">
+              <Fingerprint size={13}/> <span>{isAdmin ? 'Live Register' : 'Punch Desk'}</span>
+            </Link>
+          </div>
+          <button className="command-trigger" onClick={()=>setCommandOpen(true)} aria-label="Search"><Command size={15}/><span>Search</span><kbd aria-hidden="true">⌘ K</kbd></button>
+          <button className="icon-button theme-toggle" onClick={()=>setTheme(theme==='dark'?'light':'dark')} aria-label={theme==='dark'?'Switch to light mode':'Switch to dark mode'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button>
+          <div className="notification-wrap">
+            <button className={`icon-button notification-button${bellOpen?' active':''}`} onClick={()=>setBellOpen((v)=>!v)} aria-label="Notifications"><Bell size={19}/>{notifications.unread>0&&<span className="notification-dot"/>}</button>
+            {bellOpen&&<NotificationPopover close={()=>setBellOpen(false)} refresh={refreshNotifications}/>}
+          </div>
+          <Link to="/profile" className={`avatar avatar-top${userPhotoSrc && !topAvatarError ? ' avatar-with-photo' : ''}`} aria-label="My profile">
+            {userPhotoSrc && !topAvatarError ? <img src={userPhotoSrc} alt="" onError={()=>setTopAvatarError(true)}/> : <span aria-hidden="true">{initials(user.full_name)}</span>}
+          </Link>
+        </div>
+      </header>
       <div className="page-wrap"><Suspense fallback={<PageSkeletonLoader/>}><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
         <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/><Route path="/grievance" element={<GrievancePage/>}/>
         <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/team/:id" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('office_settings'))?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/hr/:subTab" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('audit_trail'))?<AuditPage/>:<NoAccess/>}/>
@@ -361,16 +580,46 @@ function Shell(){
 
 function CommandPalette({close,theme,setTheme,isAdmin}){
   const navigate=useNavigate();const location=useLocation();const [queryText,setQueryText]=useState('');
+  const [selectedIndex,setSelectedIndex]=useState(0);
   const nav=[...(isAdmin?adminNav:employeeNav),{to:'/profile',label:'My profile',icon:CircleUserRound}];
   const actions=isAdmin?[['/admin/attendance','Open live attendance',Clock3],['/admin/approvals','Review requests',ClipboardCheck],['/admin/team','Manage people',Users],['/admin/reports','Open reports',Activity]]:[['/attendance','Open today’s attendance',Fingerprint],['/leave','Request time off',CalendarDays],['/wfh','Request WFH',House],['/out','Mark temporary exit',ArrowUpRight]];
   const q=queryText.trim().toLowerCase();const filtered=nav.filter((item)=>item.label.toLowerCase().includes(q));const filteredActions=actions.filter(([,label])=>label.toLowerCase().includes(q));
   const go=(to)=>{navigate(to);close();};
-  useEffect(()=>{const onKey=(e)=>{if(e.key==='Escape')close();if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey);},[close]);
+  const flatItems=[
+    ...filteredActions.map(([to])=>()=>go(to)),
+    ...filtered.map((item)=>()=>go(item.to)),
+    ()=>setTheme(theme==='dark'?'light':'dark')
+  ];
+  useEffect(()=>{setSelectedIndex(0);},[queryText]);
+  useEffect(()=>{
+    const onKey=(e)=>{
+      if(e.key==='Escape')close();
+      if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();}
+      if(e.key==='ArrowDown'){
+        e.preventDefault();
+        setSelectedIndex((prev)=>flatItems.length?(prev+1)%flatItems.length:0);
+      }
+      if(e.key==='ArrowUp'){
+        e.preventDefault();
+        setSelectedIndex((prev)=>flatItems.length?(prev-1+flatItems.length)%flatItems.length:0);
+      }
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(flatItems[selectedIndex]){
+          flatItems[selectedIndex]();
+        }
+      }
+    };
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[close,flatItems,selectedIndex]);
+  let cursor=0;
   return <div className="command-overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><div className="command-palette" role="dialog" aria-modal="true" aria-label="HRMS command menu">
     <div className="command-head"><Command size={18}/><input autoFocus value={queryText} onChange={e=>setQueryText(e.target.value)} placeholder="Search pages and actions…" aria-label="Search pages and actions"/><kbd>ESC</kbd></div>
-    <div className="command-section"><span>QUICK ACTIONS</span>{filteredActions.length?filteredActions.map(([to,label,Icon])=><button className="command-item" key={to} onClick={()=>go(to)}><span className="command-item-icon"><Icon size={16}/></span><span>{label}</span><ArrowRight size={14}/></button>):<div className="command-empty"><Search size={18}/><span>No matching actions.</span></div>}</div>
-    <div className="command-section"><span>NAVIGATE</span>{filtered.length?filtered.map((item)=>{const Icon=item.icon;return <button className={`command-item${location.pathname===item.to?' active':''}`} key={item.to} onClick={()=>go(item.to)}><span className="command-item-icon"><Icon size={16}/></span><span>{item.label}</span><ArrowRight size={14}/></button>}):<div className="command-empty"><Search size={18}/><span>No matching pages.</span></div>}</div>
-    <div className="command-section"><span>PREFERENCES</span><button className="command-item" onClick={()=>setTheme(theme==='dark'?'light':'dark')}><span className="command-item-icon">{theme==='dark'?<Sun size={16}/>:<Moon size={16}/>}</span><span>{theme==='dark'?'Use light appearance':'Use dark appearance'}</span><kbd>{theme==='dark'?'LIGHT':'DARK'}</kbd></button></div>
+    <div className="command-section"><span>QUICK ACTIONS</span>{filteredActions.length?filteredActions.map(([to,label,Icon])=>{const idx=cursor++;const isSelected=selectedIndex===idx;return <button className={`command-item${isSelected?' selected':''}`} key={to} onClick={()=>go(to)} onMouseEnter={()=>setSelectedIndex(idx)}><span className="command-item-icon"><Icon size={16}/></span><span>{label}</span><ArrowRight size={14}/></button>}):<div className="command-empty"><Search size={18}/><span>No matching actions.</span></div>}</div>
+    <div className="command-section"><span>NAVIGATE</span>{filtered.length?filtered.map((item)=>{const idx=cursor++;const isSelected=selectedIndex===idx;const Icon=item.icon;return <button className={`command-item${location.pathname===item.to?' active':''}${isSelected?' selected':''}`} key={item.to} onClick={()=>go(item.to)} onMouseEnter={()=>setSelectedIndex(idx)}><span className="command-item-icon"><Icon size={16}/></span><span>{item.label}</span><ArrowRight size={14}/></button>}):<div className="command-empty"><Search size={18}/><span>No matching pages.</span></div>}</div>
+    <div className="command-section"><span>PREFERENCES</span>{(()=>{const idx=cursor++;const isSelected=selectedIndex===idx;return <button className={`command-item${isSelected?' selected':''}`} onClick={()=>setTheme(theme==='dark'?'light':'dark')} onMouseEnter={()=>setSelectedIndex(idx)}><span className="command-item-icon">{theme==='dark'?<Sun size={16}/>:<Moon size={16}/>}</span><span>{theme==='dark'?'Use light appearance':'Use dark appearance'}</span><kbd>{theme==='dark'?'LIGHT':'DARK'}</kbd></button>})()}</div>
+    <div className="command-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> select</span><span><kbd>esc</kbd> close</span></div>
   </div></div>;
 }
 
