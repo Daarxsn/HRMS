@@ -5820,101 +5820,270 @@ html[data-theme="dark"] .drawer-subtitle {
 }
 
 /* ==========================================================================
-   Falchion HRMS — Executive Top Hub Navigation & Full-Width Canvas (Phase 1)
-   Replaces fixed left sidebar with 100% full-width canvas and frosted mega-dropdowns.
+   Falchion HRMS — Executive Workspace Navigation & Collapsible Shell
+   Full-featured luxury collapsible left sidebar + Top utility hub + Frosted mega-dropdowns.
    ========================================================================== */
 
-/* Full-Width Canvas Transformation */
+/* Main Shell layout with dynamic sidebar margin */
 .main-shell {
-  margin-left: 0 !important;
-  width: 100% !important;
+  margin-left: 256px !important;
+  width: calc(100% - 256px) !important;
   min-height: 100vh;
+  display: flex !important;
+  flex-direction: column !important;
+  transition: margin-left 0.22s cubic-bezier(0.16, 1, 0.3, 1), width 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.main-shell.collapsed {
+  margin-left: 68px !important;
+  width: calc(100% - 68px) !important;
 }
 
 .page-wrap {
-  width: min(100%, 1560px) !important;
-  padding: 28px 40px 56px !important;
+  width: min(100%, 1520px) !important;
+  padding: 24px 36px 56px !important;
   margin: 0 auto !important;
+  flex: 1 0 auto !important;
 }
 
-/* Sidebar hidden on desktop; active only as mobile slide-out drawer */
+/* Executive Persistent & Collapsible Desktop Sidebar */
 .sidebar {
-  display: none !important;
-}
-
-.sidebar.sidebar-open {
   display: flex !important;
   position: fixed !important;
   inset: 0 auto 0 0 !important;
-  z-index: 60 !important;
-  box-shadow: 0 0 60px rgba(0, 0, 0, 0.45) !important;
+  width: 256px !important;
+  height: 100vh !important;
+  z-index: 50 !important;
+  padding: 16px 14px 14px !important;
+  flex-direction: column !important;
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  border-right: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface) !important;
+}
+
+html[data-theme="light"] .sidebar {
+  background: #FFFFFF !important;
+  border-right: 1px solid #E4E4E7 !important;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html[data-theme="dark"] .sidebar {
+  background: #0E1117 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Collapsed Desktop Sidebar (68px icon-rail) */
+.sidebar.collapsed {
+  width: 68px !important;
+  padding: 16px 8px 14px !important;
+}
+
+.sidebar.collapsed .brand-wordmark,
+.sidebar.collapsed .workspace-chip span:nth-child(2),
+.sidebar.collapsed .workspace-chip > svg,
+.sidebar.collapsed .nav-caption,
+.sidebar.collapsed .nav-link span,
+.sidebar.collapsed .sidebar-note,
+.sidebar.collapsed .user-lines,
+.sidebar.collapsed .user-more {
+  display: none !important;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center !important;
+  padding: 4px 0 16px !important;
+  gap: 0 !important;
+}
+
+.sidebar.collapsed .sidebar-collapse {
+  display: none !important;
+}
+
+.sidebar.collapsed .sidebar-toggle-desktop {
+  margin: 0 auto !important;
+}
+
+.sidebar.collapsed .workspace-chip {
+  justify-content: center !important;
+  padding: 7px 0 !important;
+}
+
+.sidebar.collapsed .nav-link {
+  justify-content: center !important;
+  padding: 10px 0 !important;
+}
+
+.sidebar.collapsed .sidebar-user {
+  justify-content: center !important;
+  padding-top: 12px !important;
+}
+
+/* Desktop Sidebar Toggle Buttons */
+.sidebar-toggle-desktop {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: auto !important;
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 8px !important;
+  color: var(--ui-text-muted) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.sidebar-toggle-desktop:hover {
+  background: var(--ui-hover) !important;
+  color: var(--ui-text) !important;
+  border-color: rgba(218, 175, 81, 0.25) !important;
+}
+
+.sidebar-toggle-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 9px !important;
+  color: var(--ui-text-muted) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--ui-hover) !important;
+  color: var(--ui-text) !important;
+  border-color: rgba(218, 175, 81, 0.25) !important;
+}
+
+@media (max-width: 1024px) {
+  .sidebar-toggle-desktop,
+  .sidebar-toggle-btn {
+    display: none !important;
+  }
+}
+
+/* Mobile Sidebar Drawer */
+@media (max-width: 1024px) {
+  .sidebar {
+    display: none !important;
+    width: 280px !important;
+    transform: translateX(-100%) !important;
+  }
+  .sidebar.sidebar-open {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 100 !important;
+    transform: translateX(0) !important;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.55) !important;
+  }
+  .sidebar-collapse {
+    display: flex !important;
+  }
+  .main-shell,
+  .main-shell.collapsed {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Sidebar Navigation Items & Active Luxury Indicators */
+.nav-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 11px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--ui-text-muted) !important;
+  transition: all 0.16s ease !important;
+  text-decoration: none !important;
+  position: relative !important;
+}
+
+.nav-link:hover {
+  color: var(--ui-text) !important;
+  background: var(--ui-hover) !important;
+}
+
+.nav-link.nav-active {
+  background: rgba(218, 175, 81, 0.12) !important;
+  color: #B48421 !important;
+  font-weight: 700 !important;
+  box-shadow: inset 3px 0 0 #DAAF51 !important;
+}
+
+html[data-theme="dark"] .nav-link.nav-active {
+  background: rgba(218, 175, 81, 0.16) !important;
+  color: var(--fx-gold) !important;
+  box-shadow: inset 3px 0 0 var(--fx-gold) !important;
+}
+
+.nav-link.nav-active svg {
+  color: var(--fx-gold) !important;
 }
 
 /* Executive Top Hub Header */
 .topbar.top-hub {
-  height: 64px !important;
-  padding: 0 32px !important;
+  height: 60px !important;
+  padding: 0 28px !important;
   position: sticky !important;
   top: 0 !important;
   z-index: 40 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 20px !important;
+  gap: 16px !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border-bottom: 1px solid var(--ui-border) !important;
 }
 
 html[data-theme="light"] .topbar.top-hub {
-  background: rgba(255, 255, 255, 0.90) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
 }
 
 html[data-theme="dark"] .topbar.top-hub {
-  background: rgba(17, 17, 17, 0.92) !important;
+  background: rgba(14, 17, 23, 0.94) !important;
 }
 
-.top-hub-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-  flex-shrink: 0;
+.topbar-breadcrumb {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+  color: var(--ui-text-muted) !important;
+  font-weight: 500 !important;
+  margin-left: 8px !important;
 }
 
-.top-hub-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #DAAF51 0%, #C49839 100%);
-  color: #111111;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(218, 175, 81, 0.3);
-  letter-spacing: -0.02em;
+.crumb-segment {
+  color: var(--ui-text-muted) !important;
 }
 
-.top-hub-wordmark {
-  display: flex;
-  flex-direction: column;
+.crumb-divider {
+  color: rgba(218, 175, 81, 0.45) !important;
+  font-size: 11px !important;
 }
 
-.top-hub-wordmark b {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--ui-text);
-  line-height: 1.2;
+.crumb-current {
+  color: var(--ui-text) !important;
+  font-weight: 700 !important;
 }
 
-.top-hub-wordmark small {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fx-gold);
+@media (max-width: 640px) {
+  .topbar-breadcrumb {
+    display: none !important;
+  }
 }
 
 /* Center Navigation Clusters */
@@ -5932,7 +6101,12 @@ html[data-theme="dark"] .topbar.top-hub {
 }
 
 .nav-cluster-wrap {
-  position: relative;
+  position: relative !important;
+}
+
+.nav-cluster-wrap.has-open-menu,
+.nav-cluster-wrap:has(.mega-dropdown) {
+  z-index: 60 !important;
 }
 
 .nav-cluster-btn {
@@ -5953,7 +6127,8 @@ html[data-theme="dark"] .topbar.top-hub {
 }
 
 .nav-cluster-btn:hover,
-.nav-cluster-btn.active-cluster {
+.nav-cluster-btn.active-cluster,
+.nav-cluster-btn[aria-expanded="true"] {
   color: var(--ui-text);
   background: var(--ui-hover);
   border-color: rgba(218, 175, 81, 0.25);
@@ -5964,6 +6139,14 @@ html[data-theme="dark"] .topbar.top-hub {
   color: var(--ui-text) !important;
   font-weight: 700 !important;
   border-color: rgba(218, 175, 81, 0.35) !important;
+}
+
+.nav-cluster-btn svg:last-child {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-cluster-btn[aria-expanded="true"] svg:last-child {
+  transform: rotate(180deg);
 }
 
 .nav-cluster-badge {
@@ -5981,29 +6164,42 @@ html[data-theme="dark"] .nav-cluster-badge {
   color: var(--fx-gold);
 }
 
-/* Frosted Mega-Dropdown Menu */
+/* Frosted Mega-Dropdown Menu — Fixed Hover Bridge & Safe Click Target */
 .mega-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  min-width: 310px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(218, 175, 81, 0.32);
-  border-radius: 16px;
-  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(218, 175, 81, 0.15);
-  padding: 8px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  min-width: 320px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(218, 175, 81, 0.35) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(218, 175, 81, 0.15) !important;
+  padding: 8px !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  pointer-events: auto !important;
+}
+
+/* Invisible mouse bridge over the 4px gap so onMouseLeave never triggers */
+.mega-dropdown::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -12px !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 14px !important;
+  background: transparent !important;
+  pointer-events: auto !important;
 }
 
 html[data-theme="dark"] .mega-dropdown {
-  background: rgba(24, 24, 27, 0.96);
-  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(218, 175, 81, 0.25);
+  background: rgba(20, 24, 30, 0.98) !important;
+  box-shadow: 0 24px 56px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(218, 175, 81, 0.25) !important;
 }
 
 @keyframes dropdownFadeIn {
@@ -7439,4 +7635,250 @@ html[data-theme="dark"] .inline-alert.alert-success {
   background: rgba(218, 175, 81, 0.14) !important;
   border-color: rgba(218, 175, 81, 0.4) !important;
   color: var(--fx-gold) !important;
+}
+
+/* ==========================================================================
+   Falchion HRMS — Executive Visual Revamp & Interactive Fidelity Enhancements
+   ========================================================================== */
+
+/* 1. Harmonized Light/Dark Executive Heroes */
+html[data-theme="light"] .admin-hero,
+html[data-theme="light"] .day-hero {
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAF6ED 100%) !important;
+  border: 1px solid rgba(218, 175, 81, 0.35) !important;
+  box-shadow: 0 10px 32px -6px rgba(218, 175, 81, 0.14), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  color: #18181B !important;
+}
+
+html[data-theme="light"] .admin-hero h2,
+html[data-theme="light"] .admin-hero-copy h2,
+html[data-theme="light"] .day-hero h2,
+html[data-theme="light"] .hero-text h2 {
+  color: #111111 !important;
+  font-weight: 800 !important;
+}
+
+html[data-theme="light"] .admin-hero p,
+html[data-theme="light"] .admin-hero-copy p,
+html[data-theme="light"] .day-hero p {
+  color: #52525B !important;
+}
+
+html[data-theme="light"] .admin-hero-score {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(218, 175, 81, 0.35) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme="light"] .admin-hero-score span {
+  color: #71717A !important;
+}
+
+html[data-theme="light"] .admin-hero-score small {
+  color: #71717A !important;
+}
+
+html[data-theme="light"] .admin-hero-secondary {
+  color: #3F3F46 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(218, 175, 81, 0.35) !important;
+}
+
+html[data-theme="light"] .hero-pulse-strip {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(218, 175, 81, 0.35) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme="light"] .hero-pulse-stat span {
+  color: #71717A !important;
+}
+
+html[data-theme="light"] .hero-date {
+  background: #FFFFFF !important;
+  color: #18181B !important;
+  border: 1.5px solid var(--fx-gold) !important;
+  box-shadow: 0 6px 18px rgba(218, 175, 81, 0.18) !important;
+}
+
+/* 2. Universal Form Controls, Accessible Selects & Filter Menus */
+select {
+  cursor: pointer;
+}
+
+.select-wrap {
+  position: relative;
+  display: block;
+}
+
+.select-wrap select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--ui-border, #e1e8e3);
+  background: var(--ui-field, #fff);
+  border-radius: 9px;
+  height: 40px;
+  padding: 0 34px 0 12px;
+  color: var(--ui-field-text, #465650);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.select-wrap select:hover:not(:disabled) {
+  border-color: rgba(218, 175, 81, 0.5);
+}
+
+.select-wrap select:focus {
+  border-color: var(--fx-gold, #DAAF51);
+  box-shadow: 0 0 0 3px rgba(218, 175, 81, 0.2);
+  outline: none;
+}
+
+.select-wrap > svg {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-text-muted, #91a09a);
+  pointer-events: none;
+  transition: color 0.18s ease;
+}
+
+.select-wrap:focus-within > svg {
+  color: var(--fx-gold, #DAAF51);
+}
+
+/* Compact Filter Selects (Team directory, Attendance register, Audit trail) */
+.select-small select {
+  height: 34px;
+  font-size: 12px;
+  padding: 0 30px 0 10px;
+  border-radius: 7px;
+}
+
+.select-small > svg {
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Enterprise HR Select Elements (Onboarding, Assets, Offboarding, Grievances) */
+.enterprise-select {
+  width: 100%;
+  min-height: 38px;
+  height: 38px;
+  font: inherit;
+  font-size: 12px;
+  padding: 0 28px 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border, #e1e8e3);
+  background: var(--ui-field, #fff);
+  color: var(--ui-field-text, #18181b);
+  cursor: pointer;
+  outline-offset: 2px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.enterprise-select:hover:not(:disabled) {
+  border-color: rgba(218, 175, 81, 0.5);
+}
+
+.enterprise-select:focus {
+  outline: none;
+  border-color: var(--fx-gold, #DAAF51);
+  box-shadow: 0 0 0 3px rgba(218, 175, 81, 0.2);
+}
+
+select.input {
+  cursor: pointer;
+  padding-right: 32px !important;
+}
+
+select option {
+  background-color: var(--ui-field, #ffffff);
+  color: var(--ui-field-text, #18181b);
+  padding: 6px 10px;
+}
+
+html[data-theme="dark"] select option {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+}
+
+/* 3. Date Range Filter Controls with High-Contrast Dark Mode */
+.filter-date,
+.report-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ui-text-muted);
+}
+
+.filter-date input,
+.report-filter-controls input {
+  border: 0;
+  background: transparent;
+  color: var(--ui-field-text, #334155);
+  font-size: 12px;
+  font-weight: 600;
+  outline: 0;
+  cursor: pointer;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] .filter-date input,
+html[data-theme="dark"] .report-filter-controls input {
+  color: #F4F4F5 !important;
+  color-scheme: dark !important;
+}
+
+.filter-date input::-webkit-calendar-picker-indicator,
+.report-filter-controls input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.filter-date input:hover::-webkit-calendar-picker-indicator,
+.report-filter-controls input:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+html[data-theme="dark"] .filter-date input::-webkit-calendar-picker-indicator,
+html[data-theme="dark"] .report-filter-controls input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+
+/* 4. Table Elevated Row Hover & Typography */
+.table-scroll table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+.table-scroll th {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--ui-text-muted) !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+}
+
+.table-scroll td {
+  padding: 14px 16px !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  font-size: 13px !important;
+  color: var(--ui-text) !important;
+  vertical-align: middle !important;
+}
+
+.table-scroll tr:hover td {
+  background: rgba(218, 175, 81, 0.04) !important;
+}
+
+html[data-theme="dark"] .table-scroll tr:hover td {
+  background: rgba(255, 255, 255, 0.03) !important;
 }

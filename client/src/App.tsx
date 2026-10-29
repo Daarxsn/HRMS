@@ -326,6 +326,68 @@ function Shell(){
   const [sideAvatarError, setSideAvatarError] = useState(false);
   const [topAvatarError, setTopAvatarError] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
+  const menuTimerRef = useRef(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('fx_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('fx_sidebar_collapsed', String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleMenuEnter = (menuKey) => {
+    if (menuTimerRef.current) {
+      clearTimeout(menuTimerRef.current);
+      menuTimerRef.current = null;
+    }
+    setActiveMenu(menuKey);
+  };
+
+  const handleMenuLeave = () => {
+    if (menuTimerRef.current) clearTimeout(menuTimerRef.current);
+    menuTimerRef.current = window.setTimeout(() => {
+      setActiveMenu(null);
+    }, 200);
+  };
+
+  const handleMenuToggle = (menuKey) => {
+    if (menuTimerRef.current) {
+      clearTimeout(menuTimerRef.current);
+      menuTimerRef.current = null;
+    }
+    setActiveMenu((prev) => (prev === menuKey ? null : menuKey));
+  };
+
+  useEffect(() => {
+    if (!activeMenu) return;
+    const onPointerDown = (e) => {
+      const target = e.target;
+      if (!target?.closest?.('.nav-cluster-wrap')) {
+        if (menuTimerRef.current) clearTimeout(menuTimerRef.current);
+        setActiveMenu(null);
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (menuTimerRef.current) clearTimeout(menuTimerRef.current);
+        setActiveMenu(null);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [activeMenu]);
+
   const [clockTime, setClockTime] = useState(() => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' }));
   useEffect(() => {
     const timer = setInterval(() => {
@@ -338,40 +400,62 @@ function Shell(){
     : (user?.avatar_url || null);
   useEffect(()=>{setSideAvatarError(false);setTopAvatarError(false);},[user?.photo_version, user?.avatar_url, user?.profile_photo_available]);
   useEffect(()=>{setMobileOpen(false);setBellOpen(false);setCommandOpen(false);setActiveMenu(null);},[location.pathname]);
-  useEffect(()=>{
-    const closeDropdown=(e)=>{if(!e.target.closest('.nav-cluster-wrap'))setActiveMenu(null);};
-    document.addEventListener('click',closeDropdown);
-    return ()=>document.removeEventListener('click',closeDropdown);
-  },[]);
   useEffect(()=>{const handler=(event)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommandOpen(true);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
   const pageName=nav.find((item)=>item.to===location.pathname)?.label || (location.pathname==='/profile'?'My profile':location.pathname.startsWith('/admin/')||location.pathname==='/admin'?'Overview':'Overview');
   return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a>
     {mobileOpen&&<button className="mobile-scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
-    <aside id="primary-navigation" className={`sidebar${mobileOpen?' sidebar-open':''}`} aria-label="Primary navigation">
+    <aside id="primary-navigation" className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}${mobileOpen?' sidebar-open':''}`} aria-label="Primary navigation">
       <div className="sidebar-brand">
         <Link to={isAdmin?'/admin':'/'} className="sidebar-brand-link" aria-label="Falchion Xeniaa People Portal">
           <span className="brand-logo-wrap"><IconLogo/></span>
+          {!sidebarCollapsed && (
+            <span className="brand-wordmark">
+              <b>Falchion Xeniaa</b>
+              <small>{isSuperAdmin ? 'SUPER ADMIN' : isAdmin ? 'ADMINISTRATOR' : 'PEOPLE PORTAL'}</small>
+            </span>
+          )}
         </Link>
         <button className="sidebar-collapse" aria-label="Close menu" aria-expanded={mobileOpen} aria-controls="primary-navigation" onClick={()=>setMobileOpen(false)}><PanelLeftClose size={17}/></button>
+        <button type="button" className="sidebar-toggle-desktop icon-button" aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={toggleSidebar} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><PanelLeftClose size={17} style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}/></button>
       </div>
-      <div className="workspace-chip"><span className="workspace-avatar">FX</span><span><b>Falchion Xeniaa</b><small>Pune · {isSuperAdmin?'Super Admin':isAdmin?'Administrator':'People'}</small></span><ChevronDown size={14}/></div>
-      <div className="nav-caption">WORKSPACE</div>
-      <nav className="main-nav" aria-label="Workspace">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span>{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
-      <div className="nav-bottom"><div className="nav-caption">ACCOUNT</div><NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`}><CircleUserRound size={18} strokeWidth={1.8}/><span>My profile</span></NavLink><button className="nav-link nav-logout" onClick={logout}><LogOut size={18} strokeWidth={1.8}/><span>Sign out</span></button></div>
-      <div className="sidebar-note"><div className="note-spark"><ShieldCheck size={16}/></div><p><b>Sovereign Privacy Architecture</b><br/>Presence is logged only on explicit check-in. Zero background tracking.</p></div>
-      <div className="sidebar-user"><div className={`avatar avatar-sand${userPhotoSrc && !sideAvatarError ? ' avatar-with-photo' : ''}`}>{userPhotoSrc && !sideAvatarError ? <img src={userPhotoSrc} alt="" loading="lazy" decoding="async" onError={()=>setSideAvatarError(true)}/> : initials(user.full_name)}</div><div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div><button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button></div>
+      <div className="workspace-chip" title="Falchion Xeniaa · Pune HQ">
+        <span className="workspace-avatar">FX</span>
+        {!sidebarCollapsed && <span><b>Falchion Xeniaa</b><small>Pune · {isSuperAdmin?'Super Admin':isAdmin?'Administrator':'People'}</small></span>}
+        {!sidebarCollapsed && <ChevronDown size={14}/>}
+      </div>
+      {!sidebarCollapsed && <div className="nav-caption">WORKSPACE</div>}
+      <nav className="main-nav" aria-label="Workspace">{nav.map((item)=>{const Icon=item.icon;return <NavLink key={item.to} to={item.to} end={item.to==='/' || item.to==='/admin'} className={({isActive})=>`nav-link${isActive?' nav-active':''}`} aria-label={item.label} title={sidebarCollapsed ? item.label : undefined}><Icon size={18} strokeWidth={1.8}/>{!sidebarCollapsed && <span>{item.label}</span>}{(item.to==='/approvals'||item.to==='/admin/approvals')&&notifications.unread>0?<span className="nav-count">{notifications.unread}</span>:null}</NavLink>;})}</nav>
+      <div className="nav-bottom">
+        {!sidebarCollapsed && <div className="nav-caption">ACCOUNT</div>}
+        <NavLink to="/profile" className={({isActive})=>`nav-link${isActive?' nav-active':''}`} title={sidebarCollapsed ? 'My profile' : undefined}><CircleUserRound size={18} strokeWidth={1.8}/>{!sidebarCollapsed && <span>My profile</span>}</NavLink>
+        <button className="nav-link nav-logout" onClick={logout} title={sidebarCollapsed ? 'Sign out' : undefined}><LogOut size={18} strokeWidth={1.8}/>{!sidebarCollapsed && <span>Sign out</span>}</button>
+      </div>
+      {!sidebarCollapsed && (
+        <div className="sidebar-note">
+          <div className="note-spark"><ShieldCheck size={16}/></div>
+          <p><b>Sovereign Privacy Architecture</b><br/>Presence is logged only on explicit check-in. Zero background tracking.</p>
+        </div>
+      )}
+      <div className="sidebar-user" title={user.full_name}>
+        <div className={`avatar avatar-sand${userPhotoSrc && !sideAvatarError ? ' avatar-with-photo' : ''}`}>{userPhotoSrc && !sideAvatarError ? <img src={userPhotoSrc} alt="" loading="lazy" decoding="async" onError={()=>setSideAvatarError(true)}/> : initials(user.full_name)}</div>
+        {!sidebarCollapsed && <div className="user-lines"><b>{user.full_name}</b><small>{roleInfo(user).fullLabel}</small></div>}
+        {!sidebarCollapsed && <button className="icon-button user-more" onClick={logout} title="Sign out"><MoreHorizontal size={19}/></button>}
+      </div>
     </aside>
-    <main id="main-content" className="main-shell">
+    <main id="main-content" className={`main-shell${sidebarCollapsed ? ' collapsed' : ''}`}>
       <header className="topbar top-hub">
         <div className="topbar-left">
           <button className="mobile-menu icon-button" onClick={()=>setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu size={20}/></button>
-          <Link to={isAdmin ? '/admin' : '/'} className="top-hub-brand" aria-label="Falchion Xeniaa People Portal">
-            <div className="top-hub-logo">FX</div>
-            <div className="top-hub-wordmark">
-              <b>Falchion Xeniaa</b>
-              <small>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrator' : 'Executive Portal'}</small>
-            </div>
-          </Link>
+          <button type="button" className="sidebar-toggle-btn icon-button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <PanelLeftClose size={18} style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}/>
+          </button>
+          <div className="topbar-breadcrumb" aria-label="Breadcrumb">
+            <span className="crumb-segment">Falchion</span>
+            <span className="crumb-divider">/</span>
+            <span className="crumb-segment">{isAdmin ? 'Admin' : 'Portal'}</span>
+            <span className="crumb-divider">/</span>
+            <b className="crumb-current">{pageName}</b>
+          </div>
         </div>
 
         <nav className="top-nav-clusters" aria-label="Top navigation">
@@ -384,27 +468,27 @@ function Shell(){
                 <ClipboardCheck size={15}/> <span>Approvals</span>
                 {notifications.unread > 0 && <span className="nav-cluster-badge">{notifications.unread}</span>}
               </NavLink>
-              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('people')} onMouseLeave={()=>setActiveMenu(null)}>
-                <button type="button" className={`nav-cluster-btn${['/admin/attendance','/admin/team','/admin/hr'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='people'?null:'people')}>
+              <div className={`nav-cluster-wrap${activeMenu==='people'?' has-open-menu':''}`} onMouseEnter={()=>handleMenuEnter('people')} onMouseLeave={handleMenuLeave}>
+                <button type="button" aria-haspopup="true" aria-expanded={activeMenu==='people'} className={`nav-cluster-btn${['/admin/attendance','/admin/team','/admin/hr'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>handleMenuToggle('people')}>
                   <Users size={15}/> <span>People & Operations</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='people' && (
-                  <div className="mega-dropdown">
-                    <Link to="/admin/attendance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('people')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/admin/attendance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Clock3 size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Master Attendance Register</div>
                         <div className="dropdown-item-desc">Live team punches, shift hours & network IP logs</div>
                       </div>
                     </Link>
-                    <Link to="/admin/team" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/admin/team" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Users size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Team Directory & 4-Tier RBAC</div>
                         <div className="dropdown-item-desc">Staff profiles, role privileges & shift exceptions</div>
                       </div>
                     </Link>
-                    <Link to="/admin/hr" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/admin/hr" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><GraduationCap size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Enterprise Benefits & L&D</div>
@@ -414,13 +498,13 @@ function Shell(){
                   </div>
                 )}
               </div>
-              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('finance')} onMouseLeave={()=>setActiveMenu(null)}>
-                <button type="button" className={`nav-cluster-btn${['/admin/reports','/admin/settings','/admin/audit'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='finance'?null:'finance')}>
+              <div className={`nav-cluster-wrap${activeMenu==='finance'?' has-open-menu':''}`} onMouseEnter={()=>handleMenuEnter('finance')} onMouseLeave={handleMenuLeave}>
+                <button type="button" aria-haspopup="true" aria-expanded={activeMenu==='finance'} className={`nav-cluster-btn${['/admin/reports','/admin/settings','/admin/audit'].some(p=>location.pathname.startsWith(p))?' active-cluster':''}`} onClick={()=>handleMenuToggle('finance')}>
                   <Activity size={15}/> <span>Finance & Governance</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='finance' && (
-                  <div className="mega-dropdown">
-                    <Link to="/admin/reports" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('finance')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/admin/reports" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><FileText size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Payroll & Attendance Reports</div>
@@ -428,7 +512,7 @@ function Shell(){
                       </div>
                     </Link>
                     {(isSuperAdmin || user.capabilities?.includes('office_settings')) && (
-                      <Link to="/admin/settings" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <Link to="/admin/settings" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><Settings size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Office Geofence & Settings</div>
@@ -437,7 +521,7 @@ function Shell(){
                       </Link>
                     )}
                     {(isSuperAdmin || user.capabilities?.includes('audit_trail')) && (
-                      <Link to="/admin/audit" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <Link to="/admin/audit" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><ShieldAlert size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Immutable Audit Trail</div>
@@ -454,20 +538,20 @@ function Shell(){
               <NavLink to="/" end className={({isActive})=>`nav-cluster-btn${isActive?' active-direct':''}`}>
                 <House size={15}/> <span>Dashboard</span>
               </NavLink>
-              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('time')} onMouseLeave={()=>setActiveMenu(null)}>
-                <button type="button" className={`nav-cluster-btn${['/attendance','/out'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='time'?null:'time')}>
+              <div className={`nav-cluster-wrap${activeMenu==='time'?' has-open-menu':''}`} onMouseEnter={()=>handleMenuEnter('time')} onMouseLeave={handleMenuLeave}>
+                <button type="button" aria-haspopup="true" aria-expanded={activeMenu==='time'} className={`nav-cluster-btn${['/attendance','/out'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>handleMenuToggle('time')}>
                   <Clock3 size={15}/> <span>Time & Presence</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='time' && (
-                  <div className="mega-dropdown">
-                    <Link to="/attendance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('time')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/attendance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Fingerprint size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Daily Attendance & Punch</div>
                         <div className="dropdown-item-desc">Log punches, verify GPS geofence or scan office QR</div>
                       </div>
                     </Link>
-                    <Link to="/out" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/out" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><ArrowUpRight size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Temporary Exit / Step Out</div>
@@ -477,13 +561,13 @@ function Shell(){
                   </div>
                 )}
               </div>
-              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('leave')} onMouseLeave={()=>setActiveMenu(null)}>
-                <button type="button" className={`nav-cluster-btn${['/leave','/wfh','/calendar'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='leave'?null:'leave')}>
+              <div className={`nav-cluster-wrap${activeMenu==='leave'?' has-open-menu':''}`} onMouseEnter={()=>handleMenuEnter('leave')} onMouseLeave={handleMenuLeave}>
+                <button type="button" aria-haspopup="true" aria-expanded={activeMenu==='leave'} className={`nav-cluster-btn${['/leave','/wfh','/calendar'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>handleMenuToggle('leave')}>
                   <CalendarDays size={15}/> <span>Leave & Remote</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='leave' && (
-                  <div className="mega-dropdown">
-                    <Link to="/leave" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('leave')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/leave" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><CalendarDays size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Leave & Encashment</div>
@@ -491,7 +575,7 @@ function Shell(){
                       </div>
                     </Link>
                     {user.wfh_enabled && (
-                      <Link to="/wfh" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                      <Link to="/wfh" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                         <div className="dropdown-item-icon"><House size={17}/></div>
                         <div className="dropdown-item-text">
                           <div className="dropdown-item-title">Work From Home (WFH)</div>
@@ -499,7 +583,7 @@ function Shell(){
                         </div>
                       </Link>
                     )}
-                    <Link to="/calendar" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/calendar" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Calendar size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Holiday Calendar</div>
@@ -509,34 +593,34 @@ function Shell(){
                   </div>
                 )}
               </div>
-              <div className="nav-cluster-wrap" onMouseEnter={()=>setActiveMenu('desk')} onMouseLeave={()=>setActiveMenu(null)}>
-                <button type="button" className={`nav-cluster-btn${['/documents','/policies','/grievance','/profile'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>setActiveMenu(activeMenu==='desk'?null:'desk')}>
+              <div className={`nav-cluster-wrap${activeMenu==='desk'?' has-open-menu':''}`} onMouseEnter={()=>handleMenuEnter('desk')} onMouseLeave={handleMenuLeave}>
+                <button type="button" aria-haspopup="true" aria-expanded={activeMenu==='desk'} className={`nav-cluster-btn${['/documents','/policies','/grievance','/profile'].some(p=>location.pathname===p)?' active-cluster':''}`} onClick={()=>handleMenuToggle('desk')}>
                   <FileText size={15}/> <span>Company & Desk</span> <ChevronDown size={13}/>
                 </button>
                 {activeMenu==='desk' && (
-                  <div className="mega-dropdown">
-                    <Link to="/documents" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                  <div className="mega-dropdown" role="menu" onMouseEnter={()=>handleMenuEnter('desk')} onMouseLeave={handleMenuLeave}>
+                    <Link to="/documents" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><Download size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Documents Vault</div>
                         <div className="dropdown-item-desc">Download salary slips, letters & agreements</div>
                       </div>
                     </Link>
-                    <Link to="/policies" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/policies" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><FileText size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Policy Center</div>
                         <div className="dropdown-item-desc">Browse 14 official employee guidelines</div>
                       </div>
                     </Link>
-                    <Link to="/grievance" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/grievance" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><ShieldCheck size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">Confidential Grievance</div>
                         <div className="dropdown-item-desc">Encrypted HR and POSH redressal channel</div>
                       </div>
                     </Link>
-                    <Link to="/profile" className="dropdown-item-link" onClick={()=>setActiveMenu(null)}>
+                    <Link to="/profile" className="dropdown-item-link" role="menuitem" onClick={()=>{if(menuTimerRef.current)clearTimeout(menuTimerRef.current);setActiveMenu(null);}}>
                       <div className="dropdown-item-icon"><CircleUserRound size={17}/></div>
                       <div className="dropdown-item-text">
                         <div className="dropdown-item-title">My Profile & Sessions</div>
@@ -1331,7 +1415,7 @@ function LeavePage(){
     <div className="leave-balance-grid">{loading?<Card className="balance-loading"><Spinner/></Card>:balanceCards.map((b,i)=><Card className={`leave-balance-tile leave-balance-${i}`} key={b.type}><div className="leave-tile-top"><span>{b.type==='CASUAL'?'Casual + sick':b.label}</span><span className="leave-tile-icon">{b.type==='CASUAL'?<Sun size={17}/>:b.type==='EARNED'?<BriefcaseBusiness size={17}/>:<CalendarHeart size={17}/>}</span></div><div className="leave-tile-value">{b.reviewRequired?'HR review':b.remaining}<small>{b.reviewRequired?'balance provisional':'days available'}</small></div><div className="leave-progress"><span style={{width:`${b.entitlement?Math.max(4,Math.min(100,(b.remaining/b.entitlement)*100)):0}%`}}/></div><div className="leave-tile-foot"><span>{b.used} used</span><span>{b.pending?`${b.pending} pending`:`${b.accrued} allocated`}</span></div><p className="leave-tile-note">{b.type==='CASUAL'?'Shared 8-day annual balance for casual and sick leave.':b.type==='EARNED'?(b.reviewRequired?'HR review required before using this provisional balance.':'Accrues 1 day/month after probation, up to 15 days/year.'):'For cultural, religious or personal days.'}</p></Card>)}</div>
     {upcomingLeave.length>0&&<section className="leave-upcoming-strip"><div className="leave-upcoming-heading"><span className="eyebrow">UP NEXT</span><b>Your approved time away</b><small>Planned days already cleared by your approver.</small></div><div className="leave-upcoming-list">{upcomingLeave.map((r)=><Link to="/leave" key={r.id} className="leave-upcoming-item"><span className="leave-upcoming-date"><b>{formatDate(r.start_date,{day:'2-digit'})}</b><small>{formatDate(r.start_date,{month:'short'}).toUpperCase()}</small></span><span><b>{{CASUAL:'Casual',SICK:'Sick',EARNED:'Earned',FLOATING:'Floating',LEARNING:'Learning'}[r.leave_type]||'Leave'}</b><small>{r.start_date===r.end_date?formatDate(r.start_date,{weekday:'short'}):formatDate(r.start_date,{day:'numeric',month:'short'})+' – '+formatDate(r.end_date,{day:'numeric',month:'short'})} · {r.days} day{Number(r.days)===1?'':'s'}</small></span><ArrowRight size={14}/></Link>)}</div></section>}
     <div className="leave-layout"><Card className="leave-form-card"><CardHeading title="Request time off" subtitle="Share the dates and a little context."/><form className="form-stack leave-request-form" onSubmit={submit}>
-      <div className="leave-type-group"><div className="form-field"><span>Casual + sick</span><div className="leave-type-switch" role="group" aria-label="Casual and sick leave selection"><button type="button" className={type==='CASUAL'?'active':''} onClick={()=>setType('CASUAL')}>Casual</button><button type="button" className={type==='SICK'?'active':''} onClick={()=>setType('SICK')}>Sick</button></div><small className="field-help">Both use the same shared 8-day annual balance. Sick leave of 3+ consecutive calendar days requires a doctor’s note.</small></div><div className="form-field"><span>Other leave</span><div className="select-wrap"><select aria-label="Other leave type" value={type==='CASUAL'||type==='SICK'?'EARNED':type} onChange={(e)=>setType(e.target.value)}><option value="EARNED">Earned leave</option><option value="FLOATING">Floating leave</option><option value="LEARNING">Learning time off (up to 2d/quarter)</option></select><ChevronDown size={15}/></div></div></div>
+      <div className="leave-type-group"><div className="form-field"><span>Casual + sick</span><div className="leave-type-switch" role="group" aria-label="Casual and sick leave selection"><button type="button" className={type==='CASUAL'?'active':''} onClick={()=>setType('CASUAL')}>Casual</button><button type="button" className={type==='SICK'?'active':''} onClick={()=>setType('SICK')}>Sick</button></div><small className="field-help">Both use the same shared 8-day annual balance. Sick leave of 3+ consecutive calendar days requires a doctor’s note.</small></div><div className="form-field"><span>Other leave</span><div className="select-wrap"><select aria-label="Other leave type" value={type==='CASUAL'||type==='SICK'?'':type} onChange={(e)=>{if(e.target.value)setType(e.target.value);}}><option value="" disabled>Choose other leave type…</option><option value="EARNED">Earned leave</option><option value="FLOATING">Floating leave</option><option value="LEARNING">Learning time off (up to 2d/quarter)</option></select><ChevronDown size={15}/></div></div></div>
       <div className="form-two"><label className="form-field"><span>First day</span><input aria-label="First day" type="date" value={startDate} min={today} onChange={(e)=>setStart(e.target.value)} required/></label><label className="form-field"><span>Last day</span><input aria-label="Last day" type="date" value={endDate} min={startDate||today} onChange={(e)=>setEnd(e.target.value)} required/></label></div>
       <label className="form-field"><span>A short note</span><textarea aria-label="A short note" value={reason} onChange={(e)=>setReason(e.target.value)} placeholder={type==='LEARNING'?'Course title, provider, and learning summary…':'What would you like your approver to know?'} minLength="8" maxLength="1000" required/></label>
       {type==='LEARNING'&&<div className="doc-required" style={{borderColor:'var(--brand-gold,#DAAF51)'}}><GraduationCap size={16}/><span><b>Learning Time Off</b><small>Up to 2 days per calendar quarter for professional development, certifications, and conferences. Does not deduct from your personal leave balances.</small></span></div>}
@@ -2478,7 +2562,7 @@ function AdminAttendancePage(){
   const present=rows.filter((r)=>['ON_TIME','LATE_ENTRY'].includes(r.status)).length;const late=rows.filter((r)=>r.status==='LATE_ENTRY').length;const absent=rows.filter((r)=>r.status==='ABSENT').length;const remote=rows.filter((r)=>r.status==='WFH').length;
   return <><PageTitle eyebrow="ATTENDANCE, WITH CONTEXT" title="Attendance" description="Review the working day without losing the human context behind the record." action={<Button variant="soft" icon={RefreshCw} onClick={()=>void load()} disabled={loading}>{loading?'Refreshing…':'Refresh records'}</Button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}>Retry records</button></div>}
     <div className="admin-attendance-summary"><div><span className="admin-attendance-summary-icon green"><Fingerprint size={17}/></span><b>{loading?'—':present}</b><small>Present</small></div><div><span className="admin-attendance-summary-icon rose"><Clock3 size={17}/></span><b>{loading?'—':late}</b><small>Late</small></div><div><span className="admin-attendance-summary-icon gold"><CalendarDays size={17}/></span><b>{loading?'—':absent}</b><small>Absent</small></div><div><span className="admin-attendance-summary-icon blue"><House size={17}/></span><b>{loading?'—':remote}</b><small>Remote</small></div></div>
-    <Card className="admin-attendance-card"><div className="filter-toolbar admin-attendance-toolbar"><div className="filter-date"><CalendarDays size={16}/><label><span>FROM</span><input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label><ArrowRight size={14}/><label><span>TO</span><input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label></div><div className="admin-attendance-filters"><div className="search-box"><Search size={15}/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search people" aria-label="Search people"/></div><div className="select-wrap select-small"><select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}><option value="ALL">All status</option><option value="PRESENT">Present</option><option value="LATE">Late</option><option value="ABSENT">Absent</option><option value="WFH">Remote</option></select><ChevronDown size={14}/></div><Button size="small" onClick={load} icon={Filter}>Apply</Button></div></div>
+    <Card className="admin-attendance-card"><div className="filter-toolbar admin-attendance-toolbar"><div className="filter-date"><CalendarDays size={16}/><label><span>FROM</span><input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label><ArrowRight size={14}/><label><span>TO</span><input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label></div><div className="admin-attendance-filters"><div className="search-box"><Search size={15}/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search people" aria-label="Search people"/></div><div className="select-wrap select-small"><select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} aria-label="Filter attendance by status"><option value="ALL">All status</option><option value="PRESENT">Present</option><option value="LATE">Late</option><option value="ABSENT">Absent</option><option value="WFH">Remote</option></select><ChevronDown size={14}/></div><Button size="small" onClick={load} icon={Filter}>Apply</Button></div></div>
       <div className="table-scroll"><table aria-label="Workforce attendance management records"><thead><tr><th scope="col">PERSON</th><th scope="col">DATE</th><th scope="col">CHECK IN</th><th scope="col">CHECK OUT</th><th scope="col">VERIFY</th><th scope="col">LOCATION CHECK</th><th scope="col">STATUS</th><th scope="col">EXITS</th></tr></thead><tbody>{loading?<tr><td colSpan="8" className="table-message"><Spinner/></td></tr>:filteredRows.length?filteredRows.map((r)=><tr key={r.id} className="table-row-click" onClick={()=>selectRecord(r)}><td><div className="person-cell"><span className="avatar avatar-table">{initials(r.full_name)}</span><span><b>{r.full_name}</b><small>{r.employee_code} · {r.user_type==='INTERN'?'Intern':'Employee'}</small></span></div></td><td>{formatDate(r.attendance_date,{day:'numeric',month:'short'})}</td><td>{formatTime(r.check_in_at)}</td><td>{formatTime(r.check_out_at)}</td><td><span className="verify-tag"><i/>{r.check_in_method||'—'}</span></td><td>{r.check_in_distance_m==null?'—':<span className="location-audit"><MapPin size={13}/>{Math.round(r.check_in_distance_m)} m<small>±{Math.round(r.check_in_accuracy_m||0)} m</small></span>}</td><td><StatusPill value={r.status}/>{r.correction_pending&&<span className="correction-mark">Correction</span>}</td><td>{r.exit_count||0}</td></tr>):<tr><td colSpan="8"><div className="table-message">No attendance records match these filters.</div></td></tr>}</tbody></table></div><div className="admin-attendance-foot"><span><ShieldCheck size={14}/> GPS coordinates are stored only when the employee checks in or out.</span><span>{filteredRows.length} visible records</span></div></Card>
     <div className="mobile-admin-attendance-list">
       {loading?<Card className="mobile-request-empty"><Spinner/></Card>:filteredRows.length?filteredRows.map((r)=><button type="button" key={'mobile-'+r.id} className="mobile-admin-attendance-card" onClick={()=>selectRecord(r)}>

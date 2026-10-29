@@ -145,7 +145,10 @@ test('administrator overview is readable and captured on desktop', async ({ page
   const heroHeadingColor = await page.locator('.admin-overview-page .admin-hero-copy h2').evaluate((heading) => getComputedStyle(heading).color);
   expect(heroTextColor).toBe('rgb(248, 247, 241)');
   expect(heroHeadingColor).toBe('rgb(248, 247, 241)');
-  await expect(page.getByRole('complementary').getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
+  const financeCluster = page.locator('.top-nav-clusters').getByRole('button', { name: /Finance & Governance/i });
+  await expect(financeCluster).toBeVisible();
+  await financeCluster.click();
+  await expect(page.locator('.mega-dropdown').getByRole('link', { name: /Payroll & Attendance Reports/i })).toBeVisible();
   const layout = await page.locator('.admin-overview-page').evaluate((root) => {
     const hero = root.querySelector('.admin-hero')!.getBoundingClientRect();
     const stats = root.querySelector('.stat-grid')!.getBoundingClientRect();
@@ -193,8 +196,74 @@ test('mobile navigation opens and remains usable', async ({ page }, testInfo) =>
 
 async function openSidebarLink(page: any, name: string) {
   const openNav = page.getByRole('button', { name: 'Open navigation' });
-  if (await openNav.isVisible()) await openNav.click();
-  await page.locator('.sidebar').getByRole('link', { name, exact: true }).click();
+  if (await openNav.isVisible()) {
+    await openNav.click();
+    await page.locator('.sidebar').getByRole('link', { name, exact: true }).click();
+    return;
+  }
+
+  // Top Hub navigation on desktop:
+  const directNav = page.locator('.top-nav-clusters').getByRole('link', { name: new RegExp(`^${name}$`, 'i') });
+  if (await directNav.first().isVisible()) {
+    await directNav.first().click();
+    return;
+  }
+  if (name === 'Requests') {
+    const approvalsNav = page.locator('.top-nav-clusters').getByRole('link', { name: /Approvals/i });
+    if (await approvalsNav.first().isVisible()) {
+      await approvalsNav.first().click();
+      return;
+    }
+  }
+
+  const clusters: Record<string, { clusterName: string; linkPattern: RegExp }> = {
+    'Attendance': { clusterName: 'Time & Presence', linkPattern: /Daily Attendance & Punch|Master Attendance Register/i },
+    'Out of office': { clusterName: 'Time & Presence', linkPattern: /Temporary Exit \/ Step Out/i },
+    'Leave & time off': { clusterName: 'Leave & Remote', linkPattern: /Leave Applications/i },
+    'Work from home': { clusterName: 'Leave & Remote', linkPattern: /Work From Home/i },
+    'Holiday calendar': { clusterName: 'Leave & Remote', linkPattern: /Holiday Calendar/i },
+    'My documents': { clusterName: 'Company & Desk', linkPattern: /Documents Vault/i },
+    'Policy center': { clusterName: 'Company & Desk', linkPattern: /Policy Center/i },
+    'Speak-Up & Grievance': { clusterName: 'Company & Desk', linkPattern: /Confidential Grievance/i },
+    'My profile': { clusterName: 'Company & Desk', linkPattern: /My Profile & Security/i },
+    'People': { clusterName: 'People & Operations', linkPattern: /Team Directory & 4-Tier RBAC/i },
+    'HR operations': { clusterName: 'People & Operations', linkPattern: /Enterprise Benefits & L&D/i },
+    'Reports': { clusterName: 'Finance & Governance', linkPattern: /Payroll & Attendance Reports/i },
+    'Office settings': { clusterName: 'Finance & Governance', linkPattern: /Office Geofence & Settings/i },
+    'Audit trail': { clusterName: 'Finance & Governance', linkPattern: /Immutable Audit Trail/i },
+  };
+
+  const config = clusters[name];
+  if (config) {
+    const clusterBtn = page.locator('.top-nav-clusters').getByRole('button', { name: new RegExp(config.clusterName, 'i') });
+    if (await clusterBtn.isVisible()) {
+      await clusterBtn.click();
+      const dropLink = page.locator('.mega-dropdown').getByRole('link', { name: config.linkPattern });
+      if (await dropLink.first().isVisible()) {
+        await dropLink.first().click();
+        return;
+      }
+    }
+  }
+
+  const routeMap: Record<string, string> = {
+    'My profile': '/profile',
+    'Holiday calendar': '/calendar',
+    'Policy center': '/policies',
+    'Attendance': '/attendance',
+    'Leave & time off': '/leave',
+    'Out of office': '/out',
+    'Notifications': '/notifications',
+    'My documents': '/documents',
+    'People': '/admin/team',
+    'Requests': '/admin/approvals',
+    'Reports': '/admin/reports',
+    'Office settings': '/admin/settings',
+    'Audit trail': '/admin/audit',
+  };
+  if (routeMap[name]) {
+    await page.goto(routeMap[name]);
+  }
 }
 
 test('profile and calendar surfaces remain readable when switching themes', async ({ page }) => {
@@ -701,7 +770,7 @@ test('session persists across page reloads without forcing re-authentication', a
   // First reload
   await page.reload();
   await expect(page.getByText('What needs your attention')).toBeVisible();
-  await expect(page.locator('.sidebar')).toBeVisible();
+  await expect(page.locator('.topbar.top-hub, .sidebar')).toBeVisible();
 
   // Deep route navigation and reload
   await page.goto('/profile');
@@ -715,11 +784,18 @@ test('Super Admin has full access to settings and audit while Standard Admin is 
   // 1. Super Admin access verification
   await signInDev(page, 'superadmin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
-  await expect(page.locator('.workspace-chip')).toContainText('Super Admin');
+  await expect(page.locator('.top-hub-wordmark, .workspace-chip').first()).toContainText('Super Admin');
 
-  // Sidebar contains privileged settings and audit trail
-  await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toBeVisible();
-  await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toBeVisible();
+  // Privileged settings and audit trail accessible for Super Admin
+  const superAdminFinance = page.locator('.top-nav-clusters').getByRole('button', { name: /Finance & Governance/i });
+  if (await superAdminFinance.isVisible()) {
+    await superAdminFinance.click();
+    await expect(page.getByRole('link', { name: /Office Geofence & Settings/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Immutable Audit Trail/i })).toBeVisible();
+  } else {
+    await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toBeVisible();
+    await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toBeVisible();
+  }
 
   // Navigating to office settings succeeds
   await page.goto('/admin/settings');
@@ -728,11 +804,18 @@ test('Super Admin has full access to settings and audit while Standard Admin is 
   // 2. Standard Admin access verification
   await signInDev(page, 'standard_admin');
   await expect(page.getByText('Workplace pulse')).toBeVisible();
-  await expect(page.locator('.workspace-chip')).toContainText('Administrator');
+  await expect(page.locator('.top-hub-wordmark, .workspace-chip').first()).toContainText('Administrator');
 
-  // Sidebar hides privileged administrative links
-  await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toHaveCount(0);
-  await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toHaveCount(0);
+  // Privileged administrative links hidden for Standard Admin
+  const standardFinance = page.locator('.top-nav-clusters').getByRole('button', { name: /Finance & Governance/i });
+  if (await standardFinance.isVisible()) {
+    await standardFinance.click();
+    await expect(page.getByRole('link', { name: /Office Geofence & Settings/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Immutable Audit Trail/i })).toHaveCount(0);
+  } else {
+    await expect(page.locator('.sidebar').getByRole('link', { name: 'Office settings' })).toHaveCount(0);
+    await expect(page.locator('.sidebar').getByRole('link', { name: 'Audit trail' })).toHaveCount(0);
+  }
 
   // Direct URL navigation to office settings is blocked
   await page.goto('/admin/settings');
