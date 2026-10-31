@@ -1,3 +1,17 @@
+export interface EmployeeAttendanceSummary {
+  full_name: string;
+  employee_code: string;
+  user_type?: string;
+  onTimePresent: number;
+  latePresent: number;
+  totalPresent: number;
+  totalLeaves: number;
+  leavesGranted: number;
+  wfhDays?: number;
+  absentDays?: number;
+  attendanceRate?: number;
+}
+
 export interface PdfReportData {
   title?: string;
   from: string;
@@ -12,8 +26,11 @@ export interface PdfReportData {
     onLeave?: number;
     wfh?: number;
     total: number;
+    employeesCount?: number;
+    approvedLeaveDays?: number;
   };
-  rows: Array<{
+  employeeSummaries?: EmployeeAttendanceSummary[];
+  rows?: Array<{
     full_name: string;
     employee_code: string;
     attendance_date: string;
@@ -24,23 +41,90 @@ export interface PdfReportData {
   }>;
 }
 
+function sanitizeText(str: string): string {
+  return String(str ?? '')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2022\u00B7]/g, '|')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/[\\()]/g, '\\$&');
+}
+
 export function generatePdfBlob(data: PdfReportData): Blob {
   const pages: string[] = [];
   const pageWidth = 595.28; // A4 standard width (pt)
   const pageHeight = 841.89; // A4 standard height (pt)
-  const margin = 36;
-  const contentWidth = pageWidth - (margin * 2);
+  const margin = 32;
+  const contentWidth = pageWidth - (margin * 2); // 531.28 pt
 
-  const rowsPerPage = 24;
-  const numPages = Math.max(1, Math.ceil(data.rows.length / rowsPerPage));
+  // If employeeSummaries is provided, generate the executive summarized report
+  const summaries: EmployeeAttendanceSummary[] = data.employeeSummaries || [];
   const dateRangeStr = `${data.from} to ${data.to}`;
 
+  // Layout Constants for Summarized Report
+  const cols = [
+    { name: 'EMPLOYEE NAME', w: 135, align: 'left' },
+    { name: 'CODE', w: 52, align: 'left' },
+    { name: 'ON-TIME', w: 50, align: 'center' },
+    { name: 'LATE', w: 48, align: 'center' },
+    { name: 'TOTAL PRESENT', w: 68, align: 'center' },
+    { name: 'TOTAL LEAVES', w: 58, align: 'center' },
+    { name: 'LEAVES GRANTED', w: 66, align: 'center' },
+    { name: 'ATTENDANCE', w: 54, align: 'center' }
+  ];
+
+  // If no summaries provided but rows exist, derive summaries on the fly
+  let finalSummaries = summaries;
+  if (finalSummaries.length === 0 && data.rows && data.rows.length > 0) {
+    const map = new Map<string, EmployeeAttendanceSummary>();
+    for (const r of data.rows) {
+      const key = r.employee_code || r.full_name;
+      if (!map.has(key)) {
+        map.set(key, {
+          full_name: r.full_name || 'Unknown',
+          employee_code: r.employee_code || '-',
+          onTimePresent: 0,
+          latePresent: 0,
+          totalPresent: 0,
+          totalLeaves: 0,
+          leavesGranted: 0
+        });
+      }
+      const item = map.get(key)!;
+      if (r.status === 'ON_TIME') {
+        item.onTimePresent++;
+        item.totalPresent++;
+      } else if (r.status === 'LATE_ENTRY') {
+        item.latePresent++;
+        item.totalPresent++;
+      } else if (r.status === 'ON_LEAVE') {
+        item.totalLeaves++;
+        item.leavesGranted++;
+      }
+    }
+    finalSummaries = Array.from(map.values()).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+
+  const rowsPerPage = 22;
+  const numPages = Math.max(1, Math.ceil(finalSummaries.length / rowsPerPage));
+
+  // Compute Grand Totals across all employees
+  const grandTotals = finalSummaries.reduce((acc, curr) => ({
+    onTime: acc.onTime + curr.onTimePresent,
+    late: acc.late + curr.latePresent,
+    totalPresent: acc.totalPresent + curr.totalPresent,
+    totalLeaves: acc.totalLeaves + curr.totalLeaves,
+    leavesGranted: acc.leavesGranted + curr.leavesGranted
+  }), { onTime: 0, late: 0, totalPresent: 0, totalLeaves: 0, leavesGranted: 0 });
+
   for (let p = 0; p < numPages; p++) {
-    const pageRecords = data.rows.slice(p * rowsPerPage, (p + 1) * rowsPerPage);
+    const pageRecords = finalSummaries.slice(p * rowsPerPage, (p + 1) * rowsPerPage);
+    const isLastPage = p === numPages - 1;
     let stream = '';
 
     const text = (x: number, y: number, str: string, font = '/F1', size = 8.5, r = 0.1, g = 0.1, b = 0.1) => {
-      const clean = String(str || '').replace(/[\\()]/g, '\\$&');
+      const clean = sanitizeText(str);
       stream += `BT ${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg ${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${clean}) Tj ET\n`;
     };
 
@@ -51,98 +135,147 @@ export function generatePdfBlob(data: PdfReportData): Blob {
     // Top Brand Gold Strip
     rect(0, pageHeight - 6, pageWidth, 6, 0.855, 0.686, 0.318, true); // Champagne Gold #DAAF51
 
-    let curY = pageHeight - 40;
+    let curY = pageHeight - 38;
     if (p === 0) {
       // Header brand
       text(margin, curY, 'FALCHION XENIAA', '/F2', 13.5, 0.576, 0.075, 0.078); // Deep Saffron #931314
-      text(margin + 128, curY, '· WORKFORCE ATTENDANCE REPORT', '/F2', 11.5, 0.067, 0.067, 0.067);
-      curY -= 16;
-      text(margin, curY, `Reporting Period: ${dateRangeStr}   |   Generated: ${data.generatedAt}   |   Confidential`, '/F1', 8, 0.45, 0.45, 0.45);
+      text(margin + 126, curY, '| WORKFORCE ATTENDANCE & LEAVE SUMMARY', '/F2', 11.5, 0.067, 0.067, 0.067);
+      curY -= 15;
+      text(margin, curY, `Reporting Period: ${dateRangeStr}   |   Generated: ${data.generatedAt}   |   Executive HR & Payroll Summary`, '/F1', 8, 0.45, 0.45, 0.45);
       curY -= 14;
 
-      // Summary KPI Grid Box
-      rect(margin, curY - 42, contentWidth, 44, 0.965, 0.965, 0.970, true);
-      rect(margin, curY - 42, contentWidth, 44, 0.855, 0.686, 0.318, false);
+      // 5-Column Executive KPI Summary Grid Box
+      rect(margin, curY - 44, contentWidth, 46, 0.965, 0.965, 0.970, true);
+      rect(margin, curY - 44, contentWidth, 46, 0.855, 0.686, 0.318, false);
 
-      const kpiW = contentWidth / 4;
+      const kpiW = contentWidth / 5;
       const kpis = [
-        ['PRESENT DAYS', data.summary.attended],
-        ['ON TIME', data.summary.onTime],
-        ['LATE ENTRIES', data.summary.late],
-        ['OPEN SHIFTS', data.summary.open]
+        ['ACTIVE STAFF', finalSummaries.length],
+        ['ON TIME', grandTotals.onTime || data.summary.onTime || 0],
+        ['LATE ENTRIES', grandTotals.late || data.summary.late || 0],
+        ['TOTAL PRESENT', grandTotals.totalPresent || data.summary.attended || 0],
+        ['LEAVES GRANTED', grandTotals.leavesGranted ?? (data.summary.approvedLeaveDays || data.summary.onLeave || 0)]
       ];
+
       kpis.forEach(([label, val], idx) => {
-        text(margin + (idx * kpiW) + 12, curY - 14, String(label), '/F2', 7.5, 0.45, 0.45, 0.45);
-        text(margin + (idx * kpiW) + 12, curY - 33, String(val), '/F2', 14, 0.067, 0.067, 0.067);
+        text(margin + (idx * kpiW) + 10, curY - 14, String(label), '/F2', 7.5, 0.45, 0.45, 0.45);
+        text(margin + (idx * kpiW) + 10, curY - 34, String(val), '/F2', 14, 0.067, 0.067, 0.067);
       });
-      curY -= 56;
+      curY -= 58;
     } else {
-      text(margin, curY, 'FALCHION XENIAA · WORKFORCE ATTENDANCE REGISTER', '/F2', 9.5, 0.576, 0.075, 0.078);
-      text(pageWidth - margin - 90, curY, dateRangeStr, '/F1', 8, 0.45, 0.45, 0.45);
+      text(margin, curY, 'FALCHION XENIAA | WORKFORCE ATTENDANCE & LEAVE SUMMARY', '/F2', 9.5, 0.576, 0.075, 0.078);
+      text(pageWidth - margin - 100, curY, dateRangeStr, '/F1', 8, 0.45, 0.45, 0.45);
       curY -= 18;
     }
 
-    // Table Column Layout
-    const cols = [
-      { name: 'EMPLOYEE NAME', w: 140 },
-      { name: 'CODE', w: 55 },
-      { name: 'DATE', w: 65 },
-      { name: 'CHECK IN', w: 60 },
-      { name: 'CHECK OUT', w: 60 },
-      { name: 'WORKED', w: 65 },
-      { name: 'STATUS', w: 78 }
-    ];
-
-    // Table Header Bar (Obsidian Charcoal)
-    rect(margin, curY - 18, contentWidth, 20, 0.067, 0.067, 0.067, true);
+    // Table Header Bar (Deep Obsidian Charcoal)
+    rect(margin, curY - 20, contentWidth, 22, 0.067, 0.067, 0.067, true);
     let colX = margin + 6;
     cols.forEach(c => {
-      text(colX, curY - 13, c.name, '/F2', 7.5, 0.855, 0.686, 0.318);
+      text(colX, curY - 14, c.name, '/F2', 7.5, 0.855, 0.686, 0.318);
       colX += c.w;
     });
-    curY -= 20;
+    curY -= 22;
 
     // Table Rows
     if (pageRecords.length === 0) {
-      rect(margin, curY - 20, contentWidth, 22, 0.98, 0.98, 0.98, true);
-      text(margin + 20, curY - 14, 'No attendance records found in the selected reporting range.', '/F1', 8.5, 0.4, 0.4, 0.4);
+      rect(margin, curY - 22, contentWidth, 24, 0.98, 0.98, 0.98, true);
+      text(margin + 20, curY - 15, 'No workforce records found in the selected reporting range.', '/F1', 8.5, 0.4, 0.4, 0.4);
+      curY -= 24;
     } else {
       pageRecords.forEach((r, idx) => {
+        const rowHeight = 22;
         const isAlt = idx % 2 === 1;
         if (isAlt) {
-          rect(margin, curY - 16, contentWidth, 18, 0.97, 0.97, 0.98, true);
+          rect(margin, curY - rowHeight + 4, contentWidth, rowHeight, 0.965, 0.965, 0.975, true);
         }
-        rect(margin, curY - 16, contentWidth, 18, 0.90, 0.90, 0.92, false);
+        rect(margin, curY - rowHeight + 4, contentWidth, rowHeight, 0.88, 0.88, 0.90, false);
 
         colX = margin + 6;
-        text(colX, curY - 11, r.full_name || '—', '/F2', 8, 0.1, 0.1, 0.1); colX += cols[0].w;
-        text(colX, curY - 11, r.employee_code || '—', '/F1', 7.5, 0.3, 0.3, 0.3); colX += cols[1].w;
-        text(colX, curY - 11, r.attendance_date || '—', '/F1', 7.5, 0.2, 0.2, 0.2); colX += cols[2].w;
-        text(colX, curY - 11, r.check_in_at || '—', '/F1', 7.5, 0.2, 0.2, 0.2); colX += cols[3].w;
-        text(colX, curY - 11, r.check_out_at || '—', '/F1', 7.5, 0.2, 0.2, 0.2); colX += cols[4].w;
-        text(colX, curY - 11, r.worked || '—', '/F1', 7.5, 0.2, 0.2, 0.2); colX += cols[5].w;
 
-        const isLate = r.status === 'LATE_ENTRY';
-        const isAbsent = r.status === 'ABSENT';
-        const statusR = isLate || isAbsent ? 0.576 : 0.08;
-        const statusG = isLate ? 0.075 : isAbsent ? 0.075 : 0.45;
-        const statusB = 0.1;
-        text(colX, curY - 11, r.status || '—', '/F2', 7.5, statusR, statusG, statusB);
-        curY -= 18;
+        // 1. Employee Name
+        text(colX, curY - 12, r.full_name || '-', '/F2', 8.5, 0.1, 0.1, 0.1);
+        colX += cols[0].w;
+
+        // 2. Code
+        text(colX, curY - 12, r.employee_code || '-', '/F1', 8, 0.35, 0.35, 0.35);
+        colX += cols[1].w;
+
+        // 3. On-time Present
+        text(colX + 16, curY - 12, String(r.onTimePresent), '/F2', 8.5, 0.08, 0.45, 0.15); // Emerald Green
+        colX += cols[2].w;
+
+        // 4. Late Present
+        text(colX + 14, curY - 12, String(r.latePresent), '/F2', 8.5, r.latePresent > 0 ? 0.65 : 0.4, 0.1, 0.1); // Warm Rose
+        colX += cols[3].w;
+
+        // 5. Total Present
+        text(colX + 20, curY - 12, String(r.totalPresent), '/F2', 9, 0.05, 0.05, 0.05); // Bold Obsidian
+        colX += cols[4].w;
+
+        // 6. Total Leaves Requested
+        text(colX + 16, curY - 12, String(r.totalLeaves), '/F1', 8.5, 0.35, 0.35, 0.35);
+        colX += cols[5].w;
+
+        // 7. Leaves Granted
+        text(colX + 18, curY - 12, String(r.leavesGranted), '/F2', 8.5, r.leavesGranted > 0 ? 0.72 : 0.35, r.leavesGranted > 0 ? 0.45 : 0.35, 0.1); // Amber / Slate
+        colX += cols[6].w;
+
+        // 8. Attendance Rate
+        const rateStr = r.attendanceRate !== undefined ? `${r.attendanceRate}%` : '-';
+        text(colX + 12, curY - 12, rateStr, '/F2', 8, 0.2, 0.2, 0.2);
+
+        curY -= rowHeight;
       });
+
+      // Add Company Totals Row on the Last Page
+      if (isLastPage) {
+        const totalsHeight = 24;
+        rect(margin, curY - totalsHeight + 4, contentWidth, totalsHeight, 0.93, 0.93, 0.94, true);
+        rect(margin, curY - totalsHeight + 4, contentWidth, totalsHeight, 0.855, 0.686, 0.318, false);
+
+        colX = margin + 6;
+        text(colX, curY - 13, `TOTALS (${finalSummaries.length} EMPLOYEES)`, '/F2', 8.5, 0.067, 0.067, 0.067);
+        colX += cols[0].w;
+
+        text(colX, curY - 13, '-', '/F1', 8, 0.5, 0.5, 0.5);
+        colX += cols[1].w;
+
+        text(colX + 16, curY - 13, String(grandTotals.onTime), '/F2', 8.5, 0.08, 0.45, 0.15);
+        colX += cols[2].w;
+
+        text(colX + 14, curY - 13, String(grandTotals.late), '/F2', 8.5, 0.65, 0.1, 0.1);
+        colX += cols[3].w;
+
+        text(colX + 20, curY - 13, String(grandTotals.totalPresent), '/F2', 9, 0.067, 0.067, 0.067);
+        colX += cols[4].w;
+
+        text(colX + 16, curY - 13, String(grandTotals.totalLeaves), '/F2', 8.5, 0.3, 0.3, 0.3);
+        colX += cols[5].w;
+
+        text(colX + 18, curY - 13, String(grandTotals.leavesGranted), '/F2', 8.5, 0.72, 0.45, 0.1);
+        colX += cols[6].w;
+
+        const overallRate = grandTotals.totalPresent + grandTotals.leavesGranted > 0 
+          ? Math.round((grandTotals.totalPresent / (grandTotals.totalPresent + grandTotals.leavesGranted)) * 100) 
+          : 0;
+        text(colX + 12, curY - 13, `${overallRate}%`, '/F2', 8.5, 0.067, 0.067, 0.067);
+
+        curY -= totalsHeight;
+      }
     }
 
     // Page Footer
     const footerY = 22;
     rect(margin, footerY + 12, contentWidth, 0.5, 0.85, 0.85, 0.85, false);
-    text(margin, footerY, 'Falchion Xeniaa HRMS · Internal Payroll & Attendance Register', '/F1', 7.5, 0.5, 0.5, 0.5);
+    text(margin, footerY, 'Falchion Xeniaa HRMS | Confidential Workforce Attendance & Leave Summary', '/F1', 7.5, 0.5, 0.5, 0.5);
     text(pageWidth - margin - 55, footerY, `Page ${p + 1} of ${numPages}`, '/F2', 7.5, 0.5, 0.5, 0.5);
 
     pages.push(stream);
   }
 
   // Construct PDF Document
-  let out = '%PDF-1.4\n%âãÏÓ\n';
+  let out = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
   const offsets: number[] = [];
 
   const addObj = (str: string) => {
@@ -182,7 +315,7 @@ export function downloadPdfReport(data: PdfReportData, filename?: string): void 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename || `falchion-attendance-${data.from}-${data.to}.pdf`;
+  a.download = filename || `falchion-attendance-summary-${data.from}-${data.to}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

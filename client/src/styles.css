@@ -7859,3 +7859,346 @@ html[data-theme="dark"] .report-filter-controls input::-webkit-calendar-picker-i
 html[data-theme="dark"] .table-scroll tr:hover td {
   background: rgba(255, 255, 255, 0.03) !important;
 }
+
+/* ==========================================================================
+   Falchion HRMS — Executive Overview & Attendance Command Suite Refinements
+   Polishes Admin Self-Attendance, Hero, Stat Grid, Pulse, and Employee Cards
+   ========================================================================== */
+
+/* 1. Admin Self-Attendance Command Card */
+.admin-self-attendance-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 28px !important;
+  align-items: stretch !important;
+  padding: 26px 30px !important;
+  margin-bottom: 22px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(218, 175, 81, 0.28) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 242, 0.88) 100%) !important;
+  box-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(218, 175, 81, 0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-card {
+  background: radial-gradient(ellipse at 15% 0%, rgba(218, 175, 81, 0.12) 0%, transparent 60%),
+              linear-gradient(135deg, #13171e 0%, #171b24 100%) !important;
+  border-color: rgba(218, 175, 81, 0.35) !important;
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+.admin-self-attendance-kicker {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--fx-gold, #DAAF51) !important;
+}
+
+.admin-self-attendance-kicker small {
+  margin-left: auto !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 4px 12px !important;
+  border-radius: 999px !important;
+  background: rgba(218, 175, 81, 0.12) !important;
+  color: var(--fx-gold, #DAAF51) !important;
+  border: 1px solid rgba(218, 175, 81, 0.25) !important;
+}
+
+.admin-self-attendance-heading {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  margin-top: 12px !important;
+}
+
+.admin-self-attendance-heading h2 {
+  margin: 0 !important;
+  font-family: var(--font-display, 'Sansation', sans-serif) !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--ui-text, #111827) !important;
+  line-height: 1.25 !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-heading h2 {
+  color: #F8F7F1 !important;
+}
+
+.admin-self-attendance-heading p {
+  margin: 7px 0 0 !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  color: var(--ui-text-muted, #64748b) !important;
+  max-width: 680px !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-heading p {
+  color: #A1A1AA !important;
+}
+
+.admin-self-attendance-status {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 32px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  border: 1px solid rgba(218, 175, 81, 0.3) !important;
+  background: rgba(218, 175, 81, 0.1) !important;
+  color: var(--fx-gold, #DAAF51) !important;
+  box-shadow: 0 2px 8px rgba(218, 175, 81, 0.15) !important;
+}
+
+.admin-self-attendance-status-in-progress {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #10B981 !important;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2) !important;
+}
+
+.admin-self-attendance-status-complete {
+  border-color: rgba(100, 116, 139, 0.3) !important;
+  background: rgba(100, 116, 139, 0.1) !important;
+  color: #64748B !important;
+}
+
+.admin-self-attendance-actions {
+  display: flex !important;
+  gap: 12px !important;
+  margin-top: 20px !important;
+  flex-wrap: wrap !important;
+}
+
+.admin-self-attendance-actions .button {
+  min-height: 44px !important;
+  padding: 0 22px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  letter-spacing: 0.02em !important;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, filter 0.18s ease !important;
+}
+
+.admin-self-attendance-actions .button.button-primary {
+  background: linear-gradient(135deg, #E6C26D 0%, #C49839 100%) !important;
+  color: #0F1218 !important;
+  border: 0 !important;
+  box-shadow: 0 4px 16px rgba(218, 175, 81, 0.4) !important;
+}
+
+.admin-self-attendance-actions .button.button-primary:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 8px 24px rgba(218, 175, 81, 0.55) !important;
+  filter: brightness(1.05) !important;
+}
+
+.admin-self-attendance-actions .button.button-soft {
+  background: rgba(255, 255, 255, 0.75) !important;
+  color: var(--ui-text, #334155) !important;
+  border: 1px solid var(--ui-border, rgba(0, 0, 0, 0.12)) !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-actions .button.button-soft {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #E4E4E7 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.admin-self-attendance-actions .button.button-soft:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  border-color: rgba(218, 175, 81, 0.45) !important;
+  color: var(--fx-gold, #DAAF51) !important;
+}
+
+.admin-self-attendance-facts {
+  min-width: 260px !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 2px !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: rgba(218, 175, 81, 0.2) !important;
+  border: 1px solid rgba(218, 175, 81, 0.25) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03) !important;
+}
+
+.admin-self-attendance-facts > div {
+  min-height: 84px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 14px 16px !important;
+  background: #FFFFFF !important;
+  transition: background 0.18s ease !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-facts > div {
+  background: #151922 !important;
+}
+
+.admin-self-attendance-facts span {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--ui-text-muted, #71717A) !important;
+}
+
+.admin-self-attendance-facts b {
+  font-family: var(--font-display, 'Sansation', sans-serif) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--ui-text, #18181B) !important;
+  font-feature-settings: 'tnum' 1 !important;
+}
+
+html[data-theme="dark"] .admin-self-attendance-facts b {
+  color: #F4F4F5 !important;
+}
+
+.attendance-progress {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 14px !important;
+  border-radius: 8px !important;
+  background: rgba(218, 175, 81, 0.12) !important;
+  color: var(--fx-gold, #DAAF51) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-top: 10px !important;
+  border: 1px solid rgba(218, 175, 81, 0.25) !important;
+}
+
+/* 2. Employee Overview Attendance Card Polish */
+.overview-attendance-card {
+  border-radius: 20px !important;
+  border: 1px solid rgba(218, 175, 81, 0.28) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 242, 0.9) 100%) !important;
+  box-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(218, 175, 81, 0.12) !important;
+}
+
+html[data-theme="dark"] .overview-attendance-card {
+  background: radial-gradient(ellipse at 15% 0%, rgba(218, 175, 81, 0.1) 0%, transparent 60%),
+              linear-gradient(135deg, #13171e 0%, #171b24 100%) !important;
+  border-color: rgba(218, 175, 81, 0.35) !important;
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.5) !important;
+}
+
+.overview-attendance-action .button {
+  min-height: 44px !important;
+  padding: 0 22px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  letter-spacing: 0.02em !important;
+  background: linear-gradient(135deg, #E6C26D 0%, #C49839 100%) !important;
+  color: #0F1218 !important;
+  border: 0 !important;
+  box-shadow: 0 4px 16px rgba(218, 175, 81, 0.4) !important;
+}
+
+.overview-attendance-action .button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 8px 24px rgba(218, 175, 81, 0.55) !important;
+  filter: brightness(1.05) !important;
+}
+
+/* 3. Pulsing Ambient Live Indicators */
+.pulse-dot {
+  display: inline-block !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: var(--fx-gold, #DAAF51) !important;
+  box-shadow: 0 0 0 3px rgba(218, 175, 81, 0.25), 0 0 10px rgba(218, 175, 81, 0.5) !important;
+  animation: pulseGlow 2s infinite ease-in-out !important;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.85; }
+}
+
+/* 4. Stat Grid & Overview Cards Glass Polish */
+.admin-overview-page .stat-card {
+  border-radius: 18px !important;
+  box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.04) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.admin-overview-page .stat-card:hover {
+  border-color: rgba(218, 175, 81, 0.55) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 28px -6px rgba(218, 175, 81, 0.22) !important;
+}
+
+.admin-overview-page .stat-icon {
+  width: 42px !important;
+  height: 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.admin-overview-page .stat-icon.stat-blue {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #3B82F6 !important;
+}
+
+.admin-overview-page .stat-icon.stat-green {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #10B981 !important;
+}
+
+.admin-overview-page .stat-icon.stat-gold {
+  background: rgba(218, 175, 81, 0.14) !important;
+  color: #D4A037 !important;
+}
+
+.admin-overview-page .stat-icon.stat-rose {
+  background: rgba(244, 63, 94, 0.12) !important;
+  color: #F43F5E !important;
+}
+
+@media (max-width: 900px) {
+  .admin-self-attendance-card {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+  .admin-self-attendance-facts {
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-self-attendance-card {
+    padding: 20px !important;
+  }
+  .admin-self-attendance-heading {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .admin-self-attendance-actions {
+    flex-direction: column !important;
+  }
+  .admin-self-attendance-actions .button {
+    width: 100% !important;
+  }
+}

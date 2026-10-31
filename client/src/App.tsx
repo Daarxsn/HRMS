@@ -925,21 +925,22 @@ function EmployeeHome(){
 }
 
 function AdminSelfAttendanceCard(){
-  const {notify}=useApp();
-  const [row,setRow]=useState(null);
-  const [holiday,setHoliday]=useState(null);
+  const {user,notify}=useApp();
+  const [row,setRow]=useState<any>(null);
+  const [holiday,setHoliday]=useState<any>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [attendanceProgress,setAttendanceProgress]=useState('');
   const [time,setTime]=useState(new Date());
+  const remoteCheckInAvailable = Boolean(user?.wfh_enabled);
   const load=async()=>{
     setLoading(true);setError('');
     try{
       const [attendance,calendar]=await Promise.all([get(`/attendance?from=${today}&to=${today}`),get(`/calendar?year=${today.slice(0,4)}`)]);
       setRow(attendance.records?.[0]||null);
-      setHoliday((calendar.holidays||[]).find((item)=>item.date===today&&item.kind==='FIXED')||null);
-    }catch(e){setError(e.message);}finally{setLoading(false);}
+      setHoliday((calendar.holidays||[]).find((item:any)=>item.date===today&&item.kind==='FIXED')||null);
+    }catch(e:any){setError(e.message);}finally{setLoading(false);}
   };
   useEffect(()=>{
     const refreshWhenVisible=()=>{if(document.visibilityState==='visible')load();};
@@ -949,7 +950,7 @@ function AdminSelfAttendanceCard(){
     document.addEventListener('visibilitychange',refreshWhenVisible);
     return()=>{window.clearInterval(timer);window.clearInterval(clock);document.removeEventListener('visibilitychange',refreshWhenVisible);};
   },[]);
-  const getLocation=()=>new Promise((resolve,reject)=>{
+  const getLocation=()=>new Promise<{latitude:number;longitude:number;accuracy:number}>((resolve,reject)=>{
     if(!navigator.geolocation){reject(new Error('Location is not available in this browser.'));return;}
     navigator.geolocation.getCurrentPosition(
       ({coords})=>resolve({latitude:coords.latitude,longitude:coords.longitude,accuracy:coords.accuracy}),
@@ -957,38 +958,46 @@ function AdminSelfAttendanceCard(){
       {enableHighAccuracy:true,timeout:5000,maximumAge:0}
     );
   });
-  const punch=async(type)=>{
-    setBusy(true);setError('');setAttendanceProgress('Requesting an accurate location (up to 5 seconds)…');
+  const punch=async(type:'check-in'|'check-out',workLocationOverride?:string)=>{
+    setBusy(true);setError('');
     try{
-      let geo={};let method=type==='check-out'&&row?.check_in_method==='WFH'?'WFH':'GPS';
+      let geo:any={};
+      let method=type==='check-out'
+        ?(row?.check_in_method==='WFH'?'WFH':'GPS')
+        :(remoteCheckInAvailable&&workLocationOverride!=='OFFICE'?'WFH':'GPS');
       if(method==='GPS'){
+        setAttendanceProgress('Requesting an accurate location (up to 5 seconds)…');
         try{geo=await getLocation();}
-        catch(locationError){method=type==='check-out'?'OFF_PREMISES':'WIFI';setAttendanceProgress(type==='check-out'?'GPS unavailable; saving off-premises check-out…':'GPS unavailable; checking the approved office Wi-Fi…');}
+        catch(locationError){
+          method=type==='check-out'?'OFF_PREMISES':'WIFI';
+          setAttendanceProgress(type==='check-out'?'GPS unavailable; saving off-premises check-out…':'GPS unavailable; checking the approved office Wi-Fi…');
+        }
       }
       if(method==='WIFI')setAttendanceProgress('Verifying the approved office network…');
       setAttendanceProgress('Saving attendance and audit record…');
-      const result=await post(`/attendance/${type}`,{method,...geo});
+      const result=await post(`/attendance/${type}`,{method,...(type==='check-in'&&workLocationOverride==='OFFICE'?{workLocation:'OFFICE'}:{}),...geo});
       await load();
-      const message=method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':method==='OFF_PREMISES'?'Off-premises check-out recorded.':type==='check-in'?'Your administrator check-in is recorded.':'Your administrator check-out is recorded.';
+      const message=method==='WIFI'?'Attendance recorded using approved office Wi-Fi.':method==='OFF_PREMISES'?'Off-premises check-out recorded.':type==='check-in'?(method==='WFH'?'Remote check-in recorded.':'Your administrator check-in is recorded.'):(method==='WFH'?'Remote check-out recorded.':'Your administrator check-out is recorded.');
       notify(result?.shortShiftReviewRequired?message+' This was a short shift and has been flagged for review.':message);
-    }catch(e){setError(e.message);}finally{setBusy(false);setAttendanceProgress('');}
+    }catch(e:any){setError(e.message);}finally{setBusy(false);setAttendanceProgress('');}
   };
   const state=holiday
     ? {label:'Holiday',title:holiday.name||'Office holiday',body:'Attendance is not expected today.'}
     : row?.check_in_at
       ? row.check_out_at
         ? {label:'Complete',title:'Your workday is complete.',body:`Checked in at ${formatTime(row.check_in_at)} · checked out at ${formatTime(row.check_out_at)}.`}
-        : {label:'In progress',title:`Checked in at ${formatTime(row.check_in_at)}.`,body:'Your workday is underway. Check out when you leave the office.'}
-      : {label:'Ready',title:'Ready to start your workday.',body:'Check in when you arrive at the Pune office. GPS check-in requires office geofencing and the approved office network; if GPS is inaccurate, the approved office network can verify the check-in.'};
+        : {label:'In progress',title:`Checked in at ${formatTime(row.check_in_at)}.`,body:row.check_in_method==='WFH'?'Your remote workday is underway. Check out when you finish.':'Your workday is underway. Check out when you leave the office.'}
+      : {label:'Ready',title:remoteCheckInAvailable?'WFH enabled · ready to check in.':'Ready to start your workday.',body:remoteCheckInAvailable?'Remote check-in is enabled for your account. You can check in directly without office geofencing.':'Check in when you arrive at the Pune office. GPS check-in requires office geofencing and the approved office network; if GPS is inaccurate, the approved office network can verify the check-in.'};
   return <Card className="admin-self-attendance-card">
     <div className="admin-self-attendance-copy">
       <div className="admin-self-attendance-kicker"><span className="pulse-dot"/><span>YOUR ATTENDANCE</span><small>{new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(time)} IST</small></div>
       <div className="admin-self-attendance-heading"><div><h2>{state.title}</h2><p>{state.body}</p></div><span className={`admin-self-attendance-status admin-self-attendance-status-${state.label.toLowerCase().replaceAll(' ','-')}`}>{state.label}</span></div>
       {attendanceProgress&&<small className="attendance-progress" role="status" aria-live="polite">{attendanceProgress}</small>}{error&&<div className="admin-self-attendance-error"><CircleAlert size={15}/>{error}<button type="button" className="text-button" onClick={load}>Retry</button></div>}
       {!holiday&&<div className="admin-self-attendance-actions">
-        <Button variant={row?.check_in_at?'soft':'primary'} onClick={()=>punch('check-in')} loading={busy} disabled={loading||Boolean(row?.check_in_at)} icon={LogIn}>Check in</Button>
+        <Button variant={row?.check_in_at?'soft':'primary'} onClick={()=>punch('check-in')} loading={busy} disabled={loading||Boolean(row?.check_in_at)} icon={LogIn}>{remoteCheckInAvailable?'Check in remotely':'Check in'}</Button>
         <Button variant={row?.check_in_at&&!row?.check_out_at?'primary':'soft'} onClick={()=>punch('check-out')} loading={busy} disabled={loading||!row?.check_in_at||Boolean(row?.check_out_at)} icon={LogOut}>Check out</Button>
       </div>}
+      {!holiday&&!row?.check_in_at&&remoteCheckInAvailable&&<button type="button" className="text-link attendance-office-alternative" onClick={()=>punch('check-in','OFFICE')} disabled={busy}>At the office? Check in with office verification</button>}
       {holiday&&<div className="admin-self-attendance-holiday"><CalendarDays size={15}/><span>Today is a scheduled company holiday.</span></div>}
     </div>
     <div className="admin-self-attendance-facts">
@@ -2612,7 +2621,7 @@ function ReportsPage(){
   const load=async()=>{const requestId=++reportsRequest.current;if(from>to){setError('The start date must be on or before the end date.');setLoading(false);return;}setLoading(true);setError('');const results=await Promise.allSettled([get(`/admin/attendance?from=${from}&to=${to}`),get(`/admin/leave-report?from=${from}&to=${to}`)]);if(requestId!==reportsRequest.current)return;const [attendance,leave]=results;const unavailable=[];if(attendance.status==='fulfilled'){setRows(Array.isArray(attendance.value.records)?attendance.value.records:[]);setAttendanceReportLoaded(true);}else unavailable.push('attendance report');if(leave.status==='fulfilled'){setLeaveReport(leave.value);setLeaveReportLoaded(true);}else unavailable.push('leave report');setError(unavailable.length?`Could not refresh the ${unavailable.join(' and ')}. Previously loaded data is retained; retry after checking the date range.`:'');setLoading(false);};
   useEffect(()=>{void load();return()=>{reportsRequest.current+=1;};},[]);
   const attended=rows.filter((r)=>r.status==='ON_TIME'||r.status==='LATE_ENTRY');const onTime=rows.filter((r)=>r.status==='ON_TIME').length;const late=rows.filter((r)=>r.status==='LATE_ENTRY').length;const absent=rows.filter((r)=>r.status==='ABSENT').length;const onLeave=rows.filter((r)=>r.status==='ON_LEAVE').length;const wfh=rows.filter((r)=>r.status==='WFH').length;const open=attended.filter((r)=>!r.check_out_at).length;const leaveSummary=leaveReport.summary||{}; const reportAttendanceRate=rows.length?Math.round((attended.length/rows.length)*100):0;const reportOnTimeRate=attended.length?Math.round((onTime/attended.length)*100):0; const trendDates=[...new Set(rows.map((r)=>String(r.attendance_date||'')).filter(Boolean))].sort().slice(-14);const attendanceTrend=trendDates.map((date)=>{const dayRows=rows.filter((r)=>r.attendance_date===date);const presentDay=dayRows.filter((r)=>['ON_TIME','LATE_ENTRY'].includes(r.status)).length;return {date,rate:dayRows.length?Math.round((presentDay/dayRows.length)*100):0,present:presentDay,total:dayRows.length};});
-  const download=async()=>{if(exporting||loading)return false;setExporting(true);setError('');try{if(from>to)throw new Error('The start date must be on or before the end date.');const formattedRows=rows.map((r:any)=>({full_name:r.full_name||'Unknown',employee_code:r.employee_code||'—',attendance_date:formatDate(r.attendance_date,{day:'numeric',month:'short',year:'2-digit'}),check_in_at:formatTime(r.check_in_at),check_out_at:formatTime(r.check_out_at),worked:r.check_out_at?formatMinutes(Math.max(0,Math.round((new Date(r.check_out_at).getTime()-new Date(r.check_in_at).getTime())/60000)-30)):(r.check_in_at?'In progress':'—'),status:r.status||'—'}));downloadPdfReport({title:'Falchion HRMS · Attendance & Compliance Report',from,to,generatedAt:new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',dateStyle:'medium',timeStyle:'short'}),summary:{attended:attended.length,onTime,late,open,absent,onLeave,wfh,total:rows.length},rows:formattedRows},`falchion-attendance-${from}-${to}.pdf`);return true;}catch(e:any){setError(e.message||'The report export could not be prepared.');return false;}finally{setExporting(false);}};
+  const download=async()=>{if(exporting||loading)return false;setExporting(true);setError('');try{if(from>to)throw new Error('The start date must be on or before the end date.');const empMap=new Map<string,any>();for(const r of rows as any[]){const key=(r.employee_code||r.full_name||'UNKNOWN').trim();if(!empMap.has(key)){empMap.set(key,{full_name:r.full_name||'Unknown',employee_code:r.employee_code||'—',onTimePresent:0,latePresent:0,totalPresent:0,totalLeaves:0,leavesGranted:0,wfhDays:0,absentDays:0,totalWorkdays:0});}const item=empMap.get(key)!;item.totalWorkdays+=1;if(r.status==='ON_TIME'){item.onTimePresent+=1;item.totalPresent+=1;}else if(r.status==='LATE_ENTRY'){item.latePresent+=1;item.totalPresent+=1;}else if(r.status==='WFH'){item.wfhDays+=1;item.totalPresent+=1;}else if(r.status==='ABSENT'){item.absentDays+=1;}}if(Array.isArray(leaveReport.requests)){for(const lr of (leaveReport.requests as any[])){const key=(lr.employee_code||lr.full_name||'UNKNOWN').trim();if(!empMap.has(key)){empMap.set(key,{full_name:lr.full_name||'Unknown',employee_code:lr.employee_code||'—',onTimePresent:0,latePresent:0,totalPresent:0,totalLeaves:0,leavesGranted:0,wfhDays:0,absentDays:0,totalWorkdays:0});}const item=empMap.get(key)!;const days=Number(lr.days)||1;item.totalLeaves+=days;if(lr.status==='APPROVED'){item.leavesGranted+=days;}}}const employeeSummaries=Array.from(empMap.values()).sort((a,b)=>a.full_name.localeCompare(b.full_name)).map(emp=>({...emp,attendanceRate:emp.totalWorkdays>0?Math.round((emp.totalPresent/emp.totalWorkdays)*100):100}));const formattedRows=rows.map((r:any)=>({full_name:r.full_name||'Unknown',employee_code:r.employee_code||'—',attendance_date:formatDate(r.attendance_date,{day:'numeric',month:'short',year:'2-digit'}),check_in_at:formatTime(r.check_in_at),check_out_at:formatTime(r.check_out_at),worked:r.check_out_at?formatMinutes(Math.max(0,Math.round((new Date(r.check_out_at).getTime()-new Date(r.check_in_at).getTime())/60000)-30)):(r.check_in_at?'In progress':'—'),status:r.status||'—'}));downloadPdfReport({title:'Falchion HRMS · Attendance & Compliance Report',from,to,generatedAt:new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',dateStyle:'medium',timeStyle:'short'}),summary:{attended:attended.length,onTime,late,open,absent,onLeave,wfh,total:rows.length,employeesCount:employeeSummaries.length,approvedLeaveDays:leaveSummary.approvedDays||0},employeeSummaries,rows:formattedRows},`falchion-attendance-summary-${from}-${to}.pdf`);return true;}catch(e:any){setError(e.message||'The report export could not be prepared.');return false;}finally{setExporting(false);}};
   return <><PageTitle eyebrow="CLEAR RECORDS, USEFUL CONTEXT" title="Reports" description="Attendance and leave reporting for administrators." action={<Button icon={Download} onClick={()=>setExportOpen(true)} disabled={loading||!attendanceReportLoaded||!leaveReportLoaded}>Export report</Button>}/>{error&&<div className="admin-page-error" role="alert"><CircleAlert size={16}/><span>{error}</span><button type="button" className="button button-soft button-small" onClick={()=>void load()} disabled={loading}>Retry report</button></div>}
     <Card className="report-filter-card"><div className="report-filter-copy"><span className="report-filter-icon"><Activity size={18}/></span><div><b>Reporting period</b><small>Attendance and leave · private to administrators</small></div></div><div className="report-filter-controls"><label><span>FROM</span><input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label><ArrowRight size={15}/><label><span>TO</span><input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label><Button size="small" variant="soft" icon={Filter} onClick={load}>Apply</Button></div></Card>
     <div className="report-executive-strip"><div><span className="eyebrow">ATTENDANCE RATE</span><b>{loading||!attendanceReportLoaded?'—':reportAttendanceRate+'%'}</b><small>of records present</small></div><div><span className="eyebrow">ON-TIME RATE</span><b>{loading||!attendanceReportLoaded?'—':reportOnTimeRate+'%'}</b><small>of attended days</small></div><div><span className="eyebrow">OPEN SHIFTS</span><b>{loading||!attendanceReportLoaded?'—':open}</b><small>still in progress</small></div><div><span className="eyebrow">LEAVE DAYS</span><b>{loading||!leaveReportLoaded?'—':leaveSummary.approvedDays||0}</b><small>approved in range</small></div></div>
