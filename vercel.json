@@ -37,16 +37,16 @@
       }
     },
     {
-      "source": "/((?!api/|assets/|.*\\.[a-zA-Z0-9]+).*)",
+      "source": "/(falchion-.*|login-.*|manifest\\.webmanifest|pwa-icon\\.svg|sw\\.js|favicon\\.ico|robots\\.txt)",
       "destination": {
-        "service": "frontend",
-        "path": "/index.html"
+        "service": "frontend"
       }
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": {
-        "service": "frontend"
+        "service": "frontend",
+        "path": "/index.html"
       }
     }
   ]

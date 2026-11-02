@@ -20,11 +20,18 @@ import enterpriseRoutes from './routes/enterprise.mts';
 import { getObjectStorageReadiness } from './object-storage.mts';
 import { assertProductionConfiguration } from './production-config.mts';
 import emailOutboxRoutes from './email-outbox-routes.mts';
+import { runAutoMigrations } from './auto-migrate.mts';
 
 const app = express();
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 const BUILD_SHA = process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || (process.env.NODE_ENV === 'production' ? 'production-unversioned' : 'development');
 const startedAt = Date.now();
+
+if (process.env.NODE_ENV !== 'test') {
+  runAutoMigrations().catch((err) => {
+    console.warn(JSON.stringify({ type: 'auto_migration_background_error', error: String(err?.message || err) }));
+  });
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

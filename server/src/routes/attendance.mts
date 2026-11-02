@@ -278,17 +278,33 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     const workedMinutes = Math.max(0, elapsedMinutes - lunchMinutes);
     // Flag only shifts shorter than the configured lunch deduction; this avoids inventing a new minimum-shift policy.
     const shortShiftReviewRequired = elapsedMinutes < lunchMinutes;
-    const [bpass]: any = await connection.execute(
-      `SELECT id, status FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1 FOR UPDATE`,
-      { employee: req.user.id, today }
-    );
-    const birthdayPassApplied = Boolean(bpass[0]);
-    if (bpass[0] && bpass[0].status === 'AVAILABLE') {
-      await connection.execute(`UPDATE birthday_passes SET status='CLAIMED', claimed_at=UTC_TIMESTAMP() WHERE id=:id`, { id: bpass[0].id });
+    let birthdayPassApplied = false;
+    try {
+      const [bpass]: any = await connection.execute(
+        `SELECT id, status FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1 FOR UPDATE`,
+        { employee: req.user.id, today }
+      );
+      birthdayPassApplied = Boolean(bpass?.[0]);
+      if (bpass?.[0] && bpass[0].status === 'AVAILABLE') {
+        await connection.execute(`UPDATE birthday_passes SET status='CLAIMED', claimed_at=UTC_TIMESTAMP() WHERE id=:id`, { id: bpass[0].id });
+      }
+    } catch (bpassErr: any) {
+      console.warn('Birthday pass check skipped during check-out:', String(bpassErr?.message || bpassErr));
     }
-    await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
-      id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
-    });
+    try {
+      await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
+        id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
+      });
+    } catch (methodErr: any) {
+      if (methodErr?.code === 'ER_WARN_DATA_TRUNCATED' || methodErr?.errno === 1265) {
+        const fallbackMethod = rows[0].check_in_method === 'WFH' ? 'WFH' : 'GPS';
+        await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
+          id:rows[0].id, method:fallbackMethod, lat:fallbackMethod==='GPS'?input.latitude:null, lon:fallbackMethod==='GPS'?input.longitude:null, accuracy:fallbackMethod==='GPS'?input.accuracy:null
+        });
+      } else {
+        throw methodErr;
+      }
+    }
     const details = {
       method,date:String(rows[0].attendance_date).slice(0,10),
       distance_m:distance===null?null:Math.round(distance),

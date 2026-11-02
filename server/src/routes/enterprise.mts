@@ -470,14 +470,19 @@ router.get('/birthday-pass', asyncRoute(async(req,res)=>{
     return res.json({ isBirthday: false, pass: null });
   }
 
-  const [existing] = await query('SELECT id, pass_date, status, claimed_at FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1', { employee: req.user.id, today });
-  if (existing) {
-    return res.json({ isBirthday: true, pass: { ...existing, hours_early: 2 } });
-  }
+  try {
+    const [existing] = await query('SELECT id, pass_date, status, claimed_at FROM birthday_passes WHERE employee_id=:employee AND pass_date=:today LIMIT 1', { employee: req.user.id, today });
+    if (existing) {
+      return res.json({ isBirthday: true, pass: { ...existing, hours_early: 2 } });
+    }
 
-  const passId = crypto.randomUUID();
-  await query('INSERT IGNORE INTO birthday_passes (id, employee_id, pass_date, status) VALUES (:id, :employee, :today, \'AVAILABLE\')', { id: passId, employee: req.user.id, today });
-  res.json({ isBirthday: true, pass: { id: passId, pass_date: today, status: 'AVAILABLE', hours_early: 2, claimed_at: null } });
+    const passId = crypto.randomUUID();
+    await query('INSERT IGNORE INTO birthday_passes (id, employee_id, pass_date, status) VALUES (:id, :employee, :today, \'AVAILABLE\')', { id: passId, employee: req.user.id, today });
+    res.json({ isBirthday: true, pass: { id: passId, pass_date: today, status: 'AVAILABLE', hours_early: 2, claimed_at: null } });
+  } catch (err: any) {
+    console.warn('Birthday pass check skipped:', String(err?.message || err));
+    res.json({ isBirthday: true, pass: null });
+  }
 }));
 
 router.post('/birthday-pass/claim', asyncRoute(async(req,res)=>{
