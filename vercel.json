@@ -31,64 +31,9 @@
       }
     },
     {
-      "source": "/assets/(.*)",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/sw.js",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/manifest.webmanifest",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/pwa-icon.svg",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/falchion-xeniaa-mark.svg",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/falchion-xeniaa-horizontal.svg",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/login-architectural-scene.svg",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/login-architectural-scene.webp",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": {
-        "service": "frontend"
-      }
-    },
-    {
       "source": "/(.*)",
       "destination": {
-        "service": "frontend",
-        "path": "/index.html"
+        "service": "frontend"
       }
     }
   ]
