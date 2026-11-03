@@ -225,7 +225,7 @@ function LoginScreen() {
         <p className="login-lede">Sign in with your Google account to access Falchion Xeniaa HRMS.</p>
         <div className="login-auth-card">
           <div className="login-auth-card-heading"><span className="login-google-g">G</span><span><b>Continue with Google</b><small>Use your authorised work account</small></span><ShieldCheck size={17} className="login-auth-shield"/></div>
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
+          {((typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env?.VITE_GOOGLE_CLIENT_ID)) || (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_GOOGLE_CLIENT_ID))?<div className="google-login-wrap">{busy?<div className="google-loading"><Spinner/> Verifying your account…</div>:<GoogleLogin onSuccess={(r)=>r.credential?signIn(r.credential):(setBusy(false),setError('Google did not return a sign-in credential. Please try again.'))} onError={()=>{setBusy(false);setError('Google sign-in could not start. Please try again.')}} size="large" shape="rectangular" theme="outline" text="continue_with" width="320"/>}</div>:<div className="setup-note"><ShieldCheck size={18}/><span>Google Sign-In becomes available after an administrator adds OAuth client details in the deployment settings.</span></div>}
           {error&&<div className="inline-alert alert-error"><CircleAlert size={17}/>{error}</div>}
           <label className="login-remember-toggle" style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',margin:'14px 0 8px',fontSize:'13px',color:'rgba(242, 241, 235, 0.85)',userSelect:'none'}}>
             <input
@@ -307,7 +307,7 @@ function PageSkeletonLoader() {
   );
 }
 
-function Shell(){
+function Shell({ children }: { children?: React.ReactNode } = {}){
   const {user,setUser,notifications,refreshNotifications,theme,setTheme}=useApp();
   const [mobileOpen,setMobileOpen]=useState(false);
   const [bellOpen,setBellOpen]=useState(false);
@@ -663,10 +663,10 @@ function Shell(){
           </Link>
         </div>
       </header>
-      <div className="page-wrap"><Suspense fallback={<PageSkeletonLoader/>}><Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
+      <div className="page-wrap"><Suspense fallback={<PageSkeletonLoader/>}>{children || <Routes><Route path="/" element={isAdmin?<Navigate to="/admin" replace/>:<EmployeeHome/>}/>
         <Route path="/admin" element={isAdmin?<AdminHome/>:<NoAccess/>}/><Route path="/attendance" element={<AttendancePage/>}/><Route path="/leave" element={<LeavePage/>}/><Route path="/wfh" element={<WfhPage/>}/><Route path="/out" element={<OutPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/admin/calendar" element={isAdmin?<CalendarPage/>:<NoAccess/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/documents" element={<EmployeeDocumentsPage/>}/><Route path="/policies" element={<EmployeePoliciesPage/>}/><Route path="/grievance" element={<GrievancePage/>}/>
         <Route path="/admin/team" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/team/:id" element={isAdmin?<TeamPage/>:<NoAccess/>}/><Route path="/admin/attendance" element={isAdmin?<AdminAttendancePage/>:<NoAccess/>}/><Route path="/admin/approvals" element={isAdmin?<ApprovalsPage/>:<NoAccess/>}/><Route path="/admin/reports" element={isAdmin?<ReportsPage/>:<NoAccess/>}/><Route path="/admin/settings" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('office_settings'))?<SettingsPage/>:<NoAccess/>}/><Route path="/admin/hr" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/hr/:subTab" element={isAdmin?<EnterpriseHRPage/>:<NoAccess/>}/><Route path="/admin/audit" element={isAdmin&&(isSuperAdmin||user.capabilities?.includes('audit_trail'))?<AuditPage/>:<NoAccess/>}/>
-        <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<NotFoundPage isAdmin={isAdmin}/>}/></Routes></Suspense></div>
+        <Route path="/team" element={<Navigate to="/admin/team" replace/>}/><Route path="/admin-attendance" element={<Navigate to="/admin/attendance" replace/>}/><Route path="/approvals" element={<Navigate to="/admin/approvals" replace/>}/><Route path="/reports" element={<Navigate to="/admin/reports" replace/>}/><Route path="/settings" element={<Navigate to="/admin/settings" replace/>}/><Route path="/audit" element={<Navigate to="/admin/audit" replace/>}/><Route path="*" element={<NotFoundPage isAdmin={isAdmin}/>}/></Routes>}</Suspense></div>
       <footer className="app-footer"><span>Falchion Xeniaa · People portal</span><span>Built on trust <span className="footer-dot">·</span> {new Date().getFullYear()}</span></footer>
       <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{(isAdmin?[['/admin','Overview',Gauge],['/admin/attendance','Attendance',Clock3],['/admin/approvals','Requests',ClipboardCheck],['/admin/team','People',Users],['/profile','Profile',CircleUserRound]]:[['/','Home',House],['/attendance','Attendance',Fingerprint],['/leave','Leave',CalendarDays],['/notifications','Alerts',Bell],['/profile','Profile',CircleUserRound]]).map(([to,label,Icon])=><NavLink key={to} to={to} end={to==='/'||to==='/admin'} className={({isActive})=>`mobile-bottom-item${isActive?' active':''}`}><Icon size={18}/><span>{label}</span>{((to==='/notifications'||to==='/admin/approvals')&&notifications.unread>0)&&<i>{notifications.unread>9?'9+':notifications.unread}</i>}</NavLink>)}</nav>
       {commandOpen&&<CommandPalette close={()=>setCommandOpen(false)} theme={theme} setTheme={setTheme} isAdmin={isAdmin}/>} 
@@ -2777,5 +2777,32 @@ function AuditPage(){
   </>;
 }
 
+
+export {
+  Shell,
+  EmployeeHome,
+  AdminHome,
+  AttendancePage,
+  LeavePage,
+  WfhPage,
+  OutPage,
+  CalendarPage,
+  ProfilePage,
+  NotificationsPage,
+  ApprovalsPage,
+  ReportsPage,
+  SettingsPage,
+  AuditPage,
+  TeamPage,
+  AdminAttendancePage,
+  NotFoundPage,
+  AppContext,
+  useApp,
+  LoginScreen,
+  IconLogo,
+  Toast,
+  PageSkeletonLoader,
+  AppErrorBoundary
+};
 
 export default App;

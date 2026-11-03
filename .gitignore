@@ -1,6 +1,8 @@
 node_modules/
 .env
 client/dist/
+client/.next/
+*.tsbuildinfo
 server/private-uploads/*
 !server/private-uploads/.gitkeep
 *.log

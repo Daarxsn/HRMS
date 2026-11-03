@@ -44,9 +44,21 @@ const config = {
 
 if(production&&(!process.env.DB_NAME||!process.env.DB_USER||!process.env.DB_PASSWORD))throw new Error('DB_NAME, DB_USER and DB_PASSWORD are required in production.');
 
+function sanitizeParams(values: any): any {
+  if (!values || typeof values !== 'object') return values;
+  if (Array.isArray(values)) {
+    return values.map(v => v === undefined ? null : v);
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [k, v] of Object.entries(values)) {
+    sanitized[k] = v === undefined ? null : v;
+  }
+  return sanitized;
+}
+
 export const pool = mysql.createPool(config);
 export const query = async (sql: string, values: any = {}): Promise<any> => {
-  const [rows] = await pool.execute(sql, values);
+  const [rows] = await pool.execute(sql, sanitizeParams(values));
   return rows;
 };
 const transactionRetries = Number(process.env.DB_TRANSACTION_RETRIES || 2);
@@ -75,6 +87,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const transaction = async (fn: (connection: any) => Promise<any>): Promise<any> => {
   for (let attempt = 0; attempt <= transactionRetries; attempt += 1) {
     const connection = await pool.getConnection();
+    const origExecute = connection.execute.bind(connection);
+    connection.execute = (sql: any, values: any) => origExecute(sql, sanitizeParams(values));
     let inTransaction = false;
     try {
       await connection.beginTransaction();

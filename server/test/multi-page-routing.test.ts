@@ -76,7 +76,47 @@ test('Frontend route persistence and 404 page architecture contracts', () => {
   assert.match(viteConfig, /vendor-react/);
   assert.match(viteConfig, /vendor-icons/);
   assert.match(vercelJson, /"service":\s*"frontend"/);
+  assert.match(vercelJson, /"framework":\s*"nextjs"/);
   assert.match(clientVercelJson, /"destination":\s*"\/index\.html"/);
+});
+
+test('Next.js multi-page App Router architecture and route contracts', () => {
+  const nextConfig = fs.readFileSync(path.resolve(__dirname, '../../client/next.config.mjs'), 'utf8');
+  assert.match(nextConfig, /turbopack/);
+  assert.match(nextConfig, /router-bridge/);
+  assert.match(nextConfig, /destination:\s*process\.env\.NODE_ENV === 'development'/);
+
+  const appDir = path.resolve(__dirname, '../../client/app');
+  const requiredNextPages = [
+    'page.tsx',
+    'layout.tsx',
+    'providers.tsx',
+    'not-found.tsx',
+    'attendance/page.tsx',
+    'leave/page.tsx',
+    'wfh/page.tsx',
+    'out/page.tsx',
+    'calendar/page.tsx',
+    'profile/page.tsx',
+    'notifications/page.tsx',
+    'documents/page.tsx',
+    'policies/page.tsx',
+    'grievance/page.tsx',
+    'admin/page.tsx',
+    'admin/attendance/page.tsx',
+    'admin/approvals/page.tsx',
+    'admin/reports/page.tsx',
+    'admin/settings/page.tsx',
+    'admin/hr/page.tsx',
+    'admin/audit/page.tsx',
+    'admin/team/page.tsx',
+    'admin/calendar/page.tsx'
+  ];
+
+  for (const pageRel of requiredNextPages) {
+    const fullPath = path.join(appDir, pageRel);
+    assert.ok(fs.existsSync(fullPath), `Missing Next.js multi-page route: ${pageRel}`);
+  }
 });
 
 test.after(async () => {

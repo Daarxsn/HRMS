@@ -1,7 +1,21 @@
 export interface RequestOptions extends RequestInit {}
 export interface ApiError extends Error { status?: number; requestId?: string | null; code?: string }
 
-export const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+const getEnvApiUrl = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || '';
+    }
+  } catch {}
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      return (import.meta as any).env.VITE_API_URL || '';
+    }
+  } catch {}
+  return '';
+};
+
+export const apiBase = (getEnvApiUrl() || '/api').replace(/\/$/, '');
 export const assetUrl = (path: string) => `${apiBase}${path.startsWith('/') ? path : `/${path}`}`;
 
 export async function request(path: string, options: RequestOptions = {}): Promise<any> {

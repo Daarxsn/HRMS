@@ -176,8 +176,8 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
 
     await connection.execute(`INSERT INTO attendance_records (id, employee_id, attendance_date, check_in_at, check_in_method, check_in_latitude, check_in_longitude, check_in_accuracy_m, check_in_distance_m, status, approved_start_time)
       VALUES (:id, :employee, :date, UTC_TIMESTAMP(), :method, :lat, :lon, :accuracy, :distance, :status, :approvedStart)`, {
-      id, employee: req.user.id, date, method, lat: method === 'GPS' ? input.latitude : null, lon: method === 'GPS' ? input.longitude : null,
-      accuracy: method === 'GPS' ? locationAccuracy : null, distance: method === 'GPS' ? distance : null, status, approvedStart
+      id, employee: req.user.id, date, method, lat: (method === 'GPS' ? input.latitude : null) ?? null, lon: (method === 'GPS' ? input.longitude : null) ?? null,
+      accuracy: (method === 'GPS' ? locationAccuracy : null) ?? null, distance: (method === 'GPS' ? distance : null) ?? null, status, approvedStart: approvedStart ?? null
     });
 
     // Keep the attendance row and audit event atomic so a post-commit audit
@@ -191,11 +191,11 @@ router.post('/check-in', attendanceMutationLimiter, asyncRoute(async (req, res) 
       details:JSON.stringify({
         method,
         date,
-        distance_m:distance===null?null:Math.round(distance),
+        distance_m: (typeof distance === 'number' && Number.isFinite(distance)) ? Math.round(distance) : null,
         prior_open_shift_count:previousOpenShifts.length,
         prior_open_shifts:previousOpenShifts
       }),
-      ipAddress:req.ip
+      ipAddress:req.ip || null
     });
   });
   let hrNotified = false;
@@ -293,13 +293,13 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     }
     try {
       await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
-        id:rows[0].id, method, lat:method==='GPS'?input.latitude:null, lon:method==='GPS'?input.longitude:null, accuracy:method==='GPS'?input.accuracy:null
+        id:rows[0].id, method, lat:(method==='GPS'?input.latitude:null)??null, lon:(method==='GPS'?input.longitude:null)??null, accuracy:(method==='GPS'?input.accuracy:null)??null
       });
     } catch (methodErr: any) {
       if (methodErr?.code === 'ER_WARN_DATA_TRUNCATED' || methodErr?.errno === 1265) {
         const fallbackMethod = rows[0].check_in_method === 'WFH' ? 'WFH' : 'GPS';
         await connection.execute(`UPDATE attendance_records SET check_out_at=UTC_TIMESTAMP(), check_out_method=:method, check_out_latitude=:lat, check_out_longitude=:lon, check_out_accuracy_m=:accuracy WHERE id=:id`, {
-          id:rows[0].id, method:fallbackMethod, lat:fallbackMethod==='GPS'?input.latitude:null, lon:fallbackMethod==='GPS'?input.longitude:null, accuracy:fallbackMethod==='GPS'?input.accuracy:null
+          id:rows[0].id, method:fallbackMethod, lat:(fallbackMethod==='GPS'?input.latitude:null)??null, lon:(fallbackMethod==='GPS'?input.longitude:null)??null, accuracy:(fallbackMethod==='GPS'?input.accuracy:null)??null
         });
       } else {
         throw methodErr;
@@ -307,7 +307,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
     }
     const details = {
       method,date:String(rows[0].attendance_date).slice(0,10),
-      distance_m:distance===null?null:Math.round(distance),
+      distance_m:(typeof distance === 'number' && Number.isFinite(distance)) ? Math.round(distance) : null,
       elapsed_minutes:elapsedMinutes,worked_minutes:workedMinutes,lunch_minutes:lunchMinutes,
       short_shift_review_required:shortShiftReviewRequired,
       birthday_pass_applied:birthdayPassApplied
@@ -316,7 +316,7 @@ router.post('/check-out', attendanceMutationLimiter, asyncRoute(async (req, res)
       (id,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at)
       VALUES (:logId,:actorId,'ATTENDANCE_CHECK_OUT','attendance',:attendanceId,:details,:ipAddress,UTC_TIMESTAMP())`, {
       logId:crypto.randomUUID(),actorId:req.user.id,attendanceId:rows[0].id,
-      details:JSON.stringify(details),ipAddress:req.ip
+      details:JSON.stringify(details),ipAddress:req.ip || null
     });
     result = {id:rows[0].id,method,date:String(rows[0].attendance_date).slice(0,10),elapsedMinutes,workedMinutes,shortShiftReviewRequired,birthdayPassApplied};
   });
