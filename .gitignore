@@ -27,3 +27,9 @@ server/dist/
 
 # Local migration environment
 .env.runtime-migrate
+
+# Playwright artifacts
+playwright-report/
+test-results/*
+!test-results/.last-run.json
+

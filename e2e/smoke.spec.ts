@@ -838,5 +838,5 @@ test('Super Admin has full access to settings and audit while Standard Admin is 
   await expect(page.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Table view' }).click();
   const superAdminRow = page.locator('tr').filter({ hasText: 'Om Shah' });
-  await expect(superAdminRow.locator('.role-locked-badge')).toBeVisible();
+  await expect(superAdminRow.locator('.role-locked-badge').first()).toBeVisible();
 });

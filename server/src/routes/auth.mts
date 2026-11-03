@@ -97,7 +97,11 @@ router.post('/google', googleLoginLimiter, asyncRoute(async (req, res) => {
   await audit({ actorId: user.id, action: 'AUTH_GOOGLE_SIGN_IN', entityType: 'employee', entityId: user.id, details: { rememberMe, sessionId: session.sessionId }, ipAddress: req.ip });
 }));
 
-router.get('/me', requireAuth, asyncRoute(async (req, res) => res.json({ user: publicUser(req.user) })));
+router.get('/me', requireAuth, asyncRoute(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.json({ user: publicUser(req.user) });
+}));
 
 router.get('/sessions', requireAuth, asyncRoute(async (req, res) => {
   const currentHash = req.sessionId ? crypto.createHash('sha256').update(req.sessionId).digest('hex') : '';

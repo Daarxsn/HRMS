@@ -2795,6 +2795,7 @@ export {
   AuditPage,
   TeamPage,
   AdminAttendancePage,
+  EnterpriseHRPage,
   NotFoundPage,
   AppContext,
   useApp,
@@ -2802,7 +2803,8 @@ export {
   IconLogo,
   Toast,
   PageSkeletonLoader,
-  AppErrorBoundary
+  AppErrorBoundary,
+  NoAccess
 };
 
 export default App;

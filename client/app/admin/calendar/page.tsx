@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
-import { CalendarPage } from '../../../src/App';
+import { CalendarPage, NoAccess, useApp } from '../../../src/App';
 
 export default function Page() {
-  return <CalendarPage />;
+  const { user } = useApp() || {};
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || user?.role === 'SUPER_ADMIN' || user?.user_type === 'SUPER_ADMIN');
+  const isAdmin = user?.platform === 'ADMIN' || user?.role === 'ADMIN' || isSuperAdmin;
+
+  return isAdmin ? <CalendarPage /> : <NoAccess />;
 }

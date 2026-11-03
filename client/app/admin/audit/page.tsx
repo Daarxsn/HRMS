@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AuditPage } from '../../../src/App';
+import { AuditPage, NoAccess, useApp } from '../../../src/App';
 
 export default function Page() {
-  return <AuditPage />;
+  const { user } = useApp() || {};
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || user?.role === 'SUPER_ADMIN' || user?.user_type === 'SUPER_ADMIN');
+  const isAdmin = user?.platform === 'ADMIN' || user?.role === 'ADMIN' || isSuperAdmin;
+  const canAccess = isAdmin && (isSuperAdmin || user?.capabilities?.includes('audit_trail'));
+
+  return canAccess ? <AuditPage /> : <NoAccess />;
 }

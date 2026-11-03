@@ -29,11 +29,14 @@ try {
   try {
     await connection.beginTransaction();
     const ids = new Map();
+    await connection.execute(`DELETE FROM temporary_exits WHERE employee_id IN (SELECT id FROM employees WHERE email LIKE '%@example.test')`);
+    await connection.execute(`DELETE FROM leave_requests WHERE employee_id IN (SELECT id FROM employees WHERE email LIKE '%@example.test')`);
+    await connection.execute(`DELETE FROM attendance_records WHERE employee_id IN (SELECT id FROM employees WHERE email LIKE '%@example.test')`);
     for (const [code, name, email, type, role, title, wfh] of people) {
       const id = crypto.randomUUID();
       await connection.execute(`INSERT INTO employees (id, employee_code, full_name, email, role, user_type, status, title, joined_on, probation_end_date, wfh_enabled)
         VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, '2025-01-06', '2025-04-06', ?)
-        ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), role=VALUES(role), user_type=VALUES(user_type), title=VALUES(title), wfh_enabled=VALUES(wfh_enabled)`,
+        ON DUPLICATE KEY UPDATE email=VALUES(email), full_name=VALUES(full_name), role=VALUES(role), user_type=VALUES(user_type), title=VALUES(title), wfh_enabled=VALUES(wfh_enabled)`,
       [id, code, name, email, role, type, title, wfh]);
       const [found] = await connection.execute('SELECT id FROM employees WHERE email=?', [email]);
       ids.set(email, found[0].id);

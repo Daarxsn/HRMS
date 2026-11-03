@@ -34,6 +34,7 @@ export async function request(path: string, options: RequestOptions = {}): Promi
       ...options,
       headers,
       credentials: 'include',
+      cache: options.cache || 'no-store',
       signal: options.signal || controller?.signal
     });
 

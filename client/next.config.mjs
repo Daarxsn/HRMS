@@ -7,6 +7,7 @@ const __dirname = path.dirname(__filename);
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['127.0.0.1', '127.0.0.1:3000', 'localhost', 'localhost:3000'],
   turbopack: {
     resolveAlias: {
       'react-router-dom': './src/router-bridge.tsx',
@@ -24,7 +25,7 @@ const nextConfig = {
       {
         source: '/api/:path*',
         destination: process.env.NODE_ENV === 'development'
-          ? 'http://localhost:3001/api/:path*'
+          ? `${process.env.INTERNAL_API_ORIGIN || 'http://127.0.0.1:3001'}/api/:path*`
           : '/api/:path*',
       },
     ];

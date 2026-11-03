@@ -113,7 +113,7 @@ app.use(cookieParser());
 // only for the isolated, seeded demo/E2E environment and is capped to prevent abuse.
 const requestedE2EAuthLimit = Number(process.env.HRMS_E2E_AUTH_RATE_LIMIT || 0);
 const authRequestLimit = isolatedE2E && Number.isSafeInteger(requestedE2EAuthLimit)
-  && requestedE2EAuthLimit >= 40 && requestedE2EAuthLimit <= 300
+  && requestedE2EAuthLimit >= 40 && requestedE2EAuthLimit <= 3000
   ? requestedE2EAuthLimit
   : 40;
 app.use('/api/auth',rateLimit({windowMs:15*60*1000,limit:authRequestLimit,standardHeaders:true,legacyHeaders:false}));
