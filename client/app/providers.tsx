@@ -79,16 +79,30 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let live = true;
-    Promise.allSettled([get('/auth/me')]).then(([me]) => {
-      if (!live) return;
-      if (me.status === 'fulfilled') setUser(me.value.user);
-      if (me.status === 'rejected' && (me.reason as any)?.status !== 401) {
-        setBootError((me.reason as any)?.message || 'We could not reach the HRMS server.');
-      }
-      setLoading(false);
-    });
+    const safetyTimer = setTimeout(() => {
+      if (live) setLoading(false);
+    }, 5000);
+
+    Promise.allSettled([get('/auth/me')])
+      .then(([me]) => {
+        if (!live) return;
+        clearTimeout(safetyTimer);
+        if (me.status === 'fulfilled') setUser(me.value.user);
+        if (me.status === 'rejected' && (me.reason as any)?.status !== 401) {
+          setBootError((me.reason as any)?.message || 'We could not reach the HRMS server.');
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (live) {
+          clearTimeout(safetyTimer);
+          setLoading(false);
+        }
+      });
+
     return () => {
       live = false;
+      clearTimeout(safetyTimer);
     };
   }, []);
 
