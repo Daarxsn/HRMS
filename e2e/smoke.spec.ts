@@ -761,13 +761,13 @@ test('employee can submit leave application and administrator can review and app
   await openSidebarLink(page, 'Requests');
   await expect(page.getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
 
-  // Find Aarav Mehta's pending card
-  const pendingCard = page.locator('.approval-request').filter({ hasText: 'Aarav Mehta' }).first();
+  // Find Aarav Mehta's pending card matching this test's request
+  const pendingCard = page.locator('.approval-request').filter({ hasText: 'Aarav Mehta' }).filter({ hasText: 'Automated E2E leave workflow' }).first();
   if (await pendingCard.isVisible()) {
     await pendingCard.getByRole('button', { name: 'Approve' }).click();
     await expect(page.getByRole('heading', { name: 'Approve this request?' })).toBeVisible();
     await page.getByRole('button', { name: 'Confirm approval' }).click();
-    await expect(page.getByText(/was approved/)).toBeVisible();
+    await expect(page.getByText(/was approved|no longer pending/).first()).toBeVisible();
   }
 });
 

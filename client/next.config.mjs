@@ -8,6 +8,12 @@ const __dirname = path.dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ['127.0.0.1', '127.0.0.1:3000', 'localhost', 'localhost:3000'],
+  env: {
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || '',
+    VITE_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '',
+    VITE_API_URL: process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || '',
+  },
   turbopack: {
     resolveAlias: {
       'react-router-dom': './src/router-bridge.tsx',

@@ -165,7 +165,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   };
 
   const googleClientId =
-    (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID)) || '';
+    (typeof process !== 'undefined' &&
+      (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+        process.env.VITE_GOOGLE_CLIENT_ID ||
+        process.env.GOOGLE_CLIENT_ID)) ||
+    '';
 
   const content = loading ? (
     <div className="loading-screen">
